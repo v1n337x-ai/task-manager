@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { AiReview } from "./ai-review-panel";
 
 function csrf(): string | null {
   const raw = document.cookie
@@ -270,6 +271,8 @@ export function EmailPanel({
           )}
         </div>
       </section>
+
+      {activeThread ? <AiReview threadId={activeThread.id} threadSubject={activeThread.subject} /> : null}
     </div>
   );
 }

@@ -17,6 +17,8 @@ const PROTECTED_API_PREFIXES = [
   "/api/applications",
   "/api/master-data",
   "/api/settings",
+  "/api/pt-tracker",
+  "/api/ai",
   "/api/iterations",
   "/api/findings",
   "/api/test-cases",

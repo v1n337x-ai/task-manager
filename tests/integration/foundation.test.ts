@@ -208,10 +208,10 @@ describe.skipIf(!dbAvailable)("§59 end-to-end foundation chain", () => {
     expect(evidence.length).toBe(1);
 
     // §34: only a human approval is stored by this foundation — no business write.
-    await svc.recordApprovalDecision({ extractionId: extraction.id, decision: "approve", note: "reviewed" }, userId, {});
-    const decision = await testDb.aiApprovalDecision.findUniqueOrThrow({ where: { extractionId: extraction.id } });
+    await svc.recordApprovalDecision({ extractionId: extraction.id, decision: "approve", note: "reviewed", itemKey: null }, userId, {});
+    const decision = await testDb.aiApprovalDecision.findFirstOrThrow({ where: { extractionId: extraction.id, itemKey: "__run__" } });
     expect(decision.decision).toBe("approve");
-    await expect(svc.recordApprovalDecision({ extractionId: extraction.id, decision: "reject" }, userId, {})).rejects.toThrow();
+    await expect(svc.recordApprovalDecision({ extractionId: extraction.id, decision: "reject", itemKey: null }, userId, {})).rejects.toThrow();
   });
 
   it("14. every write so far left an audit trail (§35)", async () => {

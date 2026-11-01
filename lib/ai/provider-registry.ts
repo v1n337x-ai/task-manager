@@ -1,77 +1,165 @@
 /**
- * AI provider abstraction (Phase 2.1 brief §15-16).
- * Providers register a stable slug + label. A provider exposes a connection
- * test ONLY when its real integration contract (endpoint/model/auth) is known
- * in this project. We never invent endpoints — an unknown contract yields an
- * honest "unavailable" result instead of a fake "Connected".
+ * Provider registry (§5). "opencode" is configured in Settings but has NO
+ * implemented API contract in this build (honest §6 gate). The "mock" provider
+ * is a deterministic TEST fixture (§79) — never selectable in production.
  */
-export interface ProviderTestResult {
-  status: "PASSED" | "FAILED" | "UNAVAILABLE";
-  message: string;
-}
+import type { AiProviderPort, AiAnalyzeContextInput, AiProviderAnalyzeResult } from "./providers";
 
-export interface AiProviderMetadata {
-  slug: string;
-  label: string;
-  /** True when a real API contract is implemented in this codebase. */
-  contractAvailable: boolean;
-  /** Where the contract would live once supplied (documentation hint only). */
-  contractNote: string;
-}
+/** Naive but DETERMINISTIC keyword extraction over the given context — test-only. */
+function mockAnalyze(context: AiAnalyzeContextInput): AiProviderAnalyzeResult {
+  const messages = context.messages;
+  const evidenceFor = (messageIndex: number, excerpt: string, confidence: "HIGH" | "MEDIUM" | "LOW" = "HIGH") => ({
+    messageIndex,
+    excerpt,
+    confidence,
+  });
 
-export type ProviderConnector = (apiKey: string) => Promise<ProviderTestResult>;
+  const participants = new Map<string, { email: string; role: "pentester" | "developer" | "other" | "unknown"; quote: string; messageIndex: number }>();
+  messages.forEach((m, index) => {
+    if (!participants.has(m.from) && m.from) {
+      const body = (m.bodyText ?? "").toLowerCase();
+      let role: "pentester" | "developer" | "other" | "unknown" = "unknown";
+      const quote = (m.bodyText ?? "").slice(0, 140);
+      if (/retest|still (vulnerable|reproducible)|validated as (fixed|not passed)|retest(ed)? (and|result)|penetration/.test(body)) {
+        role = "pentester";
+      } else if (/fixed|deployed|release|patch|remediat/.test(body)) {
+        role = "developer";
+      } else if (m.from.includes("digialert") || /(pentester|tester)/.test(m.from)) {
+        role = "pentester";
+      } else if (m.from.includes("akasa")) {
+        role = "other";
+      }
+      participants.set(m.from, { email: m.from, role, quote, messageIndex: index });
+    }
+  });
 
-const REGISTRY: {
-  metadata: AiProviderMetadata;
-  connector?: ProviderConnector;
-}[] = [
-  {
-    metadata: {
-      slug: "opencode",
-      label: "OpenCode",
-      contractAvailable: false,
-      contractNote:
-        "No OpenCode API endpoint/model/authentication contract is available in this project yet.",
+  const findings: unknown[] = [];
+  const statusSignals: string[] = [];
+  messages.forEach((m, index) => {
+    const body = m.bodyText ?? "";
+    const lower = body.toLowerCase();
+    const explicitId = body.match(/F-\d{3}/)?.[0] ?? null;
+    const hasFixed = /(has been fixed|is fixed|are fixed|fixed and deployed|validated as fixed)/.test(lower);
+    const hasNotFixed = /(still vulnerable|still reproducible|not fixed|remains exploitable)/.test(lower);
+    if (hasFixed || hasNotFixed) {
+      statusSignals.push(m.index.toString(10));
+      findings.push({
+        identifierExplicit: explicitId,
+        identifierMark: explicitId ? "IDENTIFIER_EXPLICIT" : "IDENTIFIER_NOT_EXPLICIT",
+        title: explicitId ? `Finding ${explicitId}` : (body.split(/[.\n]/)[0] ?? "Reported issue").slice(0, 120),
+        titleMark: explicitId ? "EXPLICIT" : "AI_PROPOSED",
+        severity: /critical/.test(lower) ? "critical" : /high/.test(lower) ? "high" : /medium/.test(lower) ? "medium" : /low/.test(lower) ? "low" : "unknown",
+        severityMark: /severity:/.test(lower) ? "EXPLICIT" : "INFERRED",
+        description: body.slice(0, 500),
+        recommendation: null,
+        relatedTestCaseRefs: [],
+        iterationSignal: /iteration\s*(\d+)|retest/.test(lower) ? (Number(body.match(/iteration\s*(\d+)/i)?.[1] ?? 2)) : null,
+        iterationSignalExplicit: /iteration\s*\d+/i.test(lower),
+        statusSignal: hasFixed ? "fixed" : "not_fixed",
+        isNewFindingCandidate: body.includes("new finding"),
+        evidence: [evidenceFor(index, body.slice(0, 160).trim() || (m.bodyText ?? ""), hasFixed && hasNotFixed ? "MEDIUM" : "HIGH")],
+      });
+    }
+    const tc = body.match(/TC-\d{3}/)?.[0];
+    if ((tc || /test case/i.test(body)) && body.length > 0) {
+      findings.push({
+        identifierExplicit: null,
+        identifierMark: "IDENTIFIER_NOT_EXPLICIT",
+        title: `TestCase mention: ${tc ?? body.slice(0, 80)}`,
+        titleMark: "AI_PROPOSED",
+        severity: "unknown",
+        severityMark: "INFERRED",
+        description: body.slice(0, 300),
+        recommendation: null,
+        relatedTestCaseRefs: tc ? [tc] : [],
+        iterationSignal: /iteration\s*(\d+)/i.exec(body)?.[1] ? Number(/iteration\s*(\d+)/i.exec(body)![1]) : null,
+        iterationSignalExplicit: /iteration\s*\d+/i.test(body),
+        statusSignal: null,
+        isNewFindingCandidate: false,
+        evidence: [evidenceFor(index, body.slice(0, 160).trim())],
+      });
+    }
+  });
+
+  return {
+    ok: true,
+    structured: {
+      schemaVersion: "AI_EXTRACTION_V1",
+      threadSummary:
+        `Thread "${context.subject ?? "(no subject)"}" contains ${messages.length} messages between ${[...participants.keys()].join(", ")}. ` +
+        (statusSignals.length ? `Status signals detected in messages ${statusSignals.join(", ")}.` : "No status statements detected."),
+      participants: [...participants.values()].map((p) => ({
+        email: p.email,
+        name: p.email,
+        proposedRole: p.role === "other" || p.role === "unknown" ? "unknown" : p.role,
+        roleBasis: p.role === "unknown" ? "INFERRED" : "EXPLICIT",
+        confidence: p.role === "unknown" ? "LOW" : "MEDIUM",
+        score: p.role === "unknown" ? 0.35 : 0.72,
+        evidence: [evidenceFor(p.messageIndex, p.quote, p.role === "unknown" ? "LOW" : "MEDIUM")],
+      })),
+      findings,
+      testCases: [],
+      iterationSignals: messages.some((m) => /iteration|retest/i.test(m.bodyText ?? "")) || context.iterations.length > 0
+        ? [{
+            candidateIteration: 1,
+            typeSignal: "retest",
+            explicitOrInferred: "INFERRED",
+            confidence: "MEDIUM",
+        evidence: [evidenceFor(0, messages[0]?.bodyText?.slice(0, 140) ?? "thread context", "MEDIUM")],
+          }]
+        : [],
+      evidence: [evidenceFor(0, context.subject ?? "(no subject)", "MEDIUM")],
     },
-  },
-];
-
-export class UnknownProviderError extends Error {
-  constructor(slug: string) {
-    super(`Unknown AI provider: ${slug}`);
-    this.name = "UnknownProviderError";
-  }
+    provider: "mock",
+    modelRaw: "deterministic-test-mock",
+    warnings: ["Deterministic mock provider — evidence derived from fixture heuristics (test environments only)."],
+  };
 }
 
-export function listProviders(): AiProviderMetadata[] {
-  return REGISTRY.map((r) => r.metadata);
+export function listRunProviders(): { slug: string; contractAvailable: boolean; testOnly: boolean }[] {
+  return [
+    { slug: "opencode", contractAvailable: false, testOnly: false },
+    { slug: "mock", contractAvailable: true, testOnly: true },
+  ];
 }
 
-export function providerLabel(slug: string): string {
-  return REGISTRY.find((r) => r.metadata.slug === slug)?.metadata.label ?? slug;
-}
-
-export function isValidProvider(slug: string): boolean {
-  return REGISTRY.some((r) => r.metadata.slug === slug);
-}
-
-/**
- * Server-side connection test (Phase 2.1 §14).
- * Never fabricates success: unknown contract ⇒ UNAVAILABLE with the honest message.
- */
-export async function testProviderConnection(slug: string, apiKey: string): Promise<ProviderTestResult> {
-  const entry = REGISTRY.find((r) => r.metadata.slug === slug);
-  if (!entry) throw new UnknownProviderError(slug);
-  if (!entry.connector) {
+export function resolveProviderPort(slug: string, isProduction: boolean): AiProviderPort {
+  if (slug === "opencode") {
     return {
-      status: "UNAVAILABLE",
-      message: `Connection test unavailable until the ${entry.metadata.label} provider endpoint/configuration is supplied. The API key is stored safely and will be used when the contract is added.`,
+      slug: "opencode",
+      modelRaw: null,
+      contractAvailable: false,
+      analyze: async () => {
+        throw new ProviderUnavailablePortError();
+      },
     };
   }
-  try {
-    return await entry.connector(apiKey);
-  } catch (error) {
-    // Provider errors must never echo the key.
-    return { status: "FAILED", message: `Provider test failed: ${String(error).slice(0, 200)}` };
+  if (slug === "mock") {
+    if (isProduction) {
+      throw new MockProviderProductionError();
+    }
+    return {
+      slug: "mock",
+      modelRaw: "deterministic-test-mock",
+      contractAvailable: true,
+      analyze: async (context) => mockAnalyze(context),
+    };
+  }
+  throw new UnknownProviderSlugError(slug);
+}
+
+class ProviderUnavailablePortError extends Error {
+  constructor() {
+    super("OpenCode provider contract is not implemented in this build — no endpoint to call (§6).");
+  }
+}
+class MockProviderProductionError extends Error {
+  constructor() {
+    super("Mock AI provider is unavailable in production environments.");
+  }
+}
+class UnknownProviderSlugError extends Error {
+  constructor(slug: string) {
+    super(`Unknown AI provider slug: ${slug}`);
   }
 }

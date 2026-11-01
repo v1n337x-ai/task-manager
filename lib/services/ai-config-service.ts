@@ -10,7 +10,7 @@
 import { prisma } from "@/lib/db";
 import { AppError, NotFoundError, ValidationError } from "@/lib/errors";
 import { decryptSecret, encryptSecret, isEncryptedEnvelope } from "@/lib/crypto/secrets";
-import { isValidProvider, providerLabel, testProviderConnection, UnknownProviderError } from "@/lib/ai/provider-registry";
+import { isValidProvider, providerLabel, testProviderConnection, UnknownProviderError } from "@/lib/ai/provider-catalog";
 import { recordAudit } from "@/lib/audit";
 import { logger } from "@/lib/logger";
 

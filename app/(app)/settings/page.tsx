@@ -4,7 +4,7 @@ import { DataTable } from "@/components/data-table";
 import { formatDate } from "@/lib/utils";
 import { listSchemaVersions, listImportJobs, listExportJobs } from "@/lib/services/job-foundation-service";
 import { getAiConfigSafe } from "@/lib/services/ai-config-service";
-import { listProviders } from "@/lib/ai/provider-registry";
+import { listProviders } from "@/lib/ai/provider-catalog";
 import { AiConfigPanel } from "./ai-config-panel";
 
 export const metadata: Metadata = { title: "Settings" };

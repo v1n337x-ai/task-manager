@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { formatDateTime } from "@/lib/utils";
 import type { AiConfigSafeDTO } from "@/lib/services/ai-config-service";
-import type { AiProviderMetadata } from "@/lib/ai/provider-registry";
+import type { AiProviderMetadata } from "@/lib/ai/provider-catalog";
 
 const selectClass = "w-full rounded-lg border border-stroke bg-card px-3 py-2 text-[14px]";
 

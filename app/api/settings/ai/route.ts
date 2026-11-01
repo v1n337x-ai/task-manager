@@ -1,14 +1,14 @@
-import { NextResponse, type NextRequest } from "next/server";
+﻿import { NextResponse, type NextRequest } from "next/server";
 import { requireSessionH, toErrorResponse } from "@/lib/api-helpers";
 import { getAiConfigSafe, saveAiConfig, clearAiApiKey } from "@/lib/services/ai-config-service";
 import { SaveAiConfigSchema } from "@/lib/validation/schemas";
 import { ValidationError } from "@/lib/errors";
-import { listProviders } from "@/lib/ai/provider-registry";
+import { listProviders } from "@/lib/ai/provider-catalog";
 
 /**
- * AI configuration endpoints (Phase 2.1 §12-13):
- * GET  → safe DTO only (never apiKey/encryptedApiKey/decryptedApiKey)
- * POST → SAVE (encrypt + upsert) or CLEAR_KEY (explicit, confirmed in UI)
+ * AI configuration endpoints (Phase 2.1 Â§12-13):
+ * GET  â†’ safe DTO only (never apiKey/encryptedApiKey/decryptedApiKey)
+ * POST â†’ SAVE (encrypt + upsert) or CLEAR_KEY (explicit, confirmed in UI)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -54,3 +54,4 @@ export async function POST(request: NextRequest) {
     return toErrorResponse(error);
   }
 }
+

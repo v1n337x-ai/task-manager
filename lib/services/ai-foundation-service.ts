@@ -106,16 +106,30 @@ export async function addEvidence(input: AddEvidenceInput, actorUserId: number |
 }
 
 /**
- * Human decision on an AI proposal (brief section 34): `approve|reject` only.
+ * Human decision on an AI proposal (§39): approve | reject | correct.
  * Applying an approved proposal is a separate, auditable service action —
- * the AI pipeline itself can never flip business rows.
+ * the AI pipeline itself can never flip business rows. Item-level decisions
+ * (§74) flow through the same table with itemKey + correctedValue.
  */
-export async function recordApprovalDecision(input: { extractionId: number; decision: "approve" | "reject"; note?: string | null }, actorUserId: number, ctx: { ip?: string; userAgent?: string }) {
+export async function recordApprovalDecision(
+  input: {
+    extractionId: number;
+    decision: "approve" | "reject" | "correct" | "partially_approved";
+    note?: string | null;
+    itemKey?: string | null; // Phase 5 §74: null/undefined = whole-run decision
+    correctedValue?: unknown; // CORRECT payload
+  },
+  actorUserId: number,
+  ctx: { ip?: string; userAgent?: string },
+) {
   const extraction = await prisma.aiExtraction.findUnique({ where: { id: input.extractionId } });
   if (!extraction) throw NotFoundError("AI extraction");
 
-  const dup = await prisma.aiApprovalDecision.findUnique({ where: { extractionId: input.extractionId } });
-  if (dup) throw ConflictError("A decision already exists for this extraction.");
+  const itemKey = input.itemKey ?? "__run__";
+  const dup = await prisma.aiApprovalDecision.findUnique({
+    where: { extractionId_itemKey: { extractionId: input.extractionId, itemKey } },
+  });
+  if (dup) throw ConflictError("A decision already exists for this item.");
 
   await prisma.$transaction([
     prisma.aiApprovalDecision.create({
@@ -124,11 +138,16 @@ export async function recordApprovalDecision(input: { extractionId: number; deci
         decision: input.decision,
         decidedByUserId: actorUserId,
         note: input.note ?? null,
+        itemKey, // "__run__" sentinel keeps the whole-run decision unique
+        correctedValue: (input.correctedValue ?? undefined) as never,
       },
     }),
     prisma.aiExtraction.update({
       where: { id: extraction.id },
-      data: { status: (await prisma.masterValue.findUniqueOrThrow({ where: { domain_value: { domain: "extraction_status", value: input.decision === "approve" ? "approved" : "rejected" } } })).id, reviewedByUserId: actorUserId, reviewedAt: new Date() },
+      data: {
+        reviewedByUserId: actorUserId,
+        reviewedAt: new Date(),
+      },
     }),
   ]);
 
@@ -137,12 +156,19 @@ export async function recordApprovalDecision(input: { extractionId: number; deci
     entityType: "AiExtraction",
     entityId: extraction.id,
     oldValue: "pending",
-    newValue: input.decision,
+    newValue: JSON.stringify({ decision: input.decision, itemKey: input.itemKey ?? "run" }),
     source: "HUMAN",
     actorUserId,
     ip: ctx.ip,
     userAgent: ctx.userAgent,
   });
+
+  // Extraction run status reflects the whole-run decision only.
+  if (!input.itemKey && ["approve", "reject", "partially_approved"].includes(input.decision)) {
+    const statusValue = input.decision === "approve" ? "approved" : input.decision === "reject" ? "rejected" : "needs_review";
+    const statusId = (await prisma.masterValue.findUniqueOrThrow({ where: { domain_value: { domain: "extraction_status", value: statusValue } } })).id;
+    await prisma.aiExtraction.update({ where: { id: extraction.id }, data: { status: statusId } });
+  }
 }
 
 export async function listExtractions(statusValue?: string) {
