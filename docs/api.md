@@ -21,6 +21,8 @@ All endpoints live under `/api` (Next.js route handlers). Zod validation at the 
 | `/api/email-threads` | POST | live (idempotent creation by subject hash) |
 | `/api/participants` | GET | live (ai/override effective roles) |
 | `/api/ai/extractions` | GET, POST | live for record-keeping; **no agent wired** |
+| `/api/settings/ai` | GET, POST | live — safe DTO GET (never returns key); POST SAVE (encrypt+upsert) / CLEAR_KEY |
+| `/api/settings/ai/test` | POST | live — server-side connection test with honest provider result |
 | `/api/audit` | GET | live (protected read) |
 | `/api/imports` | GET, POST | GET live (job registry); POST → 501 Coming in Phase 3 |
 | `/api/exports` | GET, POST | GET live (job registry); POST → 501 (Phase 3 xlsx / Phase 4-5 pptx) |

@@ -63,6 +63,15 @@ Login failure returns one generic message for unknown-email and wrong-password (
 | EML ingestion | `email_threads`/`email_messages`/`email_participants`/`email_recipients`/`email_attachments` + `normalizeSubjectForThread()` | Phase 6 |
 | AI extraction | `ai_extractions` + `ai_evidence` + `ai_approval_decisions` (AI never writes business rows directly) | Phase 5 |
 
+## Secret storage (Phase 2.1)
+
+`lib/crypto/secrets.ts` — AES-256-GCM envelope (`v1:` + base64(ciphertext‖iv‖tag)) keyed by the dedicated
+`APP_ENCRYPTION_KEY` server secret (validated distinct from `AUTH_SECRET`/`APPLICATION_SECRET`).
+Only the AI provider API key is stored there today; the plaintext never reaches the client,
+the audit log, or the logger. The provider abstraction (`lib/ai/provider-registry.ts`) refuses
+to invent endpoints: without a real contract, connection tests return `UNAVAILABLE` with an
+honest message, never a fake "Connected".
+
 ## Errors & logging
 
 - `AppError` codes (`lib/errors.ts`) map to HTTP statuses; production UI shows safe messages only.

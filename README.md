@@ -56,6 +56,20 @@ Security headers (CSP/XFO/nosniff/referrer/permissions) in `next.config.ts`; sec
 1. **Session implementation — `jose` JWT instead of NextAuth@5 (beta).** Original decision DL-04; reason: single-credential scope + beta-quality of next-auth@5 at pin time; replacement keeps all DL-04 properties (JWT in HTTP-only cookie, 12h TTL, credentials flow) and leaves an upgrade path to Auth.js without changing cookie semantics; impact on Phases 3–5: none (auth is a self-contained seam).
 2. **bcryptjs instead of native bcrypt.** Pure-JS implementation of the same bcrypt algorithm; avoids a Windows native build toolchain; identical security properties (cost default 12). Impact: none for later phases; swapping to native `bcrypt` is a drop-in change of one module.
 
+## Phase 2.1 — AI API Key Configuration (delivered)
+
+Settings → AI is now a real configuration panel (single provider: **OpenCode**; provider registry structured for future additions):
+
+- API key stored ONLY as AES-256-GCM envelope in `ai_configurations.encryptedApiKey`, keyed by the dedicated **`APP_ENCRYPTION_KEY`** env secret (never `AUTH_SECRET`, enforced by env validation).
+- GET `/api/settings/ai` returns the safe DTO only (`configured`, provider, enabled, masked `•••• abcd` hint, test state) — the key/ciphertext never leaves the server.
+- Save semantics: empty input preserves the stored key; a new key replaces it; **Remove key** requires a confirmation dialog and deletes the envelope.
+- **No reveal button** by design (§11).
+- Connection test runs server-side; with no OpenCode contract in the project it honestly reports *"Connection test unavailable until the OpenCode provider endpoint/configuration is supplied."* (never a fake "Connected").
+- Audit entries record `ai_config.saved` / `key_replaced` / `key_cleared` / `test` — never the key value.
+- No mail/IMAP/SMTP configuration exists — .eml upload remains the Phase 6 path.
+
+End-to-end tests for the above live in `tests/integration/ai-config.test.ts` (11 tests; suite total 34).
+
 ## History preservation rule (§60)
 
 Iterations, finding states (Open → Fixed / Not Fixed), test-case states (including `removed`) are append-only per (entity × iteration). Emails remain individually traceable. Nothing is ever silently overwritten.

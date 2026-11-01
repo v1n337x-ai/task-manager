@@ -24,6 +24,7 @@ Local: `docker run -d --name tm-postgres -p 5432:5432 -v tmpgdata:/var/lib/postg
 | Findings (§23-26) | `findings`, `finding_iteration_states`, `finding_status_history` (append-only) |
 | Email (§27-31) | `email_threads` (subjectHash key), `email_messages` (RFC Message-ID), `email_recipients`, `email_participants` (role + role_source + confidence + human override), `email_attachments` (sha256, processing status) |
 | AI (§32-34) | `ai_extractions`, `ai_evidence`, `ai_approval_decisions` |
+| AI configuration (Phase 2.1) | `ai_configurations` (one row per provider; API key stored ONLY as AES-256-GCM envelope `v1:…`; last4 display hint; test state NOT_TESTED/PASSED/FAILED/UNAVAILABLE) |
 | Audit (§35) | `audit_logs` (source: HUMAN/EXCEL_IMPORT/EML/AI/SYSTEM) |
 | Jobs (§36) | `import_jobs` (sha256 idempotency key), `export_jobs` |
 | Schema contract (§37) | `schema_versions` ("PT Tracker" v1.0, 39 columns) |

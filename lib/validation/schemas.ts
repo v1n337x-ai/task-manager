@@ -199,3 +199,32 @@ export const UpsertParticipantSchema = z.object({
   roleSource: z.enum(["UNKNOWN", "RULE", "AI", "HUMAN"]).default("RULE"),
   confidence: z.number().int().min(0).max(100).nullable().optional(),
 });
+
+// ---------------------------------------------------------------------------
+// Phase 2.1 — AI provider configuration (§12)
+// ---------------------------------------------------------------------------
+export const AiProviderValue = z.enum(["opencode"]);
+
+/**
+ * POST /api/settings/ai
+ * `action:"SAVE"`      — save provider/enabled; apiKey blank ⇒ preserve stored key;
+ *                        apiKey non-empty ⇒ replace (min length enforced).
+ * `action:"CLEAR_KEY"` — explicit, confirmation-gated in the UI; wipes the envelope.
+ */
+export const SaveAiConfigSchema = z
+  .object({
+    action: z.enum(["SAVE", "CLEAR_KEY"]).default("SAVE"),
+    provider: AiProviderValue,
+    enabled: z.boolean().optional(),
+    // The key itself: trim; optional. Format flexibility owned by the provider.
+    apiKey: z.string().trim().min(0).max(400).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.action === "SAVE" && typeof data.apiKey === "string" && data.apiKey.length > 0 && data.apiKey.length < 8) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["apiKey"], message: "API key looks too short (minimum 8 characters)." });
+    }
+  });
+
+export const TestAiConfigSchema = z.object({
+  provider: AiProviderValue,
+});

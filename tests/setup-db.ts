@@ -63,6 +63,7 @@ afterAll(async () => {
 export async function resetTestData(): Promise<void> {
   await testDb.$executeRawUnsafe(`
     TRUNCATE TABLE 
+      "ai_configurations",
       "email_recipients", "email_attachments", "email_messages", "email_participants",
       "email_threads",
       "ai_evidence", "ai_approval_decisions", "ai_extractions",

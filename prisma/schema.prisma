@@ -56,6 +56,13 @@ enum RecipientKind {
   BCC
 }
 
+enum AiTestStatus {
+  NOT_TESTED
+  PASSED
+  FAILED
+  UNAVAILABLE
+}
+
 // ---------------------------------------------------------------------------
 // Authentication
 // ---------------------------------------------------------------------------
@@ -682,4 +689,26 @@ model SchemaVersion {
 
   @@unique([trackerName, version])
   @@map("schema_versions")
+}
+
+// ---------------------------------------------------------------------------
+// AI configuration (Phase 2.1) — one row per provider (single active config per
+// provider now; future providers get their own row without schema redesign).
+// The API key is stored ONLY as an encrypted secret — never plaintext
+// (Phase 2.1 brief sections 5-7). Never exposed through APIs/audit/logs.
+// ---------------------------------------------------------------------------
+model AiConfiguration {
+  id              Int          @id @default(autoincrement())
+  provider        String       @unique // slug: "opencode"
+  encryptedApiKey String? // AES-256-GCM envelope — never returned to clients
+  apiKeyLast4     String? // display hint only ("•••• abcd")
+  enabled         Boolean      @default(true)
+  lastTestedAt    DateTime?
+  lastTestStatus  AiTestStatus @default(NOT_TESTED)
+  lastTestMessage String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([enabled])
+  @@map("ai_configurations")
 }

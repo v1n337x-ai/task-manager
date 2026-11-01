@@ -16,6 +16,7 @@ const PROTECTED_PREFIXES = ["/dashboard", "/pt-tracker", "/reports", "/settings"
 const PROTECTED_API_PREFIXES = [
   "/api/applications",
   "/api/master-data",
+  "/api/settings",
   "/api/iterations",
   "/api/findings",
   "/api/test-cases",

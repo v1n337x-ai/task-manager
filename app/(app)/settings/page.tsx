@@ -3,6 +3,9 @@ import { PageHeader, PageBody } from "@/components/page-header";
 import { DataTable } from "@/components/data-table";
 import { formatDate } from "@/lib/utils";
 import { listSchemaVersions, listImportJobs, listExportJobs } from "@/lib/services/job-foundation-service";
+import { getAiConfigSafe } from "@/lib/services/ai-config-service";
+import { listProviders } from "@/lib/ai/provider-registry";
+import { AiConfigPanel } from "./ai-config-panel";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -21,6 +24,10 @@ export default async function SettingsPage() {
   } catch (error) {
     dbError = String(error);
   }
+
+  // AI configuration — server reads the safe DTO only (no key material).
+  const aiInitial = await getAiConfigSafe().catch(() => null);
+  const aiProviders = listProviders();
 
   return (
     <>
@@ -110,20 +117,26 @@ export default async function SettingsPage() {
         </section>
 
         {/* AI */}
-        <section className="panel px-5 py-4" aria-labelledby="s-ai">
-          <h2 id="s-ai" className="text-[13px] font-semibold uppercase tracking-wide text-ink">AI</h2>
-          <p className="mt-1 text-[13px] text-muted">Extraction records, evidence and human approvals land in Phase 5.</p>
-          <p className="mt-2 inline-flex rounded-full bg-band px-3 py-1 text-[12px] font-semibold text-muted">
-            Coming in Phase 5
-          </p>
+        <section aria-labelledby="s-ai" id="ai">
+          <h2 id="s-ai" className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-ink">AI</h2>
+          {aiInitial ? (
+            <AiConfigPanel initial={aiInitial} providers={aiProviders} />
+          ) : (
+            <div className="panel px-5 py-4" role="alert">
+              <p className="text-[13px] font-semibold text-ink">AI configuration unavailable</p>
+              <p className="mt-1 text-[13px] text-muted">The database was not reachable, so the configuration could not be loaded.</p>
+            </div>
+          )}
         </section>
 
         {/* EMAIL PROCESSING */}
         <section className="panel px-5 py-4" aria-labelledby="s-email">
           <h2 id="s-email" className="text-[13px] font-semibold uppercase tracking-wide text-ink">Email Processing</h2>
           <p className="mt-1 text-[13px] text-muted">
-            EML upload, thread reconstruction and the conversation UI arrive in Phase 6. The database
-            foundations (threads, messages, participants, attachments) already exist.
+            EML upload, thread reconstruction and the conversation UI arrive in Phase 6. The database foundations
+            (threads, messages, participants, attachments) already exist. There is no mail-server configuration —
+            users will upload <code className="rounded bg-band px-1">.eml</code> files directly; the AI key configured
+            above is consumed by that future analysis.
           </p>
           <p className="mt-2 inline-flex rounded-full bg-band px-3 py-1 text-[12px] font-semibold text-muted">
             Coming in Phase 6
