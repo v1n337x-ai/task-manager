@@ -1,0 +1,685 @@
+// Task Manager — Phase 2 database schema
+// Source of truth: Phase 1 Blueprint (06-Database-Architecture.md) adapted to the
+// Phase 2 brief (sections 14-41). Legacy helpers (Counts/Pivot/Detail1) are NOT
+// stored — they become SQL views in Phase 3.
+//
+// Conventions:
+// - All business tables use integer autoincrement PKs.
+// - Controlled vocabularies (statuses, types, severities...) live in `MasterValue`
+//   ("domain" + "value" + "label") and every business table FK-references it.
+//   That satisfies brief section 14 (database-backed master data) and section 40.
+// - Prisma enums exist only for fixed infrastructure vocabularies the app itself
+//   defines (audit source, recipient kind, evidence source type, role source).
+// - Historical state is NEVER overwritten: iterations / test-case states /
+//   finding states are append rows (brief sections 18-26, 60).
+// - Every relation is named on BOTH sides ("allRelationsNamed" discipline).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Fixed infrastructure enums
+// ---------------------------------------------------------------------------
+enum AuditSource {
+  HUMAN
+  EXCEL_IMPORT
+  EML
+  AI
+  SYSTEM
+}
+
+enum EvidenceSourceType {
+  EMAIL_MESSAGE
+  EMAIL_ATTACHMENT
+  APPLICATION
+  ITERATION
+  FINDING
+  TEST_CASE
+}
+
+enum ParticipantRoleSource {
+  UNKNOWN
+  RULE
+  AI
+  HUMAN
+}
+
+enum RecipientKind {
+  TO
+  CC
+  BCC
+}
+
+// ---------------------------------------------------------------------------
+// Authentication
+// ---------------------------------------------------------------------------
+model User {
+  id           Int       @id @default(autoincrement())
+  email        String    @unique
+  passwordHash String
+  displayName  String
+  isSuperuser  Boolean   @default(true) // Phase 2: single credential; flag kept for later phases
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  auditLogs        AuditLog[]
+  importJobs       ImportJob[]           @relation("import_job_user")
+  exportJobs       ExportJob[]           @relation("export_job_user")
+  aiApprovals      AiApprovalDecision[]  @relation("ai_decision_user")
+  findingHistories FindingStatusHistory[] @relation("fsh_actor_user")
+
+  @@index([isActive])
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// Master data (brief section 14)
+// Controlled vocabularies used across the whole application.
+// ---------------------------------------------------------------------------
+model MasterValue {
+  id        Int      @id @default(autoincrement())
+  domain    String // application_type | environment | scope | application_status | engagement_status
+  // iteration_status | iteration_type | test_case_status | finding_status |
+  // severity | finding_iteration_status | assessment_source | participant_role |
+  // alias_type | attachment_status | extraction_status | job_status
+  value     String // canonical key, e.g. "web", "initial_scan", "critical"
+  label     String // display, e.g. "Web", "Initial Scan", "Critical"
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  appTypes      Application[]           @relation("app_type")
+  appScopes     Application[]           @relation("app_scope")
+  appEnvs       Application[]           @relation("app_env")
+  appStatuses   Application[]           @relation("app_status")
+  engScopes     Engagement[]            @relation("eng_scope")
+  engSources    Engagement[]            @relation("eng_source")
+  engStatuses   Engagement[]            @relation("eng_status")
+  iterTypes     Iteration[]             @relation("iter_type")
+  iterStatuses  Iteration[]             @relation("iter_status")
+  tcStatuses    TestCase[]              @relation("tc_status")
+  tciStatuses   TestCaseIteration[]     @relation("tci_status")
+  fndSeverities Finding[]               @relation("fnd_severity")
+  fndStatuses   Finding[]               @relation("fnd_status")
+  fisSeverities FindingIterationState[] @relation("fis_severity")
+  fisStatuses   FindingIterationState[] @relation("fis_status")
+  aliasTypes    ApplicationAlias[]      @relation("alias_type")
+  attStatuses   EmailAttachment[]       @relation("att_status")
+  extStatuses   AiExtraction[]          @relation("ext_status")
+  impStatuses   ImportJob[]             @relation("imp_status")
+  expStatuses   ExportJob[]             @relation("exp_status")
+  partRoles     EmailParticipant[]      @relation("participant_role")
+  partOverride  EmailParticipant[]      @relation("participant_role_override")
+
+  @@unique([domain, value])
+  @@index([domain, isActive])
+  @@map("master_values")
+}
+
+model Contact {
+  id        Int      @id @default(autoincrement())
+  fullName  String // e.g. "Kenneth Fernandes"
+  org       String   @default("Akasa Air") // "Akasa Air" | "Digialert (iWeen)" | ...
+  email     String?
+  phone     String?
+  notes     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  primaryOfApplications Application[]               @relation("app_primary_poc")
+  assignedToApplications ApplicationAssignedMember[]
+  findingHistories      FindingStatusHistory[]      @relation("fsh_actor_contact")
+
+  @@index([org, fullName])
+  @@unique([org, fullName])
+  @@map("contacts")
+}
+
+// ---------------------------------------------------------------------------
+// Applications (brief sections 15-17)
+// ---------------------------------------------------------------------------
+model Application {
+  id              Int      @id @default(autoincrement())
+  name            String   @unique // verbatim workbook name, e.g. "Akasa Air Ecommerce - PROD"
+  displayName     String // human-friendly display
+  applicationType Int // FK -> application_type master value
+  scope           Int // FK -> scope master value (internal | external)
+  environment     Int // FK -> environment master value (prod | uat | staging | dev | unknown)
+  site            Int // lifecycle master value (application_status)
+  isActive        Boolean  @default(true)
+  webUrl          String?
+  apiFqdn         String?
+  rawTarget       String? // unparsed URL/APK/package original text
+  primaryPocId    Int?
+  assessedOn      DateTime? // informational only until Phase 3 import
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  applicationTypeRef MasterValue                 @relation("app_type", fields: [applicationType], references: [id])
+  scopeRef           MasterValue                 @relation("app_scope", fields: [scope], references: [id])
+  environmentRef     MasterValue                 @relation("app_env", fields: [environment], references: [id])
+  statusRef          MasterValue                 @relation("app_status", fields: [site], references: [id])
+  primaryPoc         Contact?                    @relation("app_primary_poc", fields: [primaryPocId], references: [id])
+  aliases            ApplicationAlias[]
+  assignedMembers    ApplicationAssignedMember[]
+  engagements        Engagement[]
+  testCases          TestCase[]
+  findings           Finding[]
+  emailThreads       EmailThread[]
+  aiExtractions      AiExtraction[]
+
+  @@index([applicationType])
+  @@index([isActive])
+  @@index([name])
+  @@map("applications")
+}
+
+model ApplicationAssignedMember {
+  id            Int      @id @default(autoincrement())
+  applicationId Int
+  contactId     Int
+  note          String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  contact     Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([applicationId, contactId])
+  @@index([contactId])
+  @@map("application_assigned_members")
+}
+
+model ApplicationAlias {
+  id            Int      @id @default(autoincrement())
+  applicationId Int
+  alias         String // verbatim ("Cash Portal UAT", "cash-portal", subject fragment)
+  aliasType     Int // FK -> alias_type master value
+  normalized    String // lowercase, trimmed, punctuation-normalized for matching
+  isPrimary     Boolean  @default(false) // mark one anchor alias per application
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  application  Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  aliasTypeRef MasterValue @relation("alias_type", fields: [aliasType], references: [id])
+
+  @@unique([applicationId, normalized])
+  @@index([normalized])
+  @@map("application_aliases")
+}
+
+// ---------------------------------------------------------------------------
+// Engagement → Iteration (brief sections 18-19)
+// ---------------------------------------------------------------------------
+model Engagement {
+  id               Int       @id @default(autoincrement())
+  applicationId    Int
+  name             String // e.g. "Cash Portal Phase-1 VAPT"
+  scope            Int // FK -> scope master value
+  assessmentSource Int // FK -> assessment_source (source / tool)
+  target           String? // URL / APK / FQDN actually engaged
+  mailSubject      String? // initiating email thread title (tracker E column)
+  status           Int // FK -> engagement_status
+  requestedDate    DateTime?
+  reportDate       DateTime?
+  sortOrder        Int? // tracker S.no equivalent (display only — never a key, per DL-03)
+  notes            String?
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  application Application  @relation(fields: [applicationId], references: [id])
+  scopeRef    MasterValue  @relation("eng_scope", fields: [scope], references: [id])
+  sourceRef   MasterValue  @relation("eng_source", fields: [assessmentSource], references: [id])
+  statusRef   MasterValue  @relation("eng_status", fields: [status], references: [id])
+  iterations  Iteration[]
+
+  @@unique([applicationId, name])
+  @@index([applicationId])
+  @@index([status])
+  @@map("engagements")
+}
+
+model Iteration {
+  id             Int       @id @default(autoincrement())
+  engagementId   Int
+  number         Int // 1, 2, 3, ... — NOT limited to two (brief section 19)
+  iterationType  Int // FK -> iteration_type (initial_scan | retest | follow_up | other)
+  name           String    @default("Initial Scan")
+  startDate      DateTime?
+  reportDate     DateTime?
+  status         Int // FK -> iteration_status (planned | in_progress | completed | pending | cancelled)
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  engagement       Engagement             @relation(fields: [engagementId], references: [id])
+  iterationTypeRef MasterValue            @relation("iter_type", fields: [iterationType], references: [id])
+  statusRef        MasterValue            @relation("iter_status", fields: [status], references: [id])
+  testCases        TestCaseIteration[]
+  findingStates    FindingIterationState[]
+  findingHistories FindingStatusHistory[]
+
+  @@unique([engagementId, number])
+  @@index([engagementId])
+  @@index([number])
+  @@map("iterations")
+}
+
+// ---------------------------------------------------------------------------
+// Test cases & iteration state (brief sections 20-22)
+// ---------------------------------------------------------------------------
+model TestCase {
+  id            Int      @id @default(autoincrement())
+  applicationId Int
+  code          String // "TC-001" — stable identity, never renumbered for history
+  title         String
+  description   String?
+  category      String? // free until controlled categories are agreed
+  currentStatus Int // FK -> test_case_status (surface status)
+  isActive      Boolean  @default(true) // removed test cases stay, deactivated instead
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  application Application          @relation(fields: [applicationId], references: [id])
+  statusRef   MasterValue          @relation("tc_status", fields: [currentStatus], references: [id])
+  iterations  TestCaseIteration[]
+
+  @@unique([applicationId, code])
+  @@index([applicationId])
+  @@index([code])
+  @@map("test_cases")
+}
+
+model TestCaseIteration {
+  id          Int      @id @default(autoincrement())
+  testCaseId  Int
+  iterationId Int
+  status      Int // FK -> test_case_status (incl. removed / not_retested)
+  notes       String?
+  evidenceUrl String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  testCase  TestCase    @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+  iteration Iteration   @relation(fields: [iterationId], references: [id], onDelete: Cascade)
+  statusRef MasterValue @relation("tci_status", fields: [status], references: [id])
+
+  @@unique([testCaseId, iterationId])
+  @@index([iterationId])
+  @@index([testCaseId])
+  @@map("test_case_iterations")
+}
+
+// ---------------------------------------------------------------------------
+// Findings & iteration state (brief sections 23-26)
+// ---------------------------------------------------------------------------
+model Finding {
+  id            Int      @id @default(autoincrement())
+  applicationId Int
+  code          String // "F-001" — stable identity across iterations
+  title         String
+  description   String?
+  severity      Int // FK -> severity (critical | high | medium | low | info)
+  currentStatus Int // FK -> finding_status (open | fixed | not_fixed | accepted_risk | removed | duplicate)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  application     Application             @relation(fields: [applicationId], references: [id])
+  severityRef     MasterValue             @relation("fnd_severity", fields: [severity], references: [id])
+  statusRef       MasterValue             @relation("fnd_status", fields: [currentStatus], references: [id])
+  iterationStates FindingIterationState[]
+  history         FindingStatusHistory[]
+  aiProposals     AiApprovalDecision[]
+
+  @@unique([applicationId, code])
+  @@index([applicationId])
+  @@index([code])
+  @@index([severity])
+  @@map("findings")
+}
+
+// State matrix: one row per (finding × iteration). Historical iterations keep
+// their own rows — an update to Iteration 2 never overwrites Iteration 1.
+// `status` includes open / fixed / not_fixed / not_retested / removed /
+// out_of_scope / not_applicable / unknown (brief sections 24-25).
+model FindingIterationState {
+  id           Int       @id @default(autoincrement())
+  findingId    Int
+  iterationId  Int
+  severity     Int // severity as observed in this iteration
+  status       Int // FK -> finding_iteration_status
+  firstSeenAt  DateTime?
+  retestNote   String?
+  evidenceJson Json? // evidence pointers (Phase 5 fills)
+  comments     String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  finding     Finding     @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  iteration   Iteration   @relation(fields: [iterationId], references: [id], onDelete: Cascade)
+  severityRef MasterValue @relation("fis_severity", fields: [severity], references: [id])
+  statusRef   MasterValue @relation("fis_status", fields: [status], references: [id])
+
+  @@unique([findingId, iterationId])
+  @@index([findingId])
+  @@index([iterationId])
+  @@map("finding_iteration_states")
+}
+
+// Append-only status trail for a finding (brief section 26).
+model FindingStatusHistory {
+  id             Int         @id @default(autoincrement())
+  findingId      Int
+  iterationId    Int? // iteration this change belongs to
+  oldStatusCode  String?
+  newStatusCode  String
+  note           String?
+  actorUserId    Int? // null => system/AI/import
+  actorContactId Int? // vendor analyst / POC when the actor is a contact
+  source         AuditSource @default(HUMAN)
+  createdAt      DateTime    @default(now())
+
+  finding      Finding    @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  iteration    Iteration? @relation(fields: [iterationId], references: [id])
+  actorUser    User?      @relation("fsh_actor_user", fields: [actorUserId], references: [id])
+  actorContact Contact?   @relation("fsh_actor_contact", fields: [actorContactId], references: [id])
+
+  @@index([findingId, createdAt])
+  @@index([source])
+  @@map("finding_status_history")
+}
+
+// ---------------------------------------------------------------------------
+// Email foundations (brief sections 27-31) — EML ingestion lands in Phase 6.
+// ---------------------------------------------------------------------------
+model EmailThread {
+  id             Int      @id @default(autoincrement())
+  applicationId  Int? // resolved linkage (nullable until matching works)
+  subject        String // display subject of the thread
+  subjectHash    String // deterministic match key (sha256 of normalized subject)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  application Application?    @relation(fields: [applicationId], references: [id])
+  messages    EmailMessage[]
+
+  @@unique([subjectHash, applicationId])
+  @@index([subjectHash])
+  @@index([applicationId])
+  @@map("email_threads")
+}
+
+model EmailMessage {
+  id                Int       @id @default(autoincrement())
+  threadId          Int
+  messageId         String    @unique // RFC 5322 Message-ID
+  inReplyTo         String?
+  references        String?
+  fromParticipantId Int
+  subject           String?
+  sentAt            DateTime?
+  bodyText          String?
+  bodyHtml          String?
+  sourceFile        String? // original .eml path/reference — raw bytes never stored in DB
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  thread      EmailThread      @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  fromContact EmailParticipant @relation("participant_from", fields: [fromParticipantId], references: [id])
+  recipients  EmailRecipient[]
+  attachments EmailAttachment[]
+  extractions AiExtraction[]
+
+  @@index([threadId, sentAt])
+  @@index([fromParticipantId])
+  @@map("email_messages")
+}
+
+model EmailParticipant {
+  id                Int                   @id @default(autoincrement())
+  emailAddress      String                @unique // lowercase-normalized
+  name              String
+  displayName       String
+  role              Int // FK -> participant_role master value
+  roleSource        ParticipantRoleSource @default(UNKNOWN)
+  confidence        Int? // 0..100 AI confidence
+  humanOverrideRole Int? // FK -> participant_role; effective role prefers this
+  overrideNote      String?
+  overrideByUserId  Int?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  roleRef        MasterValue      @relation("participant_role", fields: [role], references: [id])
+  roleOverrideRef MasterValue?    @relation("participant_role_override", fields: [humanOverrideRole], references: [id])
+  messagesFrom   EmailMessage[]   @relation("participant_from")
+  recipients     EmailRecipient[] @relation("participant_recipient")
+
+  @@index([name])
+  @@index([emailAddress])
+  @@map("email_participants")
+}
+
+model EmailRecipient {
+  id            Int           @id @default(autoincrement())
+  messageId     Int
+  kind          RecipientKind
+  participantId Int?
+  email         String
+  name          String?
+  createdAt     DateTime      @default(now())
+
+  message     EmailMessage      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  participant EmailParticipant? @relation("participant_recipient", fields: [participantId], references: [id])
+
+  @@index([messageId])
+  @@index([participantId])
+  @@unique([messageId, kind, email])
+  @@map("email_recipients")
+}
+
+model EmailAttachment {
+  id               Int      @id @default(autoincrement())
+  messageId        Int
+  filename         String // display name only — NEVER trusted as a security control
+  contentType      String?
+  sizeBytes        Int?
+  storageReference String? // future: object-store key (no execution of files, brief 31)
+  sha256           String?
+  processingStatus Int // FK -> attachment_status (pending | processing | processed | failed | skipped)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  message             EmailMessage   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  processingStatusRef MasterValue    @relation("att_status", fields: [processingStatus], references: [id])
+  extractions         AiExtraction[] @relation("attachment_extractions")
+  evidence            AiEvidence[]
+
+  @@index([messageId])
+  @@index([sha256])
+  @@unique([messageId, filename, sha256])
+  @@map("email_attachments")
+}
+
+// ---------------------------------------------------------------------------
+// AI extraction foundations (brief sections 32-34) — no agent wired yet.
+// ---------------------------------------------------------------------------
+model AiExtraction {
+  id                 Int       @id @default(autoincrement())
+  sourceMessageId    Int? // EML that triggered extraction (nullable by design)
+  sourceAttachmentId Int?
+  applicationId      Int? // proposed application
+  extractionType     String // e.g. "finding_status", "participant_role", "test_case_removed"
+  rawOutput          String?
+  structuredOutput   Json?
+  confidence         Int? // 0..100
+  status             Int // FK -> extraction_status (pending | processed | needs_review | approved | rejected | failed)
+  reviewedByUserId   Int?
+  reviewedAt         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  sourceMessage    EmailMessage?        @relation(fields: [sourceMessageId], references: [id])
+  sourceAttachment EmailAttachment?     @relation("attachment_extractions", fields: [sourceAttachmentId], references: [id])
+  application      Application?         @relation(fields: [applicationId], references: [id])
+  statusRef        MasterValue          @relation("ext_status", fields: [status], references: [id])
+  evidence         AiEvidence[]
+  approvals        AiApprovalDecision[]
+
+  @@index([status])
+  @@index([sourceMessageId])
+  @@index([sourceAttachmentId])
+  @@map("ai_extractions")
+}
+
+// Every AI-derived value is traceable to its source + excerpt + confidence.
+model AiEvidence {
+  id             Int                @id @default(autoincrement())
+  extractionId   Int
+  sourceType     EvidenceSourceType
+  sourceId       Int // logical pointer (message id / attachment id / row id)
+  attachmentId   Int? // real FK when sourceType == EMAIL_ATTACHMENT
+  field          String // which field this evidence supports ("finding.status", "participant.role"...)
+  extractedValue String
+  excerpt        String? // quoted span from the source
+  confidence     Int?
+  createdAt      DateTime           @default(now())
+
+  extraction AiExtraction     @relation(fields: [extractionId], references: [id], onDelete: Cascade)
+  attachment EmailAttachment? @relation(fields: [attachmentId], references: [id])
+
+  @@index([extractionId])
+  @@index([sourceType, sourceId])
+  @@map("ai_evidence")
+}
+
+// Human review gate: AI never writes business rows directly (brief sections 34/61).
+model AiApprovalDecision {
+  id              Int      @id @default(autoincrement())
+  extractionId    Int      @unique
+  findingId       Int? // optional target row the proposal concerns
+  decision        String // approve | reject (Zod-validated; AI cannot bypass)
+  decidedByUserId Int
+  decidedAt       DateTime @default(now())
+  note            String?
+  createdAt       DateTime @default(now())
+
+  extraction AiExtraction @relation(fields: [extractionId], references: [id], onDelete: Cascade)
+  finding    Finding?     @relation(fields: [findingId], references: [id])
+  decidedBy  User         @relation("ai_decision_user", fields: [decidedByUserId], references: [id])
+
+  @@index([extractionId])
+  @@index([decidedByUserId])
+  @@map("ai_approval_decisions")
+}
+
+// ---------------------------------------------------------------------------
+// Audit (brief section 35)
+// ---------------------------------------------------------------------------
+model AuditLog {
+  id          Int         @id @default(autoincrement())
+  actorUserId Int? // null for system/AI/import
+  actorLabel  String? // "system", "excel import", "AI candidate"...
+  action      String // e.g. "application.create", "iteration.create"
+  entityType  String
+  entityId    String?
+  fieldName   String? // when a single field changed
+  oldValue    String?
+  newValue    String?
+  source      AuditSource @default(HUMAN)
+  ip          String?
+  userAgent   String?
+  metadata    Json?
+  createdAt   DateTime    @default(now())
+
+  actor User? @relation(fields: [actorUserId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([source])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Import / export job foundations (brief section 36) — processors land Ph 3+.
+// ---------------------------------------------------------------------------
+model ImportJob {
+  id              Int       @id @default(autoincrement())
+  filename        String
+  mimeType        String?
+  sha256          String    @unique // reproducible import idempotency
+  type            String    @default("xlsx_tracker")
+  status          Int // FK -> job_status (queued | running | completed | failed | cancelled)
+  options         Json?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  rowsProcessed   Int       @default(0)
+  rowsFailed      Int       @default(0)
+  errorCount      Int       @default(0)
+  summary         Json? // parsed workbook fingerprint (rowsIn/imports/skips...)
+  createdByUserId Int?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  statusRef MasterValue @relation("imp_status", fields: [status], references: [id])
+  createdBy User?       @relation("import_job_user", fields: [createdByUserId], references: [id])
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([sha256])
+  @@map("import_jobs")
+}
+
+model ExportJob {
+  id              Int       @id @default(autoincrement())
+  target          String    @default("xlsx") // xlsx | pptx
+  targetVersion   String? // template/report version used
+  status          Int // FK -> job_status
+  params          Json?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  rowsProcessed   Int       @default(0)
+  rowsFailed      Int       @default(0)
+  errorCount      Int       @default(0)
+  createdByUserId Int?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  statusRef MasterValue @relation("exp_status", fields: [status], references: [id])
+  createdBy User?       @relation("export_job_user", fields: [createdByUserId], references: [id])
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("export_jobs")
+}
+
+// ---------------------------------------------------------------------------
+// Schema versioning (brief section 37)
+// ---------------------------------------------------------------------------
+model SchemaVersion {
+  id           Int      @id @default(autoincrement())
+  trackerName  String   @default("PT Tracker")
+  version      String   @default("1.0")
+  columnsCount Int      @default(39) // the fixed 39-column workbook contract (DL-02)
+  columnMap    Json? // ordered column letter -> header/type contract
+  notes        String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@unique([trackerName, version])
+  @@map("schema_versions")
+}

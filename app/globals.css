@@ -1,0 +1,128 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens extracted from the Phase 1 PPT analysis (DL-01 / DL-08):
+ * ink bands #1F1F1F, accent rules #CF1325, severity palette, white pages,
+ * Bebas Neue display + Poppins body.
+ */
+@theme {
+  --color-ink: #1f1f1f;
+  --color-ink-2: #2b2b2b;
+  --color-ink-3: #333333;
+  --color-muted: #7a7a7a;
+  --color-muted-2: #6b6b6b;
+  --color-page: #ffffff;
+  --color-page-soft: #f8f8f8;
+  --color-card: #ffffff;
+  --color-band: #f3f3f3;
+  --color-stroke: #e0e0e0;
+  --color-stroke-soft: #d6d6d6;
+  --color-accent: #cf1325;
+  --color-accent-orange: #e86b10;
+  --color-progress: #1a73e8;
+  --color-good: #2e862e;
+  --color-sev-critical: #cf1325;
+  --color-sev-high: #e86b10;
+  --color-sev-medium: #f5a623;
+  --color-sev-low: #4a90d9;
+  --color-sev-info: #9e9e9e;
+  --color-tint-a: #eef3fa;
+  --color-tint-b: #f6f7f9;
+
+  --font-display: var(--font-bebas), "Arial Narrow", sans-serif;
+  --font-body: var(--font-poppins), "Segoe UI", sans-serif;
+
+  --radius-card: 12px;
+  --radius-panel: 10px;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 4%);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-page-soft);
+  color: var(--color-ink-2);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.01em;
+}
+
+/* Header band + red rule motif from every PPT content slide (DL-01 §2). */
+.brand-band {
+  background: var(--color-ink);
+  color: #ffffff;
+  border-bottom: 3px solid var(--color-accent);
+}
+
+/* PPT KPI card anatomy: white card, hairline border, top accent bar. */
+.kpi-card {
+  background: var(--color-card);
+  border: 1px solid var(--color-stroke);
+  border-radius: var(--radius-card);
+  position: relative;
+  overflow: hidden;
+}
+.kpi-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: var(--kpi-accent, var(--color-accent));
+}
+
+/* Panel (rounded rect adj≈5000 in the deck). */
+.panel {
+  background: var(--color-card);
+  border: 1px solid var(--color-stroke);
+  border-radius: var(--radius-panel);
+}
+
+/* Table styling from the register slides. */
+.tm-table {
+  background: var(--color-card);
+  border: 1px solid var(--color-stroke);
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+  width: 100%;
+}
+.tm-table thead th {
+  background: var(--color-tint-b);
+  color: var(--color-ink);
+  font-weight: 600;
+  text-align: left;
+  border-bottom: 1px solid var(--color-stroke);
+}
+.tm-table tbody tr + tr {
+  border-top: 1px solid var(--color-stroke-soft);
+}
+.tm-table tbody tr:hover {
+  background: var(--color-band);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Accessible "skip" region default */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
