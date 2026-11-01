@@ -71,9 +71,11 @@ export const MASTER_VALUES: MasterSeedEntry[] = [
   { domain: "finding_status", value: "open", label: "Open", sortOrder: 1 },
   { domain: "finding_status", value: "fixed", label: "Fixed", sortOrder: 2 },
   { domain: "finding_status", value: "not_fixed", label: "Not Fixed", sortOrder: 3 },
-  { domain: "finding_status", value: "accepted_risk", label: "Accepted Risk (CAR)", sortOrder: 4 },
-  { domain: "finding_status", value: "removed", label: "Removed", sortOrder: 5 },
-  { domain: "finding_status", value: "duplicate", label: "Duplicate", sortOrder: 6 },
+  { domain: "finding_status", value: "reopened", label: "Reopened", sortOrder: 4 },
+  { domain: "finding_status", value: "retested", label: "Retested", sortOrder: 5 },
+  { domain: "finding_status", value: "accepted_risk", label: "Accepted Risk (CAR)", sortOrder: 6 },
+  { domain: "finding_status", value: "removed", label: "Removed", sortOrder: 7 },
+  { domain: "finding_status", value: "duplicate", label: "Duplicate", sortOrder: 8 },
 
   // finding per-iteration status (brief section 24: Fixed / Not Fixed required;
   // Phase 3 §17 adds New; §16 removal states)

@@ -10,6 +10,7 @@ import { getApplicationTracker, type TrackerFinding, type ApplicationTrackerDeta
 import { prisma } from "@/lib/db";
 import { ExportExcelButton } from "../excel-actions";
 import { EmailPanel, type ThreadSummary } from "./email-panel";
+import { StateReviewPanel } from "./state-review-panel";
 import {
   FindingDialog,
   IterationDialog,
@@ -49,7 +50,7 @@ export default async function ApplicationTrackerPage({
     throw error;
   }
 
-  const activeTab = ["overview", "findings", "iterations", "test-cases", "email", "history"].includes(tab ?? "") ? tab! : "overview";
+  const activeTab = ["overview", "findings", "iterations", "test-cases", "email", "state-review", "history"].includes(tab ?? "") ? tab! : "overview";
   const iterations: IterationLite[] = detail.iterations.map((i) => ({ id: i.id, number: i.number, name: i.name }));
   const testCasesLite: TestCaseLite[] = detail.testCases.map((t) => ({ id: t.id, code: t.code, title: t.title }));
   const baseUrl = `/pt-tracker/${id}`;
@@ -102,6 +103,7 @@ export default async function ApplicationTrackerPage({
             ["iterations", "Iterations"],
             ["test-cases", "Test Cases"],
             ["email", "Email"],
+            ["state-review", "State Review"],
             ["history", "History"],
           ] as [string, string][]).map(([key, label]) => (
             <Link
@@ -127,6 +129,9 @@ export default async function ApplicationTrackerPage({
           ) : null}
           {activeTab === "email" ? (
             <EmailPanel applicationId={id} threads={emailThreads} />
+          ) : null}
+          {activeTab === "state-review" ? (
+            <StateReviewPanel applicationId={id} />
           ) : null}
           {activeTab === "history" ? (
             <section aria-label="History" className="panel px-5 py-4">

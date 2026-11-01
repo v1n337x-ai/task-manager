@@ -291,6 +291,7 @@ model Iteration {
 
 // ---------------------------------------------------------------------------
 // Test cases & iteration state (brief sections 20-22)
+// NOTE: finding surface states gain reopened/retested (Phase 6 state machine).
 // ---------------------------------------------------------------------------
 model TestCase {
   id            Int      @id @default(autoincrement())
@@ -628,7 +629,47 @@ model AiApprovalDecision {
 }
 
 // ---------------------------------------------------------------------------
-// Audit (brief section 35)
+// Authoritative state decisions (Phase 6) — append-only approval ledger.
+// Every AI-derived or human-corrected authoritative change is recorded here
+// with its full provenance chain; calculateAuthoritativeState reads this
+// ledger chronologically (§22/§25). No destructive automation exists.
+// ---------------------------------------------------------------------------
+enum StateDecisionSource {
+  STRUCTURED_DATA
+  COMMUNICATION
+  AI_APPROVED
+  HUMAN_CORRECTION
+  SYSTEM_CALCULATION
+}
+
+model AuthoritativeStateDecision {
+  id               Int                 @id @default(autoincrement())
+  entityType       String // finding | test_case | iteration
+  entityId         Int
+  iterationId      Int? // iteration context when known (resolved via iterationResolution)
+  iterationNumber  Int?
+  previousState    String?
+  newState         String
+  verification     String? // finding fixes: DEVELOPER_REPORTED | RETEST_VERIFIED | NONE
+  resolutionMethod String // EXPLICIT_COMMUNICATION | INFERRED_CONTEXT | HUMAN_CORRECTION | AI_APPROVED | SYSTEM_DEFAULT
+  decisionSource   StateDecisionSource
+  sourceMessageId  Int?
+  sourceThreadId   Int?
+  aiExtractionId   Int?
+  evidenceRef      Json? // minimal pointers [{excerpt, messageIndex}]
+  approvedByUserId Int?
+  approvedAt       DateTime?
+  reason           String?
+  createdAt        DateTime            @default(now())
+
+  @@unique([entityType, entityId, iterationId, newState, sourceMessageId])
+  @@index([entityType, entityId])
+  @@index([decisionSource])
+  @@map("authoritative_state_decisions")
+}
+
+// ---------------------------------------------------------------------------
+// Audit (brief section 35, extended §39)
 // ---------------------------------------------------------------------------
 model AuditLog {
   id          Int         @id @default(autoincrement())
