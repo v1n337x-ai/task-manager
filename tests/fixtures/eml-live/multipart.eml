@@ -1,0 +1,31 @@
+From: vineet@digialert.test
+To: appowner@akasa.test
+Subject: =?UTF-8?Q?Report_with_attachment_=E2=80=93_CashPortal?=
+Date: Thu, 05 Nov 2026 09:00:00 +0530
+Message-ID: <multi-0100@digialert.test>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="MIX-BOUNDARY"
+
+--MIX-BOUNDARY
+Content-Type: multipart/alternative; boundary="ALT-BOUNDARY"
+
+--ALT-BOUNDARY
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+Please find the report attached. Also check the inline note.
+
+--ALT-BOUNDARY
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+<html><body><p>HTML body with <strong>markup</strong></p><script>alert('evil')</script><img src=3D"https://evil.test/x.png"></body></html>
+
+--ALT-BOUNDARY--
+--MIX-BOUNDARY
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: attachment; filename="report-notes.txt"
+Content-Transfer-Encoding: base64
+
+Q2FzaCBQb3J0YWwgY2hlY2sgbm90ZXM=
+--MIX-BOUNDARY--

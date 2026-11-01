@@ -1,0 +1,10 @@
+From: Vineet S <vineet@digialert.test>
+To: Akasa Team <appowner@akasa.test>
+Cc: security@akasa.test
+Subject: VAPT Findings - Application X
+Date: Mon, 02 Nov 2026 09:30:00 +0530
+Message-ID: <chainA-0001@digialert.test>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+
+Iteration 1 report contains 3 findings for Application X.

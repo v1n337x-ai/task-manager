@@ -98,7 +98,7 @@ export async function overrideParticipantRole(input: { participantEmail: string;
   });
 }
 
-export async function createThread(input: { applicationId?: number | null; subject: string }, _actorUserId: number | null) {
+export async function createThread(input: { applicationId?: number | null; subject: string; participantKey?: string }, _actorUserId: number | null) {
   const normalized = normalizeSubjectForThread(input.subject);
   if (!normalized) throw ValidationError("Thread subject is required after normalization.");
   const hash = subjectHash(input.subject);
@@ -107,7 +107,12 @@ export async function createThread(input: { applicationId?: number | null; subje
   if (dup) return dup; // idempotent thread creation for repeated subject matches
 
   const thread = await prisma.emailThread.create({
-    data: { applicationId: input.applicationId ?? null, subject: normalized, subjectHash: hash },
+    data: {
+      applicationId: input.applicationId ?? null,
+      subject: normalized,
+      subjectHash: hash,
+      participantKey: input.participantKey ?? "",
+    },
   });
   await recordAudit({
     action: "email_thread.create",
@@ -217,6 +222,7 @@ export async function createAttachmentMeta(input: CreateAttachmentMetaInput, act
   return row;
 }
 
+/** Email foundations (brief sections 27-31). Phase 2 stores thread/message/participant/attachment metadata only — actual EML parsing lands in Phase 6. */
 export async function listThreads(applicationId?: number) {
   return prisma.emailThread.findMany({
     where: applicationId ? { applicationId } : undefined,

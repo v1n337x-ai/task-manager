@@ -7,7 +7,9 @@ import { DataTable } from "@/components/data-table";
 import { StatusBadge, SeverityBadge } from "@/components/badges";
 import { Timeline } from "@/components/timeline";
 import { getApplicationTracker, type TrackerFinding, type ApplicationTrackerDetail } from "@/lib/services/tracker-service";
+import { prisma } from "@/lib/db";
 import { ExportExcelButton } from "../excel-actions";
+import { EmailPanel, type ThreadSummary } from "./email-panel";
 import {
   FindingDialog,
   IterationDialog,
@@ -24,8 +26,8 @@ export const metadata: Metadata = { title: "Application" };
 
 /**
  * Application detail (§8-§11, §46-§47): Overview / Findings / Iterations /
- * Test Cases / History tabs. Conversation functionality stays in Phase 6
- * (informational section only — not rebuilt here).
+ * Test Cases / Email / History tabs. Phase 4 adds the Email tab with the
+ * .eml pipeline and reconstructed conversations (sanitized rendering only).
  */
 export default async function ApplicationTrackerPage({
   params,
@@ -47,10 +49,22 @@ export default async function ApplicationTrackerPage({
     throw error;
   }
 
-  const activeTab = ["overview", "findings", "iterations", "test-cases", "history"].includes(tab ?? "") ? tab! : "overview";
+  const activeTab = ["overview", "findings", "iterations", "test-cases", "email", "history"].includes(tab ?? "") ? tab! : "overview";
   const iterations: IterationLite[] = detail.iterations.map((i) => ({ id: i.id, number: i.number, name: i.name }));
   const testCasesLite: TestCaseLite[] = detail.testCases.map((t) => ({ id: t.id, code: t.code, title: t.title }));
   const baseUrl = `/pt-tracker/${id}`;
+
+  const threadRows = await prisma.emailThread.findMany({
+    where: { applicationId: id },
+    include: { messages: { orderBy: { sentAt: "desc" }, take: 1 } },
+    orderBy: { updatedAt: "desc" },
+  });
+  const emailThreads: ThreadSummary[] = threadRows.map((t) => ({
+    id: t.id,
+    subject: t.subject,
+    messageCount: t.messages.length,
+    lastSentAt: t.messages[0]?.sentAt?.toISOString() ?? null,
+  }));
 
   const statusValueFor = (label: string) => label.toLowerCase().replace(/ /g, "_");
 
@@ -87,6 +101,7 @@ export default async function ApplicationTrackerPage({
             ["findings", "Findings"],
             ["iterations", "Iterations"],
             ["test-cases", "Test Cases"],
+            ["email", "Email"],
             ["history", "History"],
           ] as [string, string][]).map(([key, label]) => (
             <Link
@@ -109,6 +124,9 @@ export default async function ApplicationTrackerPage({
           {activeTab === "iterations" ? <IterationsTab detail={detail} statusValueFor={statusValueFor} /> : null}
           {activeTab === "test-cases" ? (
             <TestCasesTab detail={detail} iterations={iterations} statusValueFor={statusValueFor} />
+          ) : null}
+          {activeTab === "email" ? (
+            <EmailPanel applicationId={id} threads={emailThreads} />
           ) : null}
           {activeTab === "history" ? (
             <section aria-label="History" className="panel px-5 py-4">

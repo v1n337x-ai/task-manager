@@ -34,3 +34,14 @@ coverage/
 
 # local docker volume dumps
 .docker/
+
+# EML storage (original uploaded files are machine-local and never committed)
+/storage/
+
+
+# live verification artifacts
+.verify-cookies.txt
+.v21cookies.txt
+.p3cookies.txt
+.export.xlsx
+_payload*
