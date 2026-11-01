@@ -86,7 +86,7 @@ export const CreateIterationSchema = z.object({
 
 export const SeverityValue = z.enum(["critical", "high", "medium", "low", "info"]);
 export const FindingStatusValue = z.enum(["open", "fixed", "not_fixed", "accepted_risk", "removed", "duplicate"]);
-export const FindingIterationStatusValue = z.enum(["open", "fixed", "not_fixed", "not_retested", "removed", "out_of_scope", "not_applicable", "unknown"]);
+export const FindingIterationStatusValue = z.enum(["open", "new", "fixed", "not_fixed", "not_retested", "removed", "out_of_scope", "not_applicable", "unknown"]);
 
 export const CreateFindingSchema = z.object({
   applicationId: z.number().int().positive(),
@@ -107,7 +107,7 @@ export const SetFindingIterationStateSchema = z.object({
   comments: optionalText,
 });
 
-export const TestCaseStatusValue = z.enum(["included", "not_tested", "passed", "failed", "removed", "not_retested", "out_of_scope", "not_applicable", "unknown"]);
+export const TestCaseStatusValue = z.enum(["included", "tested", "not_tested", "passed", "failed", "removed", "retested", "not_retested", "out_of_scope", "not_applicable", "unknown"]);
 
 export const CreateTestCaseSchema = z.object({
   applicationId: z.number().int().positive(),

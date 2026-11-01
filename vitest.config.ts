@@ -9,6 +9,8 @@ export default defineConfig({
     setupFiles: [],
     testTimeout: 30000,
     hookTimeout: 30000,
+    // The DB integration suites share one test database — run sequentially.
+    fileParallelism: false,
   },
   resolve: {
     alias: {

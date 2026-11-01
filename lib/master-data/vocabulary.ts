@@ -54,16 +54,18 @@ export const MASTER_VALUES: MasterSeedEntry[] = [
   { domain: "iteration_status", value: "completed", label: "Completed", sortOrder: 4 },
   { domain: "iteration_status", value: "cancelled", label: "Cancelled", sortOrder: 5 },
 
-  // test-case states (brief section 21)
+  // test-case states (brief section 21; Phase 3 §46 adds Tested / Retested)
   { domain: "test_case_status", value: "included", label: "Included", sortOrder: 1 },
-  { domain: "test_case_status", value: "not_tested", label: "Not Tested", sortOrder: 2 },
+  { domain: "test_case_status", value: "tested", label: "Tested", sortOrder: 2 },
   { domain: "test_case_status", value: "passed", label: "Passed", sortOrder: 3 },
   { domain: "test_case_status", value: "failed", label: "Failed", sortOrder: 4 },
   { domain: "test_case_status", value: "removed", label: "Removed", sortOrder: 5 },
-  { domain: "test_case_status", value: "not_retested", label: "Not Retested", sortOrder: 6 },
-  { domain: "test_case_status", value: "out_of_scope", label: "Out of Scope", sortOrder: 7 },
-  { domain: "test_case_status", value: "not_applicable", label: "Not Applicable", sortOrder: 8 },
-  { domain: "test_case_status", value: "unknown", label: "Unknown", sortOrder: 9 },
+  { domain: "test_case_status", value: "retested", label: "Retested", sortOrder: 6 },
+  { domain: "test_case_status", value: "not_retested", label: "Not Retested", sortOrder: 7 },
+  { domain: "test_case_status", value: "not_tested", label: "Not Tested", sortOrder: 8 },
+  { domain: "test_case_status", value: "out_of_scope", label: "Out of Scope", sortOrder: 9 },
+  { domain: "test_case_status", value: "not_applicable", label: "Not Applicable", sortOrder: 10 },
+  { domain: "test_case_status", value: "unknown", label: "Not Specified", sortOrder: 11 },
 
   // finding surface status
   { domain: "finding_status", value: "open", label: "Open", sortOrder: 1 },
@@ -73,15 +75,17 @@ export const MASTER_VALUES: MasterSeedEntry[] = [
   { domain: "finding_status", value: "removed", label: "Removed", sortOrder: 5 },
   { domain: "finding_status", value: "duplicate", label: "Duplicate", sortOrder: 6 },
 
-  // finding per-iteration status (brief section 24: Fixed / Not Fixed required)
+  // finding per-iteration status (brief section 24: Fixed / Not Fixed required;
+  // Phase 3 §17 adds New; §16 removal states)
   { domain: "finding_iteration_status", value: "open", label: "Open", sortOrder: 1 },
-  { domain: "finding_iteration_status", value: "fixed", label: "Fixed", sortOrder: 2 },
-  { domain: "finding_iteration_status", value: "not_fixed", label: "Not Fixed", sortOrder: 3 },
-  { domain: "finding_iteration_status", value: "not_retested", label: "Not Retested", sortOrder: 4 },
-  { domain: "finding_iteration_status", value: "removed", label: "Removed", sortOrder: 5 },
-  { domain: "finding_iteration_status", value: "out_of_scope", label: "Out of Scope", sortOrder: 6 },
-  { domain: "finding_iteration_status", value: "not_applicable", label: "Not Applicable", sortOrder: 7 },
-  { domain: "finding_iteration_status", value: "unknown", label: "Unknown", sortOrder: 8 },
+  { domain: "finding_iteration_status", value: "new", label: "New", sortOrder: 2 },
+  { domain: "finding_iteration_status", value: "fixed", label: "Fixed", sortOrder: 3 },
+  { domain: "finding_iteration_status", value: "not_fixed", label: "Not Fixed", sortOrder: 4 },
+  { domain: "finding_iteration_status", value: "not_retested", label: "Not Retested", sortOrder: 5 },
+  { domain: "finding_iteration_status", value: "removed", label: "Removed", sortOrder: 6 },
+  { domain: "finding_iteration_status", value: "out_of_scope", label: "Out of Scope", sortOrder: 7 },
+  { domain: "finding_iteration_status", value: "not_applicable", label: "Not Applicable", sortOrder: 8 },
+  { domain: "finding_iteration_status", value: "unknown", label: "Unknown / Not Specified", sortOrder: 9 },
 
   // severities (PPT palette; CAR is a status, not a severity — DL-06 decision 3)
   { domain: "severity", value: "critical", label: "Critical", sortOrder: 1 },
@@ -139,12 +143,15 @@ export const MASTER_VALUES: MasterSeedEntry[] = [
   { domain: "extraction_status", value: "rejected", label: "Rejected", sortOrder: 5 },
   { domain: "extraction_status", value: "failed", label: "Failed", sortOrder: 6 },
 
-  // import/export job states (brief section 36)
+  // job/import/export states (brief section 36; Phase 3 §29 pipeline states)
   { domain: "job_status", value: "queued", label: "Queued", sortOrder: 1 },
-  { domain: "job_status", value: "running", label: "Running", sortOrder: 2 },
-  { domain: "job_status", value: "completed", label: "Completed", sortOrder: 3 },
-  { domain: "job_status", value: "failed", label: "Failed", sortOrder: 4 },
-  { domain: "job_status", value: "cancelled", label: "Cancelled", sortOrder: 5 },
+  { domain: "job_status", value: "validating", label: "Validating", sortOrder: 2 },
+  { domain: "job_status", value: "ready", label: "Ready", sortOrder: 3 },
+  { domain: "job_status", value: "processing", label: "Processing", sortOrder: 4 },
+  { domain: "job_status", value: "completed", label: "Completed", sortOrder: 5 },
+  { domain: "job_status", value: "completed_with_warnings", label: "Completed with Warnings", sortOrder: 6 },
+  { domain: "job_status", value: "failed", label: "Failed", sortOrder: 7 },
+  { domain: "job_status", value: "cancelled", label: "Cancelled", sortOrder: 8 },
 ];
 
 export const MASTER_DOMAINS = [

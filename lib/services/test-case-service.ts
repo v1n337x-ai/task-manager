@@ -13,7 +13,18 @@ export interface CreateTestCaseInput {
   title: string;
   description?: string | null;
   category?: string | null;
-  statusValue: "included" | "not_tested" | "passed" | "failed" | "removed" | "not_retested" | "out_of_scope" | "not_applicable" | "unknown";
+  statusValue:
+    | "included"
+    | "tested"
+    | "not_tested"
+    | "passed"
+    | "failed"
+    | "removed"
+    | "retested"
+    | "not_retested"
+    | "out_of_scope"
+    | "not_applicable"
+    | "unknown";
 }
 
 export async function createTestCase(input: CreateTestCaseInput, actorUserId: number, ctx: { ip?: string; userAgent?: string }) {
@@ -71,7 +82,18 @@ export async function createTestCase(input: CreateTestCaseInput, actorUserId: nu
 export interface SetTestCaseIterationStateInput {
   testCaseId: number;
   iterationId: number;
-  statusValue: "included" | "not_tested" | "passed" | "failed" | "removed" | "out_of_scope" | "not_applicable" | "not_retested" | "unknown";
+  statusValue:
+    | "included"
+    | "tested"
+    | "not_tested"
+    | "passed"
+    | "failed"
+    | "removed"
+    | "retested"
+    | "not_retested"
+    | "out_of_scope"
+    | "not_applicable"
+    | "unknown";
   notes?: string | null;
 }
 
@@ -109,12 +131,15 @@ export async function setTestCaseIterationState(input: SetTestCaseIterationState
         },
       });
 
-  // Keep the test case surface status pointing at its latest iteration state.
-  const latestIteration = await prisma.iteration.findFirst({
-    where: { engagementId: iteration.engagementId },
-    orderBy: { number: "desc" },
+  // The test case surface status mirrors its own latest recorded state (§19 equivalent).
+  const existingStates = await prisma.testCaseIteration.findMany({
+    where: { testCaseId: testCase.id },
+    include: { iteration: { select: { number: true } } },
   });
-  if (latestIteration?.id === iteration.id && testCase.currentStatus !== status.id) {
+  const isLatestStateIteration = existingStates
+    .filter((s) => s.iterationId !== iteration.id)
+    .every((s) => s.iteration.number <= iteration.number);
+  if (isLatestStateIteration && testCase.currentStatus !== status.id) {
     await prisma.testCase.update({ where: { id: testCase.id }, data: { currentStatus: status.id } });
   }
   if (input.statusValue === "removed" || input.statusValue === "out_of_scope") {

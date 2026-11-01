@@ -6,7 +6,6 @@
 import { prisma } from "@/lib/db";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { recordAudit } from "@/lib/audit";
-
 export interface EngagementInput {
   applicationId: number;
   name: string;
@@ -27,6 +26,7 @@ export interface IterationInput {
   startDate?: Date | null;
   reportDate?: Date | null;
   statusValue?: string;
+  explicitNumber?: number; // §45: user may choose the number (validated against gap-free sequence)
 }
 
 const DEFAULT_APPLICATION_TARGET_TYPES = new Set(["initial_scan"]);
@@ -84,8 +84,43 @@ export async function createEngagement(input: EngagementInput, actorUserId: numb
   return row;
 }
 
-export async function createIteration(input: IterationInput, actorUserId: number, ctx: { ip?: string; userAgent?: string }) {
-  const engagement = await prisma.engagement.findUnique({
+/**
+ * Structural container guarantee: an application has ONE primary engagement for
+ * tracker operations. Created implicitly (and audited) only when the user acts
+ * on an application without one — never fabricates business data.
+ */
+export async function ensureDefaultEngagement(applicationId: number, actorUserId: number): Promise<{ id: number }> {
+  const app = await prisma.application.findUnique({ where: { id: applicationId } });
+  if (!app) throw NotFoundError("Application");
+  const existing = await prisma.engagement.findFirst({ where: { applicationId }, orderBy: { id: "asc" } });
+  if (existing) return existing;
+  const [scopeId, sourceId, statusId] = await Promise.all([
+    prisma.masterValue.findUnique({ where: { domain_value: { domain: "scope", value: "internal" } } }),
+    prisma.masterValue.findUnique({ where: { domain_value: { domain: "assessment_source", value: "vapt" } } }),
+    prisma.masterValue.findUnique({ where: { domain_value: { domain: "engagement_status", value: "initiated" } } }),
+  ]);
+  const engagement = await prisma.engagement.create({
+    data: {
+      applicationId,
+      name: `VAPT — ${app.displayName}`,
+      scope: scopeId?.id ?? (app.scope as number),
+      assessmentSource: sourceId?.id ?? 1,
+      status: statusId?.id ?? 1,
+      target: app.webUrl ?? app.apiFqdn ?? app.rawTarget,
+    },
+  });
+  await recordAudit({
+    action: "engagement.create",
+    entityType: "Engagement",
+    entityId: engagement.id,
+    newValue: JSON.stringify({ applicationId, name: engagement.name, auto: "default container for tracker operations" }),
+    source: "SYSTEM",
+    actorUserId,
+  });
+  return engagement;
+}
+
+export async function createIteration(input: IterationInput, actorUserId: number, ctx: { ip?: string; userAgent?: string }) {  const engagement = await prisma.engagement.findUnique({
     where: { id: input.engagementId },
     include: { iterations: { orderBy: { number: "desc" }, take: 1 } },
   });
@@ -99,14 +134,19 @@ export async function createIteration(input: IterationInput, actorUserId: number
   if (!statusRow) throw ValidationError("Unknown iteration status.");
 
   const lastNumber = engagement.iterations[0]?.number ?? 0;
-  const number = lastNumber + 1;
-  iterationTypeQuirk(number, input.iterationTypeValue);
+  // §45: explicit number must not skip ahead more than one (no silent gaps).
+  const number = input.explicitNumber ?? undefined;
+  if (number !== undefined && (!Number.isInteger(number) || number < 1 || number > lastNumber + 1)) {
+    throw ValidationError(`Iteration number must be between 1 and ${lastNumber + 1}.`);
+  }
+  const effectiveNumber = number ?? lastNumber + 1;
+  iterationTypeQuirk(effectiveNumber, input.iterationTypeValue);
 
-  const name = input.name?.trim() || (input.iterationTypeValue === "initial_scan" ? `Iteration ${number} — Initial Scan` : `Iteration ${number}`);
+  const name = input.name?.trim() || (input.iterationTypeValue === "initial_scan" ? `Iteration ${effectiveNumber} — Initial Scan` : `Iteration ${effectiveNumber}`);
   const row = await prisma.iteration.create({
     data: {
       engagementId: engagement.id,
-      number,
+      number: effectiveNumber,
       iterationType: typeRow.id,
       name,
       startDate: input.startDate ?? null,

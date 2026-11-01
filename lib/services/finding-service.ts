@@ -7,13 +7,31 @@ import { prisma } from "@/lib/db";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { recordAudit } from "@/lib/audit";
 
+export function normalizeFindingTitle(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Deterministic finding match key (§23) — stable across imports/retests. */
+export function buildFindingMatchKey(input: { code?: string | null; title: string; testCaseCode?: string | null }): string {
+  const parts: string[] = [];
+  if (input.testCaseCode) parts.push(input.testCaseCode.toLowerCase());
+  parts.push(normalizeFindingTitle(input.title));
+  return parts.join("::");
+}
+
 export interface CreateFindingInput {
   applicationId: number;
   code?: string; // optional external code (TC-style codes); auto F-### otherwise
-  title: string;
+  title: string
   description?: string | null;
+  testCaseId?: number | null;
   severityValue: "critical" | "high" | "medium" | "low" | "info";
   currentStatusValue?: "open" | "fixed" | "not_fixed" | "accepted_risk" | "removed" | "duplicate";
+  firstSeenIterationNumber?: number | null;
 }
 
 export async function createFinding(input: CreateFindingInput, actorUserId: number, ctx: { ip?: string; userAgent?: string }) {
@@ -26,6 +44,19 @@ export async function createFinding(input: CreateFindingInput, actorUserId: numb
   ]);
   if (!severity) throw ValidationError("Unknown severity.");
   if (!status) throw ValidationError("Unknown finding status.");
+
+  let testCaseCode: string | null = null;
+  let testCaseId: number | null = null;
+  if (input.testCaseId) {
+    const tc = await prisma.testCase.findUnique({ where: { id: input.testCaseId } });
+    if (!tc || tc.applicationId !== app.id) throw ValidationError("Test case does not belong to this application.");
+    testCaseId = tc.id;
+    testCaseCode = tc.code;
+  }
+
+  const matchKey = buildFindingMatchKey({ code: input.code, title: input.title, testCaseCode });
+  const dup = await prisma.finding.findUnique({ where: { applicationId_matchKey: { applicationId: app.id, matchKey } } });
+  if (dup) throw ConflictError(`A matching finding already exists for this application (${dup.code}).`);
 
   // Auto-code: F-001.. per application, sparse-code tolerant (counts existing).
   let code = input.code?.trim();
@@ -53,6 +84,9 @@ export async function createFinding(input: CreateFindingInput, actorUserId: numb
       code: code!,
       title: input.title.trim(),
       description: input.description?.trim() || null,
+      testCaseId,
+      firstSeenIterationNumber: input.firstSeenIterationNumber ?? null,
+      matchKey,
       severity: severity.id,
       currentStatus: status.id,
     },
@@ -76,7 +110,7 @@ export interface SetIterationStateInput {
   findingId: number;
   iterationId: number;
   severityValue: "critical" | "high" | "medium" | "low" | "info";
-  statusValue: "open" | "fixed" | "not_fixed" | "not_retested" | "removed" | "out_of_scope" | "not_applicable" | "unknown";
+  statusValue: "open" | "new" | "fixed" | "not_fixed" | "not_retested" | "removed" | "out_of_scope" | "not_applicable" | "unknown";
   firstSeenAt?: Date | null;
   retestNote?: string | null;
   comments?: string | null;
@@ -144,12 +178,17 @@ export async function setFindingIterationState(input: SetIterationStateInput, ac
     });
   }
 
-  // Reflect surface status when the change is the latest iteration.
-  const latestIteration = await prisma.iteration.findFirst({
-    where: { engagementId: iteration.engagementId },
-    orderBy: { number: "desc" },
+  // Surface status mirrors the finding's own latest state (§19): updates on a
+  // state with iteration number >= the finding's current max state apply;
+  // historical backfills on older iterations do not rewrite the surface.
+  const existingStates = await prisma.findingIterationState.findMany({
+    where: { findingId: finding.id },
+    include: { iteration: { select: { number: true } } },
   });
-  if (latestIteration?.id === iteration.id && previous?.value !== statusRow.value) {
+  const isLatestStateIteration = existingStates
+    .filter((s) => s.id !== state.id)
+    .every((s) => s.iteration.number <= iteration.number);
+  if (isLatestStateIteration && previous?.value !== statusRow.value) {
     const surface =
       statusRow.value === "fixed"
         ? "fixed"
@@ -159,8 +198,10 @@ export async function setFindingIterationState(input: SetIterationStateInput, ac
             ? "removed"
             : statusRow.value === "out_of_scope" || statusRow.value === "not_applicable"
               ? "accepted_risk"
-              : "open";
-    const target = await prisma.masterValue.findUnique({ where: { domain_value: { domain: "finding_status", value: surface } } });
+              : "open"; // open | new | not_retested | unknown → surface Open
+    const target = await prisma.masterValue.findUnique({
+      where: { domain_value: { domain: "finding_status", value: surface } },
+    });
     if (target && target.id !== finding.currentStatus) {
       await prisma.finding.update({ where: { id: finding.id }, data: { currentStatus: target.id } });
     }

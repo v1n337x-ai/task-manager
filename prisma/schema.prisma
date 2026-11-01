@@ -78,9 +78,9 @@ model User {
   updatedAt    DateTime  @updatedAt
 
   auditLogs        AuditLog[]
-  importJobs       ImportJob[]           @relation("import_job_user")
-  exportJobs       ExportJob[]           @relation("export_job_user")
-  aiApprovals      AiApprovalDecision[]  @relation("ai_decision_user")
+  importJobs       ImportJob[]            @relation("import_job_user")
+  exportJobs       ExportJob[]            @relation("export_job_user")
+  aiApprovals      AiApprovalDecision[]   @relation("ai_decision_user")
   findingHistories FindingStatusHistory[] @relation("fsh_actor_user")
 
   @@index([isActive])
@@ -143,12 +143,12 @@ model Contact {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  primaryOfApplications Application[]               @relation("app_primary_poc")
+  primaryOfApplications  Application[]               @relation("app_primary_poc")
   assignedToApplications ApplicationAssignedMember[]
-  findingHistories      FindingStatusHistory[]      @relation("fsh_actor_contact")
+  findingHistories       FindingStatusHistory[]      @relation("fsh_actor_contact")
 
-  @@index([org, fullName])
   @@unique([org, fullName])
+  @@index([org, fullName])
   @@map("contacts")
 }
 
@@ -156,21 +156,21 @@ model Contact {
 // Applications (brief sections 15-17)
 // ---------------------------------------------------------------------------
 model Application {
-  id              Int      @id @default(autoincrement())
-  name            String   @unique // verbatim workbook name, e.g. "Akasa Air Ecommerce - PROD"
+  id              Int       @id @default(autoincrement())
+  name            String    @unique // verbatim workbook name, e.g. "Akasa Air Ecommerce - PROD"
   displayName     String // human-friendly display
   applicationType Int // FK -> application_type master value
   scope           Int // FK -> scope master value (internal | external)
   environment     Int // FK -> environment master value (prod | uat | staging | dev | unknown)
   site            Int // lifecycle master value (application_status)
-  isActive        Boolean  @default(true)
+  isActive        Boolean   @default(true)
   webUrl          String?
   apiFqdn         String?
   rawTarget       String? // unparsed URL/APK/package original text
   primaryPocId    Int?
   assessedOn      DateTime? // informational only until Phase 3 import
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   applicationTypeRef MasterValue                 @relation("app_type", fields: [applicationType], references: [id])
   scopeRef           MasterValue                 @relation("app_scope", fields: [scope], references: [id])
@@ -247,10 +247,10 @@ model Engagement {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  application Application  @relation(fields: [applicationId], references: [id])
-  scopeRef    MasterValue  @relation("eng_scope", fields: [scope], references: [id])
-  sourceRef   MasterValue  @relation("eng_source", fields: [assessmentSource], references: [id])
-  statusRef   MasterValue  @relation("eng_status", fields: [status], references: [id])
+  application Application @relation(fields: [applicationId], references: [id])
+  scopeRef    MasterValue @relation("eng_scope", fields: [scope], references: [id])
+  sourceRef   MasterValue @relation("eng_source", fields: [assessmentSource], references: [id])
+  statusRef   MasterValue @relation("eng_status", fields: [status], references: [id])
   iterations  Iteration[]
 
   @@unique([applicationId, name])
@@ -268,13 +268,17 @@ model Iteration {
   startDate      DateTime?
   reportDate     DateTime?
   status         Int // FK -> iteration_status (planned | in_progress | completed | pending | cancelled)
+  // Phase 3: raw aggregate snapshot imported from the 39-column workbook
+  // (severity counts etc.) — AUDIT CONTEXT ONLY, never the authoritative count
+  // source (Phase 3 brief §36). Live counts derive from findings.
+  importSnapshot Json?
   notes          String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  engagement       Engagement             @relation(fields: [engagementId], references: [id])
-  iterationTypeRef MasterValue            @relation("iter_type", fields: [iterationType], references: [id])
-  statusRef        MasterValue            @relation("iter_status", fields: [status], references: [id])
+  engagement       Engagement              @relation(fields: [engagementId], references: [id])
+  iterationTypeRef MasterValue             @relation("iter_type", fields: [iterationType], references: [id])
+  statusRef        MasterValue             @relation("iter_status", fields: [status], references: [id])
   testCases        TestCaseIteration[]
   findingStates    FindingIterationState[]
   findingHistories FindingStatusHistory[]
@@ -300,9 +304,10 @@ model TestCase {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  application Application          @relation(fields: [applicationId], references: [id])
-  statusRef   MasterValue          @relation("tc_status", fields: [currentStatus], references: [id])
+  application Application         @relation(fields: [applicationId], references: [id])
+  statusRef   MasterValue         @relation("tc_status", fields: [currentStatus], references: [id])
   iterations  TestCaseIteration[]
+  findings    Finding[]
 
   @@unique([applicationId, code])
   @@index([applicationId])
@@ -334,18 +339,23 @@ model TestCaseIteration {
 // Findings & iteration state (brief sections 23-26)
 // ---------------------------------------------------------------------------
 model Finding {
-  id            Int      @id @default(autoincrement())
-  applicationId Int
-  code          String // "F-001" — stable identity across iterations
-  title         String
-  description   String?
-  severity      Int // FK -> severity (critical | high | medium | low | info)
-  currentStatus Int // FK -> finding_status (open | fixed | not_fixed | accepted_risk | removed | duplicate)
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                       Int      @id @default(autoincrement())
+  applicationId            Int
+  code                     String // "F-001" — stable identity across iterations
+  title                    String
+  description              String?
+  // Phase 3: linkage + deterministic matching + first-seen tracking
+  testCaseId               Int? // related test case (workbook TC / manual selection)
+  firstSeenIterationNumber Int? // "New in Iteration 2" (§22); null when unknown
+  matchKey                 String? // deterministic match key for future importers (§23)
+  severity                 Int // FK -> severity (critical | high | medium | low | info)
+  currentStatus            Int // FK -> finding_status (open | fixed | not_fixed | accepted_risk | removed | duplicate)
+  isActive                 Boolean  @default(true)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 
   application     Application             @relation(fields: [applicationId], references: [id])
+  testCase        TestCase?               @relation(fields: [testCaseId], references: [id])
   severityRef     MasterValue             @relation("fnd_severity", fields: [severity], references: [id])
   statusRef       MasterValue             @relation("fnd_status", fields: [currentStatus], references: [id])
   iterationStates FindingIterationState[]
@@ -353,9 +363,11 @@ model Finding {
   aiProposals     AiApprovalDecision[]
 
   @@unique([applicationId, code])
+  @@unique([applicationId, matchKey])
   @@index([applicationId])
   @@index([code])
   @@index([severity])
+  @@index([testCaseId])
   @@map("findings")
 }
 
@@ -418,14 +430,16 @@ model EmailThread {
   applicationId  Int? // resolved linkage (nullable until matching works)
   subject        String // display subject of the thread
   subjectHash    String // deterministic match key (sha256 of normalized subject)
+  participantKey String // Phase 4: participant-overlap fallback signal (deterministic)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  application Application?    @relation(fields: [applicationId], references: [id])
+  application Application?   @relation(fields: [applicationId], references: [id])
   messages    EmailMessage[]
 
   @@unique([subjectHash, applicationId])
   @@index([subjectHash])
+  @@index([participantKey])
   @@index([applicationId])
   @@map("email_threads")
 }
@@ -433,9 +447,11 @@ model EmailThread {
 model EmailMessage {
   id                Int       @id @default(autoincrement())
   threadId          Int
-  messageId         String    @unique // RFC 5322 Message-ID
+  messageId         String    @unique // RFC 5322 Message-ID (synthesized hash when absent, §13)
   inReplyTo         String?
   references        String?
+  replyTo           String? // Reply-To header (Phase 4 §12)
+  headersRaw        Json? // PRESERVED original headers — the DB row is an interpretation (§2/§12)
   fromParticipantId Int
   subject           String?
   sentAt            DateTime?
@@ -453,6 +469,7 @@ model EmailMessage {
 
   @@index([threadId, sentAt])
   @@index([fromParticipantId])
+  @@index([inReplyTo])
   @@map("email_messages")
 }
 
@@ -470,10 +487,10 @@ model EmailParticipant {
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
 
-  roleRef        MasterValue      @relation("participant_role", fields: [role], references: [id])
-  roleOverrideRef MasterValue?    @relation("participant_role_override", fields: [humanOverrideRole], references: [id])
-  messagesFrom   EmailMessage[]   @relation("participant_from")
-  recipients     EmailRecipient[] @relation("participant_recipient")
+  roleRef         MasterValue      @relation("participant_role", fields: [role], references: [id])
+  roleOverrideRef MasterValue?     @relation("participant_role_override", fields: [humanOverrideRole], references: [id])
+  messagesFrom    EmailMessage[]   @relation("participant_from")
+  recipients      EmailRecipient[] @relation("participant_recipient")
 
   @@index([name])
   @@index([emailAddress])
@@ -492,9 +509,9 @@ model EmailRecipient {
   message     EmailMessage      @relation(fields: [messageId], references: [id], onDelete: Cascade)
   participant EmailParticipant? @relation("participant_recipient", fields: [participantId], references: [id])
 
+  @@unique([messageId, kind, email])
   @@index([messageId])
   @@index([participantId])
-  @@unique([messageId, kind, email])
   @@map("email_recipients")
 }
 
@@ -515,9 +532,9 @@ model EmailAttachment {
   extractions         AiExtraction[] @relation("attachment_extractions")
   evidence            AiEvidence[]
 
+  @@unique([messageId, filename, sha256])
   @@index([messageId])
   @@index([sha256])
-  @@unique([messageId, filename, sha256])
   @@map("email_attachments")
 }
 
@@ -630,20 +647,24 @@ model ImportJob {
   mimeType        String?
   sha256          String    @unique // reproducible import idempotency
   type            String    @default("xlsx_tracker")
-  status          Int // FK -> job_status (queued | running | completed | failed | cancelled)
+  schemaVersionId Int? // PT Tracker contract used (Phase 3 §29)
+  status          Int // FK -> job_status (queued | validating | ready | processing | completed | completed_with_warnings | failed | cancelled)
   options         Json?
+  preview         Json? // validated preview payload for the confirm step (no DB writes)
   startedAt       DateTime?
   completedAt     DateTime?
   rowsProcessed   Int       @default(0)
   rowsFailed      Int       @default(0)
+  warningCount    Int       @default(0)
   errorCount      Int       @default(0)
-  summary         Json? // parsed workbook fingerprint (rowsIn/imports/skips...)
+  summary         Json? // parsed workbook fingerprint (rowsIn/imports/skips/exceptions...)
   createdByUserId Int?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  statusRef MasterValue @relation("imp_status", fields: [status], references: [id])
-  createdBy User?       @relation("import_job_user", fields: [createdByUserId], references: [id])
+  statusRef     MasterValue    @relation("imp_status", fields: [status], references: [id])
+  schemaVersion SchemaVersion? @relation(fields: [schemaVersionId], references: [id])
+  createdBy     User?          @relation("import_job_user", fields: [createdByUserId], references: [id])
 
   @@index([status])
   @@index([createdAt])
@@ -653,8 +674,10 @@ model ImportJob {
 
 model ExportJob {
   id              Int       @id @default(autoincrement())
+  filename        String? // generated template filename (Phase 3)
   target          String    @default("xlsx") // xlsx | pptx
   targetVersion   String? // template/report version used
+  schemaVersionId Int? // tracker contract exported against
   status          Int // FK -> job_status
   params          Json?
   startedAt       DateTime?
@@ -666,8 +689,9 @@ model ExportJob {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  statusRef MasterValue @relation("exp_status", fields: [status], references: [id])
-  createdBy User?       @relation("export_job_user", fields: [createdByUserId], references: [id])
+  statusRef     MasterValue    @relation("exp_status", fields: [status], references: [id])
+  schemaVersion SchemaVersion? @relation(fields: [schemaVersionId], references: [id])
+  createdBy     User?          @relation("export_job_user", fields: [createdByUserId], references: [id])
 
   @@index([status])
   @@index([createdAt])
@@ -678,14 +702,16 @@ model ExportJob {
 // Schema versioning (brief section 37)
 // ---------------------------------------------------------------------------
 model SchemaVersion {
-  id           Int      @id @default(autoincrement())
-  trackerName  String   @default("PT Tracker")
-  version      String   @default("1.0")
-  columnsCount Int      @default(39) // the fixed 39-column workbook contract (DL-02)
+  id           Int         @id @default(autoincrement())
+  trackerName  String      @default("PT Tracker")
+  version      String      @default("1.0")
+  columnsCount Int         @default(39) // the fixed 39-column workbook contract (DL-02)
   columnMap    Json? // ordered column letter -> header/type contract
   notes        String?
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
+  isActive     Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  importJobs   ImportJob[]
+  exportJobs   ExportJob[]
 
   @@unique([trackerName, version])
   @@map("schema_versions")

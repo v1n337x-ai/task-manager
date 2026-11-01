@@ -34,8 +34,15 @@ Sign in with the seeded credential from your `.env` (`SEED_ADMIN_EMAIL` / `SEED_
 | `npm run db:migrate` / `db:deploy` / `db:seed` / `db:reset` | database tooling |
 | `npm run test` / `test:unit` / `test:db` | 23 tests (unit + §59 foundation chain) |
 
-## What Phase 2 delivers
+## What Phase 3 delivers (operational PT Tracker)
+- **Iteration engine** (`docs/iteration-engine.md`): open-ended iterations (1 = Initial Scan auto-named; 2+ default Retest; 3+ no migrations), append-only per-iteration states for findings AND test cases, current state = latest authoritative iteration state, `firstSeenIterationNumber` for "New in I2", deterministic `matchKey` for future import matching.
+- **PT Tracker UI** (`docs/pt-tracker.md`): dense application table with live finding-derived counts + filters/search; application detail with Overview/Findings/Iterations/Test-Cases/History tabs; Add Finding / Create Iteration / Add Test Case flows; every figure computed from PostgreSQL.
+- **Strict Excel contract** (`docs/excel-contract.md`): PT Tracker v1.0 — 39 verbatim columns (headers compared exactly incl. trailing spaces); validate → preview → confirm (single transaction); idempotent by sha256; unresolved applications skipped (never silently created); import snapshots stored as audit context only; template-preserving export with live data and explicit SUM totals (stale/`#REF!` formulas never recreated); round-trip enforced by tests.
+- **APIs**: `/api/pt-tracker`, `/api/pt-tracker/[applicationId]`(+`/findings`), findings POST/PATCH(history), iterations, test-cases, `/api/imports/excel{,/validate,/confirm}`, `/api/exports/excel` — all behind auth + CSRF + Zod + audit.
+- **Migration** `20261102000000_phase3_pt_tracker_iteration_excel` (new migration — Phase 2 untouched): findings.testCaseId/firstSeenIterationNumber/matchKey(+unique), iterations.importSnapshot, import_jobs.preview/schemaVersionId/warningCount, export_jobs.filename/schemaVersionId, new master values (generating + tested/retested + pipeline job states).
+- **Tests**: 40+ total incl. §61 data-integrity chain and the §60 template round trip; `fileParallelism: false` serialises DB suites.
 
+## What Phase 2 delivers
 - **Secure single-user auth**: bcrypt + HTTP-only JWT cookie (12h), edge middleware + server-side session re-verification, per-IP rate limit, double-submit CSRF, audited login/logout, no user enumeration.
 - **Database**: PostgreSQL 16; migrations only (§38); full model — applications/aliases, master_values (18 domains/98 values), contacts/POC/assigned members, engagements → open-ended **iterations** (1=Initial Scan, 2+=Retest enforced), test cases + iteration states (removed cases preserved), findings + per-iteration states + append-only status history, email threads/messages/participants-with-AI-role-plus-human-override/attachments, AI extractions + evidence + human-approval gate, audit logs (HUMAN/EXCEL_IMPORT/EML/AI/SYSTEM), import/export job registries, PT Tracker schema-version contract (39 columns).
 - **Master Data UI**: application registry with create/edit/deactivate + alias manager (duplicate-safe, normalization for future EML/AI matching), controlled-vocabulary viewer.

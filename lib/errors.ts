@@ -10,6 +10,7 @@ export type ApiErrorCode =
   | "CONFLICT"
   | "RATE_LIMITED"
   | "DATABASE_UNAVAILABLE"
+  | "INVALID_EXCEL_SCHEMA"
   | "INTERNAL_ERROR";
 
 export class AppError extends Error {

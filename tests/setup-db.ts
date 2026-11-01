@@ -29,26 +29,35 @@ try {
   console.warn("[tests] test database unreachable â€” DB-dependent tests will SKIP.");
 }
 
+function prismaCli(args: string): string {
+  // Direct Node entry — Windows .cmd shims require a shell to spawn (Node ≥ 20).
+  const cli = path.join(ROOT, "node_modules", "prisma", "build", "index.js");
+  return `"${process.execPath}" "${cli}" ${args}`;
+}
+
 beforeAll(async () => {
   if (!dbAvailable) return;
 
   // Ensure the test schema matches current migrations (brief section 38).
   if (process.env.TESTS_SKIP_MIGRATE !== "1") {
     try {
-      execSync("npx prisma migrate deploy", {
+      execSync(prismaCli("migrate deploy"), {
         stdio: "pipe",
         env: { ...process.env },
-        cwd: path.resolve(__dirname, ".."),
+        cwd: ROOT,
+        windowsHide: true,
       });
-    } catch {
+    } catch (deployError) {
+      console.warn("[tests] migrate deploy failed, attempting reset:", String((deployError as Error).message).slice(0, 240));
       try {
-        execSync("npx prisma migrate reset --force --skip-seed", {
+        execSync(prismaCli("migrate reset --force --skip-seed"), {
           stdio: "pipe",
           env: { ...process.env },
-          cwd: path.resolve(__dirname, ".."),
+          cwd: ROOT,
+          windowsHide: true,
         });
       } catch (error) {
-        console.warn("[tests] migrate/reset failed:", String(error).slice(0, 200));
+        console.warn("[tests] migrate/reset failed:", String(error).slice(0, 240));
       }
       await testDb.$connect();
     }
@@ -90,8 +99,14 @@ export async function seedMinimal(bcryptModule: typeof bcrypt): Promise<{ userId
     data: MASTER_VALUES.map((m) => ({ domain: m.domain, value: m.value, label: m.label, sortOrder: m.sortOrder })),
     skipDuplicates: true,
   });
+  // Register the fixed workbook contract (Phase 3 §37) — required by the importer.
+  await testDb.schemaVersion.upsert({
+    where: { trackerName_version: { trackerName: "PT Tracker", version: "1.0" } },
+    update: { columnsCount: 39 },
+    create: { trackerName: "PT Tracker", version: "1.0", columnsCount: 39, notes: "Fixture bootstrap (tests)." },
+  });
   return { userId: user.id };
 }
 
-export const ROOT = path.resolve(__dirname, "..");
-export const hasMigrationsFolder = fs.existsSync(path.join(ROOT, "prisma", "migrations"));
+/** Test root (setup lives in tests/). */
+export const ROOT = path.resolve(__dirname, "..");export const hasMigrationsFolder = fs.existsSync(path.join(ROOT, "prisma", "migrations"));
