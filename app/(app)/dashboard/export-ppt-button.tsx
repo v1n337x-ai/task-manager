@@ -56,7 +56,7 @@ export function ExportPptButton({ filtersQS }: { filtersQS: string }) {
         {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <FileDown className="h-4 w-4" aria-hidden />}
         Export PPT
       </Button>
-      {error ? <span role="alert" className="text-[12px] text-accent">{error}</span> : null}
+      {error ? <span role="alert" className="text-[12px] text-danger">{error}</span> : null}
     </>
   );
 }

@@ -1,41 +1,53 @@
 @import "tailwindcss";
 
 /*
- * Design tokens extracted from the Phase 1 PPT analysis (DL-01 / DL-08):
- * ink bands #1F1F1F, accent rules #CF1325, severity palette, white pages,
- * Bebas Neue display + Poppins body.
+ * Design tokens — AKASA AIR brand theme (Phase 9 visual refresh):
+ * Sunrise Orange primary accent (#FF6D1F), deep-plum ink (#3D2054),
+ * ivory-lavender surfaces, sky-blue progress, VAPT severity palette
+ * (contract) untouched. Bebas Neue display + Poppins body (DL-08).
+ * Danger surfaces keep a dedicated #CF1325 token (never orange).
  */
 @theme {
-  --color-ink: #1f1f1f;
-  --color-ink-2: #2b2b2b;
-  --color-ink-3: #333333;
-  --color-muted: #7a7a7a;
-  --color-muted-2: #6b6b6b;
+  /* Akasa brand */
+  --color-accent: #ff6d1f; /* sunrise orange — CTAs, active states, brand rule */
+  --color-accent-deep: #e0550c;
+  --color-accent-soft: #fff2ea;
+
+  /* Ink family = deep plum (Akasa wordmark feel) */
+  --color-ink: #3d2054;
+  --color-ink-2: #4a3563;
+  --color-ink-3: #5d4a78;
+  --color-muted: #857896;
+  --color-muted-2: #6e617f;
+
+  /* Surfaces */
   --color-page: #ffffff;
-  --color-page-soft: #f8f8f8;
+  --color-page-soft: #faf8fc;
   --color-card: #ffffff;
-  --color-band: #f3f3f3;
-  --color-stroke: #e0e0e0;
-  --color-stroke-soft: #d6d6d6;
-  --color-accent: #cf1325;
-  --color-accent-orange: #e86b10;
-  --color-progress: #1a73e8;
+  --color-band: #f4f0f8;
+  --color-stroke: #e7e1ee;
+  --color-stroke-soft: #dcd4e6;
+  --color-tint-a: #f6effa;
+  --color-tint-b: #fbf8fd;
+
+  /* Semantics (fixed by the platform contract) */
+  --color-danger: #cf1325;
+  --color-progress: #2e86c1;
   --color-good: #2e862e;
   --color-sev-critical: #cf1325;
   --color-sev-high: #e86b10;
   --color-sev-medium: #f5a623;
   --color-sev-low: #4a90d9;
   --color-sev-info: #9e9e9e;
-  --color-tint-a: #eef3fa;
-  --color-tint-b: #f6f7f9;
 
   --font-display: var(--font-bebas), "Arial Narrow", sans-serif;
   --font-body: var(--font-poppins), "Segoe UI", sans-serif;
 
-  --radius-card: 12px;
-  --radius-panel: 10px;
+  --radius-card: 14px;
+  --radius-panel: 12px;
 
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 4%);
+  --shadow-sm: 0 1px 2px rgb(61 32 84 / 6%);
+  --shadow-card: 0 1px 3px rgb(61 32 84 / 7%), 0 4px 14px rgb(61 32 84 / 5%);
 }
 
 html,
@@ -48,8 +60,13 @@ body {
   color: var(--color-ink-2);
   font-family: var(--font-body);
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-ink);
 }
 
 .font-display {
@@ -57,20 +74,52 @@ body {
   letter-spacing: 0.01em;
 }
 
-/* Header band + red rule motif from every PPT content slide (DL-01 §2). */
+/* Slim, theme-matched scrollbars (no overlap from fat native bars). */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-stroke-soft) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-stroke-soft);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted);
+  background-clip: content-box;
+  border: 3px solid transparent;
+}
+
+/* Topbar / page header band: deep-plum gradient + sunrise-orange rule. */
 .brand-band {
-  background: var(--color-ink);
+  background: linear-gradient(120deg, #3d2054 0%, #492a63 55%, #5c3479 100%);
   color: #ffffff;
   border-bottom: 3px solid var(--color-accent);
 }
 
-/* PPT KPI card anatomy: white card, hairline border, top accent bar. */
+/* Sidebar rail tint to separate from the canvas. */
+.side-rail {
+  background: var(--color-card);
+  border-right: 1px solid var(--color-stroke);
+}
+
+/* PPT-derived KPI card anatomy: white card, accent bar, soft lift on hover. */
 .kpi-card {
   background: var(--color-card);
   border: 1px solid var(--color-stroke);
   border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
   position: relative;
   overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.kpi-card:hover {
+  transform: translateY(-1px);
 }
 .kpi-card::before {
   content: "";
@@ -80,33 +129,67 @@ body {
   background: var(--kpi-accent, var(--color-accent));
 }
 
-/* Panel (rounded rect adj≈5000 in the deck). */
+/* Panel — rounded, gently elevated. */
 .panel {
   background: var(--color-card);
   border: 1px solid var(--color-stroke);
   border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-sm);
 }
 
-/* Table styling from the register slides. */
+/* Tables: sticky plum header, zebra rows, orange hover — no overlap: the
+   wrapper always scrolls horizontally instead of squeezing columns. */
 .tm-table {
   background: var(--color-card);
   border: 1px solid var(--color-stroke);
   border-radius: var(--radius-panel);
   overflow: hidden;
   width: 100%;
+  box-shadow: var(--shadow-sm);
+}
+.tm-table .overflow-x-auto {
+  border-radius: inherit;
+}
+.tm-table table {
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 100%;
 }
 .tm-table thead th {
   background: var(--color-tint-b);
   color: var(--color-ink);
   font-weight: 600;
   text-align: left;
-  border-bottom: 1px solid var(--color-stroke);
+  white-space: nowrap;
+  border-bottom: 2px solid var(--color-stroke);
 }
-.tm-table tbody tr + tr {
+.tm-table thead th:first-child {
+  border-top-left-radius: var(--radius-panel);
+}
+.tm-table thead th:last-child {
+  border-top-right-radius: var(--radius-panel);
+}
+.tm-table tbody tr + tr td,
+.tm-table tbody tr + tr th {
   border-top: 1px solid var(--color-stroke-soft);
 }
+.tm-table tbody tr:nth-child(even) {
+  background: var(--color-tint-b);
+}
 .tm-table tbody tr:hover {
-  background: var(--color-band);
+  background: var(--color-accent-soft);
+}
+.tm-table td {
+  overflow-wrap: anywhere;
+}
+
+/* Inputs: calm plum focus. */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+  border-color: var(--color-accent);
 }
 
 :focus-visible {

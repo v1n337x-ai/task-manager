@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, ListChecks, FileText, Settings2, Database, Menu, X, LogOut, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, ListChecks, FileText, Settings2, Database, Menu, X, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -70,12 +70,13 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
                     className={cn(
                       "flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition",
                       isActive(item.href)
-                        ? "bg-accent/10 font-semibold text-accent"
+                        ? "bg-accent-soft font-semibold text-accent-deep"
                         : "text-ink-2 hover:bg-band",
                     )}
                   >
                     <item.icon className={cn("h-4 w-4", isActive(item.href) ? "text-accent" : "text-muted")} aria-hidden />
                     {item.label}
+                    {isActive(item.href) ? <span className="ml-auto h-1.5 w-1.5 rounded-full bg-accent" aria-hidden /> : null}
                   </Link>
                 </li>
               ))}
@@ -84,8 +85,9 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
         ))}
       </nav>
       <div className="px-3 pb-4">
-        <p className="rounded-lg bg-tint-b px-3 py-2 text-[11px] text-muted">
-          Phase 2 foundation · secure login active
+        <p className="flex items-center justify-between rounded-lg bg-tint-b px-3 py-2 text-[11px] text-muted">
+          <span>Akasa Air · It&apos;s Your Sky</span>
+          <span className="h-2 w-2 rounded-full bg-good/80" aria-hidden />
         </p>
       </div>
     </div>
@@ -127,15 +129,15 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
 
         <div className="mx-auto flex max-w-[1600px]">
           {/* Desktop sidebar */}
-          <aside className="sticky top-[52px] hidden h-[calc(100vh-52px)] w-60 shrink-0 border-r border-stroke bg-card lg:block">
+          <aside className="side-rail sticky top-[52px] hidden h-[calc(100vh-52px)] w-60 shrink-0 lg:block">
             {sidebar}
           </aside>
 
           {/* Mobile drawer */}
           {mobileOpen ? (
             <div className="fixed inset-0 z-40 lg:hidden">
-              <div className="absolute inset-0 bg-ink/40" onClick={() => setMobileOpen(false)} aria-hidden />
-              <aside className="absolute left-0 top-0 h-full w-64 bg-card shadow-xl">{sidebar}</aside>
+              <div className="fixed inset-0 bg-ink/40" onClick={() => setMobileOpen(false)} aria-hidden />
+              <aside className="side-rail absolute left-0 top-0 h-full w-64 shadow-xl">{sidebar}</aside>
             </div>
           ) : null}
 
@@ -156,8 +158,12 @@ function BrandMenu() {
           className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-white/10 focus:outline-none"
           aria-haspopup="menu"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-accent text-white" aria-hidden>
-            <ShieldCheck className="h-4 w-4" />
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-white shadow-sm" aria-hidden>
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden>
+              {/* Akasa "rising A" motif — wing shaping inside the A */}
+              <path d="M12 3.5 21 21h-4.6l-1.9-4h-5l-1.9 4H3L12 3.5Z" fill="#fff" />
+              <path d="M12 9.6 14.2 14h-4.4L12 9.6Z" fill="#E0550C" />
+            </svg>
           </span>
           <span>
             <span className="block font-display text-[18px] leading-4 tracking-wide text-white">TASK MANAGER</span>

@@ -166,7 +166,7 @@ export function ImportExcelDialog() {
                 <div className="mt-3 max-h-44 overflow-y-auto rounded-lg border border-stroke bg-tint-b px-3 py-2">
                   <ul className="space-y-1 text-[12px]">
                     {exceptions.slice(0, 40).map((ex, i) => (
-                      <li key={i} className={cn("flex gap-2", ex.severity === "error" ? "text-accent" : "text-muted-2")}>
+                      <li key={i} className={cn("flex gap-2", ex.severity === "error" ? "text-danger" : "text-muted-2")}>
                         {ex.severity === "error" ? <TriangleAlert className="mt-0.5 h-3 w-3 shrink-0" aria-hidden /> : null}
                         <span className="font-semibold">{ex.code}</span>
                         <span>{ex.message}</span>

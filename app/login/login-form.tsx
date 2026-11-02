@@ -43,7 +43,7 @@ export default function LoginForm({ nextPath }: { nextPath?: string }) {
       </div>
 
       {state.error ? (
-        <p role="alert" className="rounded-md border border-accent/30 bg-accent/5 px-3 py-2 text-[13px] text-accent">
+        <p role="alert" className="rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-[13px] text-danger">
           {state.error}
         </p>
       ) : null}

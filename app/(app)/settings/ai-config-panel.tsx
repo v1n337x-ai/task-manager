@@ -194,7 +194,7 @@ export function AiConfigPanel({
           className={
             "mt-3 rounded-md border px-3 py-2 text-[13px] " +
             (message.kind === "error"
-              ? "border-accent/30 bg-accent/5 text-accent"
+              ? "border-danger/30 bg-danger/5 text-danger"
               : message.kind === "ok"
                 ? "border-good/30 bg-good/5 text-good"
                 : "border-stroke bg-band text-muted-2")

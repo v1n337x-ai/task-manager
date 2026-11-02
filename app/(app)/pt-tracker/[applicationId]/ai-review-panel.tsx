@@ -185,7 +185,7 @@ export function AiReview({ threadId, threadSubject }: { threadId: number; thread
       ) : !extraction ? (
         <p className="mt-4 text-[13px] text-muted">No extraction selected — run &quot;Analyze Thread&quot; first.</p>
       ) : extraction.errorMessage ? (
-        <p role="alert" className="mt-4 rounded-md border border-accent/30 bg-accent/5 px-3 py-2 text-[13px] text-accent">{extraction.errorMessage}</p>
+        <p role="alert" className="mt-4 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-[13px] text-danger">{extraction.errorMessage}</p>
       ) : !extraction.structured ? (
         <p className="mt-4 text-[13px] text-muted">Extraction stored without structured output.</p>
       ) : (

@@ -161,7 +161,7 @@ export function EmailPanel({
         {results ? (
           <ul className="mt-3 space-y-2">
             {results.map((r, i) => (
-              <li key={i} className={cn("rounded-lg border px-3 py-2 text-[13px]", r.ok ? "border-stroke bg-card" : "border-accent/40 bg-accent/5")}>
+              <li key={i} className={cn("rounded-lg border px-3 py-2 text-[13px]", r.ok ? "border-stroke bg-card" : "border-danger/40 bg-danger/5")}>
                 {r.ok ? (
                   <>
                     <div className="flex items-center justify-between gap-2">
@@ -172,15 +172,15 @@ export function EmailPanel({
                       from {r.preview?.from?.email ?? "?"} · {r.preview?.to.length ?? 0} recipients · {r.preview?.attachments.length ?? 0} attachments ·
                       thread: {r.preview?.threadMatch.reason ?? "new_thread"}
                     </p>
-                    {(r.preview?.warnings.length ?? 0) > 0 ? <p className="mt-1 text-[12px] text-accent">{r.preview!.warnings.join(" · ")}</p> : null}
+                    {(r.preview?.warnings.length ?? 0) > 0 ? <p className="mt-1 text-[12px] text-danger">{r.preview!.warnings.join(" · ")}</p> : null}
                   </>
                 ) : (
                   <>
-                    <div className="flex items-center gap-2 text-accent">
+                    <div className="flex items-center gap-2 text-danger">
                       <TriangleAlert className="h-3.5 w-3.5" aria-hidden />
                       <span className="font-medium">{r.filename}</span>
                     </div>
-                    <p className="mt-0.5 text-[12px] text-accent">{r.error}</p>
+                    <p className="mt-0.5 text-[12px] text-danger">{r.error}</p>
                   </>
                 )}
               </li>

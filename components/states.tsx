@@ -24,8 +24,8 @@ export function LoadingState({ label = "Loading…", className }: { label?: stri
 /** Safe error surface (brief section 46) — no stack traces. */
 export function ErrorState({ title = "Something went wrong", detail, className }: { title?: string; detail?: string; className?: string }) {
   return (
-    <div className={cn("panel flex items-center gap-3 border-l-4 border-l-accent px-6 py-5", className)} role="alert">
-      <TriangleAlert className="h-5 w-5 text-accent" aria-hidden />
+    <div className={cn("panel flex items-center gap-3 border-l-4 border-l-danger px-6 py-5", className)} role="alert">
+      <TriangleAlert className="h-5 w-5 text-danger" aria-hidden />
       <div>
         <p className="text-[14px] font-semibold text-ink">{title}</p>
         {detail ? <p className="text-[13px] text-muted">{detail}</p> : null}

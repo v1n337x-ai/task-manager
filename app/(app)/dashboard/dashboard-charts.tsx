@@ -19,9 +19,9 @@ export function DashboardCharts({
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">Severity distribution</h2>
         <ResponsiveContainer width="100%" height={260}>
           <BarChart data={severity}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
-            <XAxis dataKey="name" tick={{ fill: "#7A7A7A", fontSize: 12 }} />
-            <YAxis allowDecimals={false} tick={{ fill: "#7A7A7A", fontSize: 12 }} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#E7E1EE" />
+            <XAxis dataKey="name" tick={{ fill: "#857896", fontSize: 12 }} />
+            <YAxis allowDecimals={false} tick={{ fill: "#857896", fontSize: 12 }} />
             <Tooltip />
             <Bar dataKey="value">
               {severity.map((entry, i) => (
@@ -36,11 +36,11 @@ export function DashboardCharts({
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">Finding status</h2>
         <ResponsiveContainer width="100%" height={260}>
           <BarChart data={status}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
-            <XAxis dataKey="name" tick={{ fill: "#7A7A7A", fontSize: 12 }} />
-            <YAxis allowDecimals={false} tick={{ fill: "#7A7A7A", fontSize: 12 }} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#E7E1EE" />
+            <XAxis dataKey="name" tick={{ fill: "#857896", fontSize: 12 }} />
+            <YAxis allowDecimals={false} tick={{ fill: "#857896", fontSize: 12 }} />
             <Tooltip />
-            <Bar dataKey="value" fill="#1A73E8" />
+            <Bar dataKey="value" fill="#2E86C1" />
           </BarChart>
         </ResponsiveContainer>
       </section>
@@ -52,11 +52,11 @@ export function DashboardCharts({
         ) : (
           <ResponsiveContainer width="100%" height={Math.max(240, applications.length * 34)}>
             <BarChart data={applications} layout="vertical" margin={{ left: 40 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
-              <XAxis type="number" allowDecimals={false} tick={{ fill: "#7A7A7A", fontSize: 12 }} />
-              <YAxis type="category" dataKey="name" width={110} tick={{ fill: "#1F1F1F", fontSize: 12 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#E7E1EE" />
+              <XAxis type="number" allowDecimals={false} tick={{ fill: "#857896", fontSize: 12 }} />
+              <YAxis type="category" dataKey="name" width={110} tick={{ fill: "#3D2054", fontSize: 12 }} />
               <Tooltip />
-              <Bar dataKey="value" fill="#CF1325" />
+              <Bar dataKey="value" fill="#FF6D1F" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
         )}

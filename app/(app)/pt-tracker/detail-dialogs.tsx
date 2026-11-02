@@ -190,7 +190,7 @@ export function FindingDialog({
                 </div>
               ) : null}
             </div>
-            {error ? <p role="alert" className="rounded-md border border-accent/30 bg-accent/5 px-3 py-2 text-[13px] text-accent">{error}</p> : null}
+            {error ? <p role="alert" className="rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-[13px] text-danger">{error}</p> : null}
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setOpen(false)} type="button">Cancel</Button>
               <Button variant="accent" onClick={submit} disabled={busy || title.trim().length < 3}>
@@ -271,7 +271,7 @@ export function IterationDialog({ applicationId }: { applicationId: number }) {
               <Label htmlFor="i-notes">Notes (optional)</Label>
               <Input id="i-notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
-            {error ? <p role="alert" className="rounded-md border border-accent/30 bg-accent/5 px-3 py-2 text-[13px] text-accent">{error}</p> : null}
+            {error ? <p role="alert" className="rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-[13px] text-danger">{error}</p> : null}
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setOpen(false)} type="button">Cancel</Button>
               <Button variant="accent" onClick={submit} disabled={busy}>
@@ -337,7 +337,7 @@ export function TestCaseDialog({ applicationId }: { applicationId: number }) {
               <Label htmlFor="tc-cat">Category (optional)</Label>
               <Input id="tc-cat" value={category} onChange={(e) => setCategory(e.target.value)} />
             </div>
-            {error ? <p role="alert" className="rounded-md border border-accent/30 bg-accent/5 px-3 py-2 text-[13px] text-accent">{error}</p> : null}
+            {error ? <p role="alert" className="rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-[13px] text-danger">{error}</p> : null}
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setOpen(false)} type="button">Cancel</Button>
               <Button variant="accent" onClick={submit} disabled={busy || title.trim().length < 3}>
@@ -439,7 +439,7 @@ export function FindingStateDialog({
               <Label htmlFor="fs-note">Retest note (optional)</Label>
               <Input id="fs-note" value={note} onChange={(e) => setNote(e.target.value)} />
             </div>
-            {error ? <p role="alert" className="rounded-md border border-accent/30 bg-accent/5 px-3 py-2 text-[13px] text-accent">{error}</p> : null}
+            {error ? <p role="alert" className="rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-[13px] text-danger">{error}</p> : null}
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setOpen(false)} type="button">Cancel</Button>
               <Button variant="accent" onClick={submit} disabled={busy || iterationId === 0}>
@@ -531,7 +531,7 @@ export function TestCaseStateDialog({
               <Label htmlFor="tcs-notes">Notes (optional)</Label>
               <Input id="tcs-notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
-            {error ? <p role="alert" className="rounded-md border border-accent/30 bg-accent/5 px-3 py-2 text-[13px] text-accent">{error}</p> : null}
+            {error ? <p role="alert" className="rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-[13px] text-danger">{error}</p> : null}
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setOpen(false)} type="button">Cancel</Button>
               <Button variant="accent" onClick={submit} disabled={busy || iterationId === 0}>

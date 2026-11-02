@@ -111,8 +111,8 @@ export default async function ApplicationTrackerPage({
               href={`${baseUrl}?tab=${key}`}
               aria-current={activeTab === key ? "page" : undefined}
               className={cn(
-                "rounded-lg px-3 py-1.5 text-[13px] font-medium transition",
-                activeTab === key ? "bg-accent text-white" : "text-ink-2 hover:bg-band",
+                "rounded-full px-3.5 py-1.5 text-[13px] font-medium transition",
+                activeTab === key ? "bg-accent text-white shadow-sm" : "text-ink-2 hover:bg-accent-soft hover:text-accent-deep",
               )}
             >
               {label}

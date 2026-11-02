@@ -39,7 +39,7 @@ const of = (masterValues: MasterValueLite[], domain: string) =>
 
 function AlertText({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <p role="alert" className={"rounded-md border border-accent/30 bg-accent/5 px-3 py-2 text-[13px] text-accent " + (className ?? "")}>
+    <p role="alert" className={"rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-[13px] text-danger " + (className ?? "")}>
       {children}
     </p>
   );

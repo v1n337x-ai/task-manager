@@ -35,7 +35,7 @@ export default async function SettingsPage() {
 
       <PageBody className="space-y-6">
         {dbError ? (
-          <section role="alert" className="panel border-l-4 border-l-accent px-5 py-4">
+          <section role="alert" className="panel border-l-4 border-l-danger px-5 py-4">
             <p className="text-[13px] font-semibold text-ink">Database unavailable</p>
             <p className="mt-1 text-[13px] text-muted">Settings read their values live; connectivity was not established. Other sections stay in safe placeholder states.</p>
           </section>
