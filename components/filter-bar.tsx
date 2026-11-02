@@ -15,7 +15,7 @@ export function FilterBar({ children, className }: { children: React.ReactNode; 
 
 export function FilterChip({ active, children, onClick, href }: { active?: boolean; children: React.ReactNode; onClick?: () => void; href?: string }) {
   const classes = cn(
-    "rounded-none border px-3 py-1 text-[12px] font-medium transition shadow-sm",
+    "rounded-none px-3 py-1 text-[12px] font-medium transition shadow-sm",
     active ? "border-accent-deep bg-accent text-white" : "border-stroke bg-card text-ink-2 hover:bg-accent-soft hover:text-accent-deep",
   );
   if (href) {

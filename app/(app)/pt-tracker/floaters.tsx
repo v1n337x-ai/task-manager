@@ -153,11 +153,11 @@ export function SevStat({ sev, total, open, closed }: { sev: "critical" | "high"
             <span className="ml-auto text-muted">total {total}</span>
           </div>
           <div className="mt-2.5 grid grid-cols-2 gap-2 text-center">
-            <div className="rounded-none bg-xlsx-peach px-2 py-2" style={{ border: "1px solid var(--color-sev-critical)" }}>
+            <div className="rounded-none bg-xlsx-peach px-2 py-2">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-sev-critical-text">Open</p>
               <p className="font-display text-2xl leading-none text-sev-critical-text">{open}</p>
             </div>
-            <div className="rounded-none bg-xlsx-green px-2 py-2" style={{ border: "1px solid var(--color-sev-low)" }}>
+            <div className="rounded-none bg-xlsx-green px-2 py-2">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-sev-low-text">Closed</p>
               <p className="font-display text-2xl leading-none text-sev-low-text">{closed}</p>
             </div>

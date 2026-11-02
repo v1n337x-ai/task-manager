@@ -264,16 +264,16 @@ interface ChatMessage {
 }
 
 const ROLE_META: Record<string, { label: string; badge: string; dot: string; side: "left" | "right" }> = {
-  pentester: { label: "PENTESTER", badge: "bg-accent/10 text-accent-deep border border-accent/30", dot: "#E86B10", side: "left" },
-  developer: { label: "DEVELOPER", badge: "bg-progress/10 text-progress border border-progress/30", dot: "#2E86C1", side: "right" },
-  application_owner: { label: "APP OWNER", badge: "bg-tint-a text-ink-2 border border-stroke", dot: "#5D4A78", side: "right" },
-  security_team: { label: "SECURITY", badge: "bg-tint-a text-ink-2 border border-stroke", dot: "#2E862E", side: "left" },
-  unknown: { label: "ROLE UNKNOWN", badge: "bg-band text-muted border border-stroke", dot: "#9E9E9E", side: "left" },
+  pentester: { label: "PENTESTER", badge: "bg-accent/10 text-accent-deep", dot: "#E86B10", side: "left" },
+  developer: { label: "DEVELOPER", badge: "bg-progress/10 text-progress", dot: "#2E86C1", side: "right" },
+  application_owner: { label: "APP OWNER", badge: "bg-tint-a text-ink-2", dot: "#5D4A78", side: "right" },
+  security_team: { label: "SECURITY", badge: "bg-tint-a text-ink-2", dot: "#2E862E", side: "left" },
+  unknown: { label: "ROLE UNKNOWN", badge: "bg-band text-muted", dot: "#9E9E9E", side: "left" },
 };
 
 function roleMeta(effectiveRole: string) {
   const key = effectiveRole.replace(/\s*\(human override\)\s*/i, "").trim();
-  if (effectiveRole.includes("human")) return { label: `HUMAN · ${key.toUpperCase()}`, badge: "bg-good/10 text-good border border-good/30", dot: "#2E862E", side: key.includes("pentester") ? "left" : "right" } as const;
+  if (effectiveRole.includes("human")) return { label: `HUMAN · ${key.toUpperCase()}`, badge: "bg-good/10 text-good", dot: "#2E862E", side: key.includes("pentester") ? "left" : "right" } as const;
   return ROLE_META[key] ?? { label: key.toUpperCase(), badge: "bg-band text-ink-2 border border-stroke", dot: "#9E9E9E", side: "left" } as const;
 }
 
@@ -352,7 +352,7 @@ function ChatThread({ subject, appDisplayName, messages }: { subject: string; ap
                     {m.attachments.length > 0 ? (
                       <ul className="mt-2 flex flex-wrap gap-2">
                         {m.attachments.map((a) => (
-                          <li key={a.id} className="flex items-center gap-1 rounded-none border border-stroke bg-white px-2 py-0.5 text-[11px] text-ink-2">
+                          <li key={a.id} className="flex items-center gap-1 rounded-none bg-tint-b px-2 py-0.5 text-[11px] text-ink-2">
                             <Paperclip className="h-3 w-3" aria-hidden /> {a.filename} ({Math.max(1, Math.round((a.sizeBytes ?? 0) / 1024))} KB)
                           </li>
                         ))}
