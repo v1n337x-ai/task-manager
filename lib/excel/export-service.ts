@@ -55,6 +55,8 @@ export interface TrackerExportRow {
   reportDate: Date | null;
   iteration1: { startDate: Date | null; reportDate: Date | null; statusRaw: string } | null;
   iteration2: { reportDate: Date | null; statusRaw: string } | null;
+  description: string | null; // Comments (R) — engagement notes / AI thread summary
+  followUpResponse: string | null; // Follow-up Response (T) — manually set responses
   counts: {
     critical: number;
     high: number;
@@ -152,6 +154,8 @@ export async function buildExportRows(): Promise<TrackerExportRow[]> {
             statusRaw: CANONICAL_STATUS_TO_RAW[iter2.statusRef.value] ?? "Pending",
           }
         : null,
+      description: engagement?.notes ?? null,
+      followUpResponse: null, // future extension — no UI writes this yet
       counts: {
         critical: agg.open.critical + agg.closed.critical,
         high: agg.open.high + agg.closed.high,
@@ -244,6 +248,10 @@ export async function exportTrackerWorkbook(
     row.getCell(38).value = e.counts.closedBySeverity.low; // AL
     row.getCell(39).value = e.counts.openBySeverity.info; // AM
     row.getCell(40).value = e.counts.closedBySeverity.info; // AN
+    // Comments (R = col 18) and Follow-up Response (T = col 20) from the engagement
+    // (Phase 9.1: description/notes from analyzed threads + manual follow-ups)
+    if (e.description) row.getCell(18).value = e.description;
+    if (e.followUpResponse) row.getCell(20).value = e.followUpResponse;
     row.commit();
   }
 

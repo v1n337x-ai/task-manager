@@ -1,0 +1,1 @@
+Pipeline completion: engagement.notes (Comments column R) and Follow-up Response (T) now carry the AI finding descriptions into the Excel export. The export fills R=18 from engagement.notes and T=20 from followUpResponse. Thread descriptions were synced from the OPAS findings. Build passes; export now writes all 39 columns.
