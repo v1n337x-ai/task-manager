@@ -29,12 +29,43 @@ export interface PstUploadResult {
   storedAs: string;
 }
 
-/** Proof-of-type: a PST starts with the !BDN magic (ANSI/Unicode formats). */
 function hasPstMagic(head: Buffer): boolean {
   return head.length >= 4 && head.subarray(0, 4).equals(PST_MAGIC_ANSI);
 }
 
-export async function uploadPst(params: { filename: string; content: Buffer; userId: number; ctx: { ip?: string; userAgent?: string } }): Promise<PstUploadResult> {
+function sanitize(name: string): string {
+  const c = name.split(/[\\/]/).pop() ?? "backup.pst";
+  return c.replace(/[\x00-\x1f\x7f]/g, "").trim() || "backup.pst";
+}
+
+async function createPstJob(params: { filename: string; storageReference: string; sha256: string; userId: number; applicationId: number | null }): Promise<number> {
+  const ready = await prisma.masterValue.findUniqueOrThrow({ where: { domain_value: { domain: "job_status", value: "ready" } } });
+  const job = await prisma.importJob.create({
+    data: {
+      filename: params.filename,
+      mimeType: "application/vnd.microsoft.outlook-pst",
+      sha256: params.sha256,
+      type: "pst_batch",
+      status: ready.id,
+      rowsProcessed: 0,
+      createdByUserId: params.userId,
+      options: { storageReference: params.storageReference, declaredApplicationId: params.applicationId } as never,
+    },
+  });
+  await recordAudit({
+    action: "pst_upload.stored",
+    entityType: "ImportJob",
+    entityId: job.id,
+    newValue: JSON.stringify({ filename: params.filename, sha256: params.sha256, path: params.storageReference }),
+    source: "HUMAN",
+    actorUserId: params.userId,
+    index: { note: "pst verbatim lives at user path (locked by Outlook at ingestion time)" },
+  });
+  return job.id;
+}
+
+/** Bytes uploaded through the browser → stored verbatim under storage/pst. */
+export async function uploadPst(params: { filename: string; content: Buffer; userId: number; applicationId?: number; ctx: { ip?: string; userAgent?: string } }): Promise<PstUploadResult> {
   if (params.content.length === 0) throw ValidationError("The uploaded .pst file is empty.");
   if (params.content.length > PST_MAX_BYTES) throw ValidationError(`The .pst exceeds the limit (max ${Math.round(PST_MAX_BYTES / 1048576)} MB).`);
   if (!hasPstMagic(params.content.subarray(0, 4))) {
@@ -44,7 +75,6 @@ export async function uploadPst(params: { filename: string; content: Buffer; use
   const base = sanitize(params.filename);
   const dup = await prisma.importJob.findFirst({ where: { sha256: sha, type: "pst_batch" } });
   if (dup) {
-    // allow re-entry: refresh the preview stage
     const ready = await prisma.masterValue.findUniqueOrThrow({ where: { domain_value: { domain: "job_status", value: "ready" } } });
     await prisma.importJob.update({ where: { id: dup.id }, data: { status: ready.id } });
     return { jobId: dup.id, byteSize: params.content.length, sha256: sha, storedAs: dup.filename };
@@ -53,42 +83,35 @@ export async function uploadPst(params: { filename: string; content: Buffer; use
   await fs.mkdir(root, { recursive: true });
   const stored = `${Date.now()}-${randomBytes(4).toString("hex")}-${base.slice(0, 60)}.pst`;
   await fs.writeFile(path.join(root, stored), params.content);
-
-  const ready = await prisma.masterValue.findUniqueOrThrow({ where: { domain_value: { domain: "job_status", value: "ready" } } });
-  const job = await prisma.importJob.create({
-    data: {
-      filename: params.filename,
-      mimeType: "application/vnd.microsoft.outlook-pst",
-      sha256: sha,
-      type: "pst_batch",
-      status: ready.id,
-      rowsProcessed: 0,
-      createdByUserId: params.userId,
-      options: { storageReference: path.join(root, stored) } as never,
-    },
-  });
-  await recordAudit({
-    action: "pst_upload.stored",
-    entityType: "ImportJob",
-    entityId: job.id,
-    newValue: JSON.stringify({ filename: params.filename, sha256: sha, bytes: params.content.length }),
-    source: "HUMAN",
-    actorUserId: params.userId,
-    ip: params.ctx.ip,
-    userAgent: params.ctx.userAgent,
-    index: { note: "pst bytes verbatim" },
-  });
-  return { jobId: job.id, byteSize: params.content.length, sha256: sha, storedAs: path.join(root, stored) };
+  const jobId = await createPstJob({ filename: params.filename, storageReference: path.join(root, stored), sha256: sha, userId: params.userId, applicationId: params.applicationId ?? null });
+  return { jobId, byteSize: params.content.length, sha256: sha, storedAs: path.join(root, stored) };
 }
 
-function sanitize(name: string): string {
-  const c = name.split(/[\\/]/).pop() ?? "backup.pst";
-  return c.replace(/[\x00-\x1f\x7f]/g, "").trim() || "backup.pst";
+/**
+ * Path-mounted ingestion: the .pst lives on disk (Outlook holds it with an
+ * exclusive lock — bytes cannot be copied). The COM worker mounts THAT path,
+ * so verbatim preservation stays with the user's file and the sha256 is
+ * recorded as path-reference only.
+ */
+export async function uploadPstByPath(params: { sourcePath: string; applicationId?: number; userId: number; ctx: { ip?: string; userAgent?: string } }): Promise<PstUploadResult> {
+  const resolved = path.resolve(params.sourcePath);
+  const stat = await fs.stat(resolved).catch(() => null);
+  if (!stat) throw ValidationError(`The path does not exist: ${resolved}`);
+  if (stat.size > PST_MAX_BYTES) throw ValidationError(`The .pst exceeds the limit (max ${Math.round(PST_MAX_BYTES / 1048576)} MB).`);
+  if (!/\.pst$/i.test(resolved)) throw ValidationError("The referenced file is not a .pst.");
+  const jobId = await createPstJob({
+    filename: path.basename(resolved),
+    storageReference: resolved,
+    sha256: `path-ref:${resolved.toLowerCase()}`,
+    userId: params.userId,
+    applicationId: params.applicationId ?? null,
+  });
+  return { jobId, byteSize: stat.size, sha256: `path-ref:${resolved.toLowerCase()}`, storedAs: resolved };
 }
 
 function runPowershell(args: string[], timeoutMs: number): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = execFile(
+    execFile(
       "powershell",
       ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", path.resolve("scripts", "pst-export.ps1"), ...args],
       { timeout: timeoutMs, maxBuffer: 32 * 1024 * 1024 },
@@ -97,21 +120,20 @@ function runPowershell(args: string[], timeoutMs: number): Promise<string> {
         else resolve(String(stdout));
       },
     );
-    void child;
   });
 }
 
 export interface PstSubjectEntry {
   key: string; // normalized subject key
   subject: string;
-  count: number; // number of messages in the PST for that subject
+  count: number;
   firstSentAt: string | null;
   lastSentAt: string | null;
   senders: string[];
   vaptFlagged: boolean;
 }
 
-const VAPT_RE = /(vapt|vulnerab|penetration|\bblack box\b|retest|\bcve\b|security advisory|\bwaf\b|\baudit\b|\bfix(ed)?\b|\bexploit\b|\bpayload\b|\bweb application\b.?findings)/i;
+const VAPT_RE = /(vapt|vulnerab|penetration|\bblack box\b|retest|\bcve\b|security advisory|\bwaf\b|\baudit\b|\bexploit\b|\bpayload\b|\bseverit)/i;
 
 export async function parsePstSubjects(jobId: number, userId: number, ctx: { ip?: string; userAgent?: string }): Promise<{ subjects: PstSubjectEntry[]; totalMessages: number; warnings: string[] }> {
   const job = await prisma.importJob.findUnique({ where: { id: jobId } });
@@ -119,17 +141,18 @@ export async function parsePstSubjects(jobId: number, userId: number, ctx: { ip?
   const options = (job.options ?? {}) as { storageReference?: string };
   if (!options.storageReference) throw ValidationError("The .pst payload was not found on disk.");
 
-  const readyProbe = await fs.stat(options.storageReference).catch(() => null);
-  if (!readyProbe) throw NotFoundError("Stored .pst file (was it moved/deleted?)");
+  const stat = await fs.stat(options.storageReference).catch(() => null);
+  if (!stat) throw NotFoundError("Stored .pst file (was it moved/deleted?)");
 
   const outSidecar = path.join(pstStorageRoot(), `meta-${jobId}.json`);
   const stdout = await runPowershell(
     ["-Mode", "metadata", "-PstPath", options.storageReference, "-OutPath", outSidecar],
-    20 * 60_000,
+    30 * 60_000,
   );
   if (!/DONE/.test(stdout)) throw ValidationError(String(stdout).slice(0, 240));
   const raw = await fs.readFile(outSidecar, "utf8");
-  const data = JSON.parse(raw) as { total: number; messages: Array<{ subject: string; sentAt: string; fromMail: string; inReplyTo: string; messageId: string }> };
+  const stripBom = (s: string) => (s.charCodeAt(0) === 0xfeff ? s.slice(1) : s);
+  const data = JSON.parse(stripBom(raw)) as { total: number; messages: Array<{ subject: string; sentAt: string; fromMail: string; inReplyTo: string; messageId: string }> };
 
   const warnings: string[] = [];
   const byKey = new Map<string, PstSubjectEntry>();
@@ -197,25 +220,27 @@ export async function confirmPstSelection(
   const tempDir = path.join(pstStorageRoot(), `psttmp-${params.jobId}-${randomBytes(3).toString("hex")}`);
   await fs.mkdir(tempDir, { recursive: true });
   const selectionPath = path.join(tempDir, "selection.json");
-  await fs.writeFile(selectionPath, JSON.stringify({ keys: params.selectedKeys }), "utf8");
+  await fs.writeFile(selectionPath, JSON.stringify({ keys: params.selectedKeys.map((k) => k.toLowerCase().replace(/[^a-z0-9]/g, "")) }), "utf8");
 
   const exportPath = path.join(tempDir, "export-index.json");
   const stdout = await runPowershell(
     ["-Mode", "export", "-PstPath", options.storageReference, "-OutPath", exportPath, "-SelectionPath", selectionPath, "-TempDir", tempDir],
-    30 * 60_000,
+    120 * 60_000,
   );
   if (!/DONE/.test(stdout)) throw ValidationError(String(stdout).slice(0, 240));
-  const index = JSON.parse(await fs.readFile(exportPath, "utf8")) as { count: number; files: { subjectKey: string; eml: string }[] };
+  const rawIndex = await fs.readFile(exportPath, "utf8");
+  const stripBom = (s: string) => (s.charCodeAt(0) === 0xfeff ? s.slice(1) : s);
+  const index = JSON.parse(stripBom(rawIndex)) as { count: number; files: { subjectKey: string; eml: string }[] };
 
   const { validateEmlUpload, confirmEmlUpload } = await import("@/lib/eml/email-import-service");
   let imported = 0;
   let skipped = 0;
   const threads = new Set<number>();
   const warnings: string[] = [];
+  const declaredApp = (job.options as { declaredApplicationId?: number } | null)?.declaredApplicationId ?? null;
   for (const f of index.files) {
     try {
       const content = await fs.readFile(f.eml);
-      const declaredApp = (job.options as { declaredApplicationId?: number } | null)?.declaredApplicationId ?? null;
       const valid = await validateEmlUpload({
         filename: path.basename(f.eml),
         content,

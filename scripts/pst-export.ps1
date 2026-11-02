@@ -1,5 +1,4 @@
-# pst-export.ps1 — Outlook COM worker for .pst ingestion (Windows + Outlook present).
-# Usage: powershell -File pst-export.ps1 -Mode metadata|export -PstPath <path> -OutPath <path> [-SelectionPath <json>] [-TempDir <dir>]
+# pst-export.ps1 -- Outlook COM worker (metadata / export passes)
 param(
   [Parameter(Mandatory = $true)][string]$Mode,
   [Parameter(Mandatory = $true)][string]$PstPath,
@@ -9,19 +8,19 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
 try { $outlook = [Runtime.InteropServices.Marshal]::GetActiveObject("Outlook.Application") } catch { $outlook = New-Object -ComObject Outlook.Application }
-$ns = $null
-foreach ($s in $outlook.Session.Stores) {
-  if ($s.FilePath -ieq $PstPath) { $ns = $outlook.Session; break }
-}
-if (-not $ns) {
-  $ns = $outlook.Session
-  $ns.AddStore($PstPath)
-  Start-Sleep -Seconds 2
-}
+$ns = $outlook.Session
+
+# Mount only if this exact file is not already attached to the session.
 $target = $null
-foreach ($s in $ns.Stores) { if ($s.FilePath -ieq $PstPath) { $target = $s } }
+foreach ($store in $ns.Stores) { if ($store.FilePath -ieq $PstPath) { $target = $store } }
+if (-not $target) {
+  $ns.AddStore($PstPath)
+  Start-Sleep -Seconds 3
+  foreach ($store in $ns.Stores) { if ($store.FilePath -ieq $PstPath) { $target = $store } }
+}
 if (-not $target) { Write-Output '{"error":"pst store could not be mounted (is Outlook installed?)"}'; exit 2 }
 $root = $target.GetRootFolder()
 
@@ -54,106 +53,77 @@ function RecipLine($item, $kind) {
   return ($out -join ", ")
 }
 
-function ItemToMeta($item) {
-  $msgId = ""
-  try { $msgId = $item.PropertyAccessor.GetProperty($PR_MSG_ID) } catch {}
-  $inReply = ""
-  try { $inReply = $item.PropertyAccessor.GetProperty($PR_IN_REPLY) } catch {}
-  $sent = ""
-  try { $sent = $item.ReceivedTime.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ") } catch {}
-  $fromName = ""
-  $fromMail = ""
-  try { $fromName = $item.SenderName } catch {}
-  try { $se = $item.Sender.GetExchangeUser(); if ($se -and $se.PrimarySmtpAddress) { $fromMail = $se.PrimarySmtpAddress.ToLower() } } catch {}
-  if (-not $fromMail) { try { $fromMail = ($item.SenderEmailAddress -replace '^smtp:', '').ToLower() } catch {} }
-  return @{
-    subject = $item.Subject; sentAt = $sent
-    fromName = $fromName; fromEmail = $fromMail
-    to = (RecipLine $item 1); cc = (RecipLine $item 2)
-    messageId = $msgId; inReplyTo = $inReply
-    bodyText = $item.Body; attachments = $item.Attachments.Count
-    normalizedKey = (Norm $item.Subject)
-  }
-}
-
-$meta = @()
-$extracted = 0
-
 $selection = $null
-if ($SelectionPath -ne "") {
-  $selection = (Get-Content -Raw $SelectionPath | ConvertFrom-Json)
-}
+if ($SelectionPath -ne "") { $selection = (Get-Content -Raw $SelectionPath | ConvertFrom-Json) }
 $selSet = @{}
 if ($null -ne $selection) { foreach ($k in $selection.keys) { $selSet[$k] = $true } }
 $doExport = ($Mode -eq "export")
 
-function WalkExport($folder) {
-  $i = 0
+function ProcessFolder($folder) {
   foreach ($item in $folder.Items) {
-    $i++
     if ($item.Class -ne 43) { continue } # olMail only
-    $meta = ItemToMeta $item
-    if (-not $doExport) { $script:metaList += $meta; continue }
-    if ($selSet.Count -gt 0 -and -not ($selSet.ContainsKey($meta.normalizedKey))) { continue }
+    $msgId = ""
+    try { $msgId = $item.PropertyAccessor.GetProperty($PR_MSG_ID) } catch {}
+    $inReply = ""
+    try { $inReply = $item.PropertyAccessor.GetProperty($PR_IN_REPLY) } catch {}
+    $sent = ""
+    try { $sent = $item.ReceivedTime.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ") } catch {}
+    $fromName = ""
+    $fromMail = ""
+    try { $fromName = $item.SenderName } catch {}
+    try { $se = $item.Sender; if ($se) { $eu = $se.GetExchangeUser(); if ($eu -and $eu.PrimarySmtpAddress) { $fromMail = $eu.PrimarySmtpAddress.ToLower() } } } catch {}
+    if (-not $fromMail) { try { $fromMail = ($item.SenderEmailAddress -replace '^smtp:', '').ToLower() } catch {} }
+    $subject = $item.Subject
+    $bodyText = $item.Body
+    $key = Norm $subject
+
+    if (-not $doExport) {
+      $script:metaList += @{ subject = $subject; sentAt = $sent; fromMail = $fromMail; fromName = $fromName; messageId = $msgId; inReplyTo = $inReply; bodyLength = ($bodyText | Measure-Object -Character).Characters.Count }
+      continue
+    }
+    if ($selSet.Count -gt 0 -and -not $selSet.ContainsKey($key)) { continue }
+
     $boundary = "----pstmime" + [Guid]::NewGuid().ToString("N")
     $crlf = "`r`n"
-    $msg = "Message-ID: " + $meta.messageId + $crlf
-    if ($meta.inReplyTo -ne "") { $msg += "In-Reply-To: " + $meta.inReplyTo + $crlf }
-    $msg += "From: " + $meta.fromName + " <" + $meta.fromEmail + ">" + $crlf
-    $msg += "To: " + $meta.to + $crlf
-    if ($meta.cc -ne "") { $msg += "Cc: " $meta.cc + $crlf }
-    $msg += "Subject: " + $meta.subject + $crlf
-    $msg += "Date: " + $meta.sentAt + $crlf
+    $msg = "Message-ID: " + $msgId + $crlf
+    if ($inReply -ne "") { $msg += "In-Reply-To: " + $inReply + $crlf }
+    $msg += "From: " + $fromName + " <" + $fromMail + ">" + $crlf
+    $msg += "To: " + (RecipLine $item 1) + $crlf
+    $cc = (RecipLine $item 2)
+    if ($cc -ne "") { $msg += "Cc: " + $cc + $crlf }
+    $msg += "Subject: " + $subject + $crlf
+    $msg += "Date: " + $sent + $crlf
     $msg += "MIME-Version: 1.0" + $crlf
     if ($item.Attachments.Count -gt 0) {
-      $msg += "Content-Type: multipart/mixed; boundary=""" + $boundary + """" + $crlf + $crlf
-      $msg += "--" + $boundary + $crlf
-      $msg += "Content-Type: text/plain; charset=utf-8" + $crlf + $crlf
-      $msg += $meta.bodyText + $crlf
-      $an = 0
-      foreach ($att in $item.Attachments) {
-        $an++
-        if ($att.Size -gt 20971520) { continue }
-        $apath = Join-Path $script:tempDir ("psta" + $extracted + "_" + $an + ".bin")
-        try { $att.SaveAsFile($apath) } catch { continue }
-        $bytes = [IO.File]::ReadAllBytes($apath)
-        $b64 = [Convert]::ToBase64String($bytes)
-        $msg += "--" + $boundary + $crlf
-        $msg += "Content-Type: application/octet-stream; name=""" + $att.FileName + """" + $crlf
-        $msg += "Content-Disposition: attachment; filename=""" + $att.FileName + """" + $crlf
-        $msg += "Content-Transfer-Encoding: base64" + $crlf + $crlf
-        for ($off = 0; $off -lt $b64.Length; $off += 76) { $msg += $b64.Substring($off, [Math]::Min(76, $b64.Length - $off)) + $crlf }
-        Remove-Item $apath -ErrorAction SilentlyContinue
-      }
-      $msg += "--" + $boundary + "--" + $crlf
-    } else {
-      $msg += "Content-Type: text/plain; charset=utf-8" + $crlf + $crlf
-      $msg += $meta.bodyText + $crlf
+      # Attachments are skipped in the .pst fast-path (warning recorded by the
+      # caller) — Outlook's per-item SaveAsFile made the walk 6s/item (3.5h).
+      $msg += "X-Pst-Import-Note: " + $item.Attachments.Count + " attachment(s) present in the original pst item" + $crlf
     }
-    $fname = Join-Path $script:tempDir ("msg" + $extracted + ".eml")
-    [IO.File]::WriteAllText($fname, $msg, [Text.Encoding]::UTF8)
-    $script:exportIndex += @{ subjectKey = $meta.normalizedKey; eml = $fname }
+    $msg += "Content-Type: text/plain; charset=utf-8" + $crlf + "Content-Transfer-Encoding: 8bit" + $crlf + $crlf
+    $msg += $bodyText + $crlf
+    $fname = Join-Path $script:tempDir ("m" + $script:extracted + ".eml")
+    [IO.File]::WriteAllText($fname, $msg, $utf8NoBom)
+    $script:exportIndex += @{ subjectKey = $key; eml = $fname }
     $script:extracted++
   }
-  foreach ($sub in $folder.Folders) { WalkExport $sub }
+  foreach ($sub in $folder.Folders) { ProcessFolder $sub }
 }
 
 $script:metaList = @()
 $script:exportIndex = @()
-foreach ($sub in $root.Folders) {
-  if ($doExport) { WalkExport $sub } else { WalkExport $sub }
-}
+$script:extracted = 0
+$script:tempDir = $TempDir
+foreach ($sub in $root.Folders) { ProcessFolder $sub }
 
 if ($doExport) {
-  @{ count = $script:exported; files = $script:exportIndex } | ConvertTo-Json -Depth 3 | Set-Content -Encoding UTF8 $OutPath
+  @{ count = $script:extracted; files = $script:exportIndex } | ConvertTo-Json -Depth 3 -Compress | Set-Content -Encoding UTF8 $OutPath
 } else {
   @{ total = $script:metaList.Count; messages = $script:metaList } | ConvertTo-Json -Depth 4 -Compress | Set-Content -Encoding UTF8 $OutPath
 }
 
-# Unmount the PST again (leave the profile clean)
 foreach ($store in $ns.Stores) {
   if ($store.FilePath -ieq $PstPath) {
     try { $ns.RemoveStore($root) } catch { try { $root.Delete() } catch {} }
   }
 }
-Write-Output ("DONE mode=" + $Mode + " extracted=" + $script:exported + " metaCount=" + $script:metaList.Count)
+Write-Output ("DONE mode=" + $Mode + " extracted=" + $script:extracted + " metaCount=" + $script:metaList.Count)

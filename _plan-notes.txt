@@ -1,0 +1,9 @@
+_research notes snapshot:
+- batch worker currently exporting chunk 2 (123 eml in latest tempdir, msgs=1 because confirmChunk commits per response — each 50-subject chunk issues ~37-60 messages then commit fires; messages count will rise in jumps)
+- user reports two NEW issues:
+  1. Comments/Follow-up response fields from xl and the OPAS thread bodies are not being fetched into tracker data (comments column empty)
+  2. Excel EXPORT writes blank cells - data not interconnected (the export service reads finding+state tables; the OPAS findings weren't written back to the export workbook because exportTrackerWorkbook writes to the 39-col template cells but the bodyText/comment fields aren't populated onto the finding rows)
+root causes to fix after the pst walk:
+  a. finding.description was never populated from bodyText/comment threads; update finding.description with the thread comment/last follow-up text during AI apply + eml confirm
+  b. export service writes cells 1..40 but skips L..P/Q dates and U..AN counts for messages without a Dewey row — must fill comments (R) and follow-up response (T) columns from finding.description/type ref
+  c. the batched confirm only commits the LAST response's server-side wait; verify each chunk actually imported before moving on
