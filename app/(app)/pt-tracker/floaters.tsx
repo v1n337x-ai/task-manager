@@ -5,75 +5,99 @@ import { createPortal } from "react-dom";
 import { Info } from "lucide-react";
 
 /**
- * PT Tracker floaters (user-requested): hover a severity number → Excel
- * Open/Closed pair; hover ⓘ → EVERY iteration (I1..In, open-ended) or the row's
- * remaining Excel columns (Mail Subject, POC, Assigned, dates, Comments).
- * Cards render in a PORTAL at fixed positions, so the scrollable table can
- * never clip, squeeze, or overlap them.
+ * PT Tracker floaters — BIG hover surface: the whole table CELL is the hot
+ * zone (negative-margin block), with a 150ms close grace for diagonal mouse
+ * travel and full card-out/in movement. Cards render in a PORTAL at fixed
+ * positions, so the scrollable table can never clip or overlap them.
  */
 
 const fmtD = (iso: Date | string | null) =>
   iso ? new Date(iso).toLocaleDateString("en-GB") : "—";
 
+/** Full-cell hot zone (eats the default td padding, then re-pads itself). */
+const CELL_ZONE = "-mx-4 -my-2.5 flex min-h-[46px] items-center px-4 py-2.5 transition hover:bg-accent-soft/50";
+
 function Floater({
   trigger,
   content,
+  triggerClassName = "",
   width = 280,
   testId,
 }: {
   trigger: React.ReactNode;
   content: React.ReactNode;
+  triggerClassName?: string;
   width?: number;
   testId?: string;
 }) {
   const [open, setOpen] = React.useState(false);
   const [pos, setPos] = React.useState({ top: 0, left: 0 });
   const anchor = React.useRef<HTMLSpanElement | null>(null);
+  const card = React.useRef<HTMLDivElement | null>(null);
+  const grace = React.useRef<number | null>(null);
+
+  const cancelGrace = React.useCallback(() => {
+    if (grace.current !== null) {
+      window.clearTimeout(grace.current);
+      grace.current = null;
+    }
+  }, []);
+
+  const gracefulClose = React.useCallback(() => {
+    cancelGrace();
+    grace.current = window.setTimeout(() => setOpen(false), 150);
+  }, [cancelGrace]);
 
   const show = React.useCallback(() => {
+    cancelGrace();
     const el = anchor.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    const flipUp = r.bottom + 340 > window.innerHeight;
     setPos({
-      top: flipUp ? Math.max(12, r.top - 10) : r.bottom + 8,
+      top: r.bottom + 340 > window.innerHeight ? Math.max(12, r.top - 10) : r.bottom + 8,
       left: Math.max(12, Math.min(r.left, window.innerWidth - width - 16)),
     });
     setOpen(true);
-  }, [width]);
-
-  const close = React.useCallback(() => setOpen(false), []);
+  }, [width, cancelGrace]);
 
   React.useEffect(() => {
     if (!open) return;
-    const onClose = () => setOpen(false);
     const onMove = (e: MouseEvent) => {
-      const el = anchor.current;
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      const inX = e.clientX >= r.left - 10 && e.clientX <= r.right + width + 10;
-      const inY = e.clientY >= r.top - 12 && e.clientY <= Math.max(r.bottom, pos.top + 220) + 10;
-      if (!(inX && inY)) onClose();
+      const zones: DOMRect[] = [];
+      if (anchor.current) zones.push(anchor.current.getBoundingClientRect());
+      if (card.current) zones.push(card.current.getBoundingClientRect());
+      const pad = 12;
+      const inside = zones.some(
+        (r) =>
+          e.clientX >= r.left - pad &&
+          e.clientX <= r.right + pad &&
+          e.clientY >= r.top - pad &&
+          e.clientY <= r.bottom + pad,
+      );
+      if (!inside) gracefulClose();
+      else cancelGrace();
     };
-    window.addEventListener("scroll", onClose, true);
-    window.addEventListener("resize", onClose);
+    const onScrollOrResize = () => gracefulClose();
+    window.addEventListener("scroll", onScrollOrResize, true);
+    window.addEventListener("resize", onScrollOrResize);
     document.addEventListener("mousemove", onMove);
     return () => {
-      window.removeEventListener("scroll", onClose, true);
-      window.removeEventListener("resize", onClose);
+      window.removeEventListener("scroll", onScrollOrResize, true);
+      window.removeEventListener("resize", onScrollOrResize);
       document.removeEventListener("mousemove", onMove);
+      cancelGrace();
     };
-  }, [open, close, pos.top, width]);
+  }, [open, gracefulClose, cancelGrace]);
 
   return (
     <>
       <span
         ref={anchor}
-        className="relative inline-flex cursor-help"
+        className={`relative cursor-help focus:outline-none ${triggerClassName}`}
         onMouseEnter={show}
-        onMouseLeave={close}
+        onMouseLeave={gracefulClose}
         onFocus={show}
-        onBlur={close}
+        onBlur={gracefulClose}
         tabIndex={0}
         data-testid={testId}
       >
@@ -82,8 +106,9 @@ function Floater({
       {open
         ? createPortal(
             <div
+              ref={card}
               className="fixed z-50 rounded-xl border border-stroke bg-card px-4 py-3 text-[12px] shadow-[0_12px_30px_rgb(61_32_84/16%)]"
-              style={{ top: pos.top, left: pos.left, width, marginTop: open && pos.top > 40 ? 0 : 0 }}
+              style={{ top: pos.top, left: pos.left, width }}
             >
               {content}
             </div>,
@@ -94,7 +119,7 @@ function Floater({
   );
 }
 
-/* Severity cell — the Excel Open/Closed pair on hover. */
+/* Severity cell — the whole cell is the hover zone; the Excel Open/Closed pair appears. */
 
 const SEV_DOT: Record<string, string> = {
   critical: "#CF1325",
@@ -108,8 +133,17 @@ export function SevStat({ sev, total, open, closed }: { sev: "critical" | "high"
   return (
     <Floater
       testId={total > 0 ? `sev-${sev}-${total}` : undefined}
+      triggerClassName={CELL_ZONE}
       trigger={
-        <span className={total > 0 ? "font-semibold underline decoration-stroke decoration-dotted underline-offset-4" : "text-muted"}>{total}</span>
+        <span
+          className={
+            total > 0
+              ? "font-semibold underline decoration-stroke decoration-dotted underline-offset-4"
+              : "text-muted"
+          }
+        >
+          {total}
+        </span>
       }
       content={
         <>
@@ -148,6 +182,7 @@ export function IterationsFloater({ iterations }: { iterations: IterationFloater
   return (
     <Floater
       testId={iterations.length > 0 ? `iter-${iterations[0]!.number}` : undefined}
+      triggerClassName={CELL_ZONE + " justify-center"}
       trigger={
         <span className="inline-flex items-center gap-1 whitespace-nowrap">
           {iterations.length > 0 ? `I${iterations[iterations.length - 1]!.number}` : "—"}
@@ -192,6 +227,7 @@ export function DetailsFloater({ fields }: { fields: DetailField[] }) {
     <Floater
       testId="row-details"
       width={320}
+      triggerClassName={CELL_ZONE + " justify-center"}
       trigger={
         <span className="text-muted transition hover:text-accent" aria-hidden>
           <Info className="h-4 w-4" />
