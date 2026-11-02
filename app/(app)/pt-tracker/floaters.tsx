@@ -107,7 +107,7 @@ function Floater({
         ? createPortal(
             <div
               ref={card}
-              className="fixed z-50 rounded-xl border border-stroke bg-card px-4 py-3 text-[12px] shadow-[0_12px_30px_rgb(61_32_84/16%)]"
+              className="fixed z-50 rounded-none border border-xlsx-band bg-card px-4 py-3 text-[12px] shadow-[0_12px_30px_rgb(61_32_84/16%)]"
               style={{ top: pos.top, left: pos.left, width }}
             >
               {content}
@@ -122,11 +122,11 @@ function Floater({
 /* Severity cell — the whole cell is the hover zone; the Excel Open/Closed pair appears. */
 
 const SEV_DOT: Record<string, string> = {
-  critical: "#CF1325",
-  high: "#E86B10",
-  medium: "#F5A623",
-  low: "#4A90D9",
-  info: "#9E9E9E",
+  critical: "#ED7D31",
+  high: "#4472C4",
+  medium: "#FFC000",
+  low: "#70AD47",
+  info: "#A5A5A5",
 };
 
 export function SevStat({ sev, total, open, closed }: { sev: "critical" | "high" | "medium" | "low" | "info"; total: number; open: number; closed: number }) {
@@ -153,13 +153,13 @@ export function SevStat({ sev, total, open, closed }: { sev: "critical" | "high"
             <span className="ml-auto text-muted">total {total}</span>
           </div>
           <div className="mt-2.5 grid grid-cols-2 gap-2 text-center">
-            <div className="rounded-lg bg-danger/5 px-2 py-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Open</p>
-              <p className="font-display text-2xl leading-none text-danger">{open}</p>
+            <div className="rounded-none bg-xlsx-peach px-2 py-2" style={{ border: "1px solid var(--color-sev-critical)" }}>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-sev-critical-text">Open</p>
+              <p className="font-display text-2xl leading-none text-sev-critical-text">{open}</p>
             </div>
-            <div className="rounded-lg bg-good/5 px-2 py-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Closed</p>
-              <p className="font-display text-2xl leading-none text-good">{closed}</p>
+            <div className="rounded-none bg-xlsx-green px-2 py-2" style={{ border: "1px solid var(--color-sev-low)" }}>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-sev-low-text">Closed</p>
+              <p className="font-display text-2xl leading-none text-sev-low-text">{closed}</p>
             </div>
           </div>
           <p className="mt-2 text-[11px] text-muted">Excel Open/Closed matrix pair — open includes open/new/not fixed/not retested.</p>

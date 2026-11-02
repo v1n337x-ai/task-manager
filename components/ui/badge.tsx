@@ -8,17 +8,19 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        neutral: "bg-band text-ink-2 border border-stroke",
-        critical: "bg-sev-critical text-white",
-        high: "bg-sev-high text-white",
-        medium: "bg-sev-medium text-ink",
-        low: "bg-sev-low text-white",
-        info: "bg-sev-info text-white",
-        good: "bg-good text-white",
-        progress: "bg-progress text-white",
+        // Severity chips follow the WORKBOOK's Excel look (user direction):
+        // light accent-tint fill + darker accent text.
+        critical: "bg-sev-critical-soft text-sev-critical-text border border-sev-critical",
+        high: "bg-sev-high-soft text-sev-high-text border border-sev-high",
+        medium: "bg-sev-medium-soft text-sev-medium-text border border-sev-medium",
+        low: "bg-sev-low-soft text-sev-low-text border border-sev-low",
+        info: "bg-sev-info-soft text-sev-info-text border border-sev-info",
+        good: "bg-sev-low-soft text-sev-low-text border border-sev-low",
+        progress: "bg-xlsx-peach text-sev-critical-text border border-sev-critical/50",
         accent: "bg-accent text-white",
         hold: "bg-accent-orange text-white",
         muted: "bg-band text-muted",
+        neutral: "bg-band text-ink-2 border border-stroke",
       },
     },
     defaultVariants: { variant: "neutral" },

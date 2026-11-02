@@ -22,8 +22,9 @@ import {
  * can NEVER make elements overlap.
  */
 
-// VAPT severity palette — fixed by the platform contract.
-const SEVERITY_COLORS = ["#CF1325", "#E86B10", "#F5A623", "#4A90D9", "#9E9E9E"];
+// VAPT severity palette — from the WORKBOOK's own Office theme accents
+// (user-directed 2026-11: "same color code of xl").
+const SEVERITY_COLORS = ["#ED7D31", "#4472C4", "#FFC000", "#70AD47", "#A5A5A5"];
 const GRID = "#E7E1EE";
 const AXIS = "#857896";
 const INK = "#3D2054";
