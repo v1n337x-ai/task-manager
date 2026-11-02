@@ -266,15 +266,32 @@ interface ChatMessage {
 const ROLE_META: Record<string, { label: string; badge: string; dot: string; side: "left" | "right" }> = {
   pentester: { label: "PENTESTER", badge: "bg-sev-critical text-sev-critical-text", dot: "#C1272D", side: "left" },
   developer: { label: "DEVELOPER", badge: "bg-sev-info text-sev-info-text", dot: "#0070C0", side: "right" },
-  application_owner: { label: "APP OWNER", badge: "bg-slate text-white", dot: "#44546A", side: "right" },
+  application_owner: { label: "APP OWNER", badge: "bg-slate text-white", dot: "#44546A", side: "left" },
+  management: { label: "MANAGEMENT", badge: "bg-slate text-white", dot: "#44546A", side: "left" },
   security_team: { label: "SECURITY", badge: "bg-sev-low text-sev-low-text", dot: "#39B54A", side: "left" },
+  other: { label: "OTHER", badge: "bg-xlsx-band text-ink", dot: "#7a7a7a", side: "left" },
   unknown: { label: "ROLE UNKNOWN", badge: "bg-band text-muted", dot: "#7a7a7a", side: "left" },
 };
 
+/** Two-sided thread convention: LEFT = Akasa defense + pentester (assessment
+ * side), RIGHT = vendor developers. EVERY role maps into a side — no orphans. */
+const LEFT_SIDE = new Set(["pentester", "security_team", "application_owner", "management", "other", "unknown"]);
+
+function sideOf(effectiveRole: string): "left" | "right" {
+  const key = effectiveRole.replace(/\s*\(human override\)\s*/i, "").trim();
+  return LEFT_SIDE.has(key) ? "left" : "right";
+}
+
 function roleMeta(effectiveRole: string) {
   const key = effectiveRole.replace(/\s*\(human override\)\s*/i, "").trim();
-  if (effectiveRole.includes("human")) return { label: `HUMAN · ${key.toUpperCase()}`, badge: "bg-sev-low text-sev-low-text", dot: "#39B54A", side: key.includes("pentester") ? "left" : "right" } as const;
-  return ROLE_META[key] ?? { label: key.toUpperCase(), badge: "bg-band text-ink-2", dot: "#7a7a7a", side: "left" } as const;
+  let base = ROLE_META[key];
+  if (!base) {
+    base = { label: key.toUpperCase(), badge: "bg-band text-ink-2", dot: "#7a7a7a", side: "left" };
+  }
+  if (effectiveRole.includes("human")) {
+    return { label: `HUMAN · ${key.toUpperCase()}`, badge: "bg-sev-low text-sev-low-text", dot: "#39B54A", side: sideOf(key) };
+  }
+  return { ...base, side: sideOf(key) };
 }
 
 function initials(name: string): string {
@@ -394,22 +411,63 @@ function NeatTextBody({ body }: { body: string }) {
 const timeOf = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "");
 
 function ChatThread({ subject, appDisplayName, messages }: { subject: string; appDisplayName: string | null; messages: ChatMessage[] }) {
+  const scrollRef = React.useRef<HTMLDivElement | null>(null);
+
+  // Jump rail data: per-day anchors (with message counts).
+  const days = React.useMemo(() => {
+    const map = new Map<string, { label: string; count: number }>();
+    for (const m of messages) {
+      const key = m.sentAt ? new Date(m.sentAt).toDateString() : "undated";
+      const label = m.sentAt ? new Date(m.sentAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) : "undated";
+      const prev = map.get(key);
+      map.set(key, { label: prev?.label ?? label, count: (prev?.count ?? 0) + 1 });
+    }
+    return [...map.entries()].map(([key, v]) => ({ key, ...v }));
+  }, [messages]);
+
+  // Two-sided split computed from the resolved roles — confirms that EVERY
+  // message is assigned to the pentester/defense side or the developer side.
+  const sideCounts = React.useMemo(() => {
+    let left = 0;
+    let right = 0;
+    for (const m of messages) {
+      if (roleMeta(m.from.effectiveRole).side === "right") right += 1;
+      else left += 1;
+    }
+    return { left, right };
+  }, [messages]);
+
+  function jumpTo(id: string) {
+    const container = scrollRef.current;
+    if (!container) return;
+    const el = container.querySelector(`[data-anchor="${id}"]`);
+    if (el) container.scrollTo({ top: (el as HTMLElement).offsetTop - container.offsetTop - 8, behavior: "auto" });
+  }
+
   return (
     <div className="flex h-full flex-col">
-      {/* Chat header — sticky within the panel */}
+      {/* Header with the side-split confirmation */}
       <div className="border-b border-stroke pb-3">
         <h3 className="font-display truncate text-2xl text-ink">{subject}</h3>
-        <p className="text-[12px] text-muted">
-          {appDisplayName ?? "Unassigned"} · {messages.length} messages · original .eml files preserved verbatim
+        <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted" data-testid="side-split">
+          <span>
+            {appDisplayName ?? "Unassigned"} · {messages.length} messages
+          </span>
+          <span>
+            <span className="font-semibold text-sev-critical">pentester/defense {sideCounts.left}</span>
+            <span className="mx-1 text-muted">·</span>
+            <span className="font-semibold text-sev-info">developer {sideCounts.right}</span>
+            <span> every message is on a side</span>
+          </span>
         </p>
       </div>
 
       {/* Chat area — bubbles scroll inside a fixed-height canvas; contained
           scrolling keeps the page from jumping (the delayed-scroll fix). */}
-      <div
-        className="mt-3 min-h-[420px] flex-1 space-y-3 overflow-y-auto overscroll-contain bg-tint-b p-4"
-        style={{ maxHeight: 640, scrollBehavior: "auto" }}
-      >
+      <div className="mt-3 flex min-h-[420px] flex-1 gap-3" style={{ maxHeight: 640 }}>
+        {/* Chat canvas — bubbles scroll inside; contained scrolling keeps the
+            page from jumping (the delayed-scroll fix). */}
+        <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto overscroll-contain bg-tint-b p-4" style={{ scrollBehavior: "auto" }}>
         {messages.map((m, i) => {
           const meta = roleMeta(m.from.effectiveRole);
           const side = meta.side;
@@ -420,13 +478,13 @@ function ChatThread({ subject, appDisplayName, messages }: { subject: string; ap
           return (
             <React.Fragment key={m.id}>
               {dayKey && dayKey !== prevDay ? (
-                <div className="flex justify-center" style={{ contentVisibility: "auto" }}>
+                <div id={`day-${dayKey}`} data-anchor={`day-${dayKey}`} className="flex justify-center" style={{ contentVisibility: "auto" }}>
                   <span className="rounded-none bg-card px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted shadow-sm">
                     {m.sentAt ? new Date(m.sentAt).toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "short" }) : "undated message"}
                   </span>
                 </div>
               ) : null}
-              <div className={`flex gap-2 ${isRight ? "flex-row-reverse" : ""}`} style={{ contentVisibility: "auto", containIntrinsicSize: "auto 220px" }}>
+              <div id={`msg-${m.id}`} data-anchor={`msg-${m.id}`} className={`flex gap-2 ${isRight ? "flex-row-reverse" : ""}`} style={{ contentVisibility: "auto", containIntrinsicSize: "auto 220px" }}>
                 {/* Avatar */}
                 <span
                   className={`mt-1 hidden h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white sm:flex`}
@@ -486,6 +544,47 @@ function ChatThread({ subject, appDisplayName, messages }: { subject: string; ap
             </React.Fragment>
           );
         })}
+        </div>
+
+        {/* Jump rail — click a date or a message to jump; the human-machine
+            shortcut for long vendor threads. */}
+        <aside className="hidden w-52 shrink-0 flex-col border-l border-stroke pl-3 xl:flex" aria-label="Conversation jump rail">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Jump to date</p>
+          <div className="mt-1 flex flex-wrap gap-1">
+            {days.map((d) => (
+              <button
+                key={d.key}
+                type="button"
+                onClick={() => jumpTo(`day-${d.key}`)}
+                className="flex items-center gap-1 border border-stroke bg-card px-2 py-1 text-[11px] font-medium text-ink-2 transition hover:bg-xlsx-data"
+              >
+                {d.label} <span className="text-[10px] text-muted">{d.count}</span>
+              </button>
+            ))}
+          </div>
+          <p className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-muted">Jump to message</p>
+          <div className="mt-1 flex-1 overflow-y-auto pr-1" style={{ maxHeight: 320 }}>
+            <ul className="space-y-1">
+              {messages.map((m, i) => (
+                <li key={m.id}>
+                  <button
+                    type="button"
+                    onClick={() => jumpTo(`msg-${m.id}`)}
+                    className="w-full truncate border border-stroke bg-card px-2 py-1 text-left text-[11px] text-ink-2 transition hover:bg-xlsx-data"
+                    title={`${m.from.displayName} — ${m.sentAt ? new Date(m.sentAt).toLocaleString("en-GB") : "no date"}`}
+                  >
+                    <span className="font-semibold">{i + 1}.</span>{" "}
+                    <span className={roleMeta(m.from.effectiveRole).side === "right" ? "text-sev-info" : "text-sev-critical"}>
+                      {m.from.displayName}
+                    </span>
+                    {" — "}
+                    {timeOf(m.sentAt)}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </aside>
       </div>
 
       {/* Composer is intentionally absent: no mailbox/SMTP integration by design —
