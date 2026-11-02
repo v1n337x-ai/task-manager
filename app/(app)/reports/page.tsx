@@ -107,7 +107,7 @@ export default async function ReportsPage({
                     { key: "name", header: "Iteration name", className: "min-w-[150px]", render: (it) => it.name },
                     { key: "type", header: "Type", className: "whitespace-nowrap", render: (it) => it.typeLabel },
                     { key: "status", header: "Status", className: "whitespace-nowrap", render: (it) => it.statusLabel },
-                    { key: "dates", header: "Dates", className: "whitespace-nowrap", render: (it) => <span className="text-muted text-[12px]">{fmtDate(it.startDate)} → {fmtDate(it.reportDate)}</span> },
+                    { key: "dates", header: "Date", className: "whitespace-nowrap", render: (it) => <span className="text-muted text-[12px]">{fmtDate(it.reportDate ?? it.startDate)}</span> },
                     { key: "crit", header: "Crit", className: "text-center", render: (it) => it.counts.critical },
                     { key: "high", header: "High", className: "text-center", render: (it) => it.counts.high },
                     { key: "med", header: "Med", className: "text-center", render: (it) => it.counts.medium },
