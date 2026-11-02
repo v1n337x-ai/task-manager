@@ -135,7 +135,7 @@ export default async function SettingsPage() {
             there is no mail-server configuration — users upload .eml files directly. The AI key
             configured above powers finding/role analysis on those threads.
           </p>
-          <p className="mt-2 inline-flex rounded-full bg-good/10 px-3 py-1 text-[12px] font-semibold text-good">
+          <p className="mt-2 inline-flex rounded-none bg-good/10 px-3 py-1 text-[12px] font-semibold text-good">
             Live (Phase 4/5)
           </p>
         </section>
@@ -147,7 +147,7 @@ export default async function SettingsPage() {
             Fixed / Not Fixed determination is live per application (PT Tracker → application → State Review tab).
             Decisions are append-only with full provenance (AI extraction → evidence → human approval).
           </p>
-          <p className="mt-2 inline-flex rounded-full bg-good/10 px-3 py-1 text-[12px] font-semibold text-good">
+          <p className="mt-2 inline-flex rounded-none bg-good/10 px-3 py-1 text-[12px] font-semibold text-good">
             Live (Phase 6)
           </p>
         </section>

@@ -309,7 +309,7 @@ function ChatThread({ subject, appDisplayName, messages }: { subject: string; ap
             <React.Fragment key={m.id}>
               {dayKey && dayKey !== prevDay ? (
                 <div className="flex justify-center">
-                  <span className="rounded-full bg-card px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted shadow-sm">
+                  <span className="rounded-none bg-card px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted shadow-sm">
                     {m.sentAt ? new Date(m.sentAt).toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "short" }) : "undated message"}
                   </span>
                 </div>
@@ -333,7 +333,7 @@ function ChatThread({ subject, appDisplayName, messages }: { subject: string; ap
                   >
                     <p className="flex flex-wrap items-center gap-2 text-[12px]">
                       <span className={`font-semibold ${isRight ? "text-ink" : "text-ink-2"}`}>{m.from.displayName}</span>
-                      <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold tracking-wide ${meta.badge}`}>
+                      <span className={`inline-flex items-center rounded-none px-1.5 py-0.5 text-[9px] font-bold tracking-wide ${meta.badge}`}>
                         {meta.label}
                       </span>
                       {m.from.roleSource === "RULE" ? <span className="text-[9px] text-muted">auto-detected</span> : null}
@@ -352,7 +352,7 @@ function ChatThread({ subject, appDisplayName, messages }: { subject: string; ap
                     {m.attachments.length > 0 ? (
                       <ul className="mt-2 flex flex-wrap gap-2">
                         {m.attachments.map((a) => (
-                          <li key={a.id} className="flex items-center gap-1 rounded-full border border-stroke bg-white px-2 py-0.5 text-[11px] text-ink-2">
+                          <li key={a.id} className="flex items-center gap-1 rounded-none border border-stroke bg-white px-2 py-0.5 text-[11px] text-ink-2">
                             <Paperclip className="h-3 w-3" aria-hidden /> {a.filename} ({Math.max(1, Math.round((a.sizeBytes ?? 0) / 1024))} KB)
                           </li>
                         ))}

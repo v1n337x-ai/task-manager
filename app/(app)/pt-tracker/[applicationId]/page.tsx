@@ -114,7 +114,7 @@ export default async function ApplicationTrackerPage({
               href={`${baseUrl}?tab=${key}`}
               aria-current={activeTab === key ? "page" : undefined}
               className={cn(
-                "rounded-full px-3.5 py-1.5 text-[13px] font-medium transition",
+                "rounded-none px-3.5 py-1.5 text-[13px] font-medium transition",
                 activeTab === key ? "bg-accent text-white shadow-sm" : "text-ink-2 hover:bg-accent-soft hover:text-accent-deep",
               )}
             >
@@ -204,33 +204,35 @@ function FindingsTab({
   // stay in the database (append-only) but are never displayed.
   const usedIterations = [...allIterationsUsed].sort((a, b) => a - b).filter((n) => n <= 2);
 
-  // Excel-style layout (user-provided vapt.xlsx): # | Name of the vulnerability |
-  // Severity | (both iterations separately) | + one explicit I2 status column.
+  // Excel-style layout (vapt.xlsx): # | Name of the vulnerability | Severity
+  // | Iteration 1 | Iteration 2 | + explicit I2 status column. Compact widths.
+  const numbered = detail.findings.map((f, i) => ({ f, no: i + 1 }));
   return (
     <DataTable
       caption="Findings summary — vapt.xlsx layout"
-      rows={detail.findings}
+      rows={numbered}
       columns={[
-        { key: "no", header: "#", className: "w-12 text-center text-muted", render: (f: TrackerFinding) => f.code },
+        { key: "no", header: "#", className: "w-10 text-center text-muted", render: (r: { no: number }) => String(r.no) },
         {
           key: "name",
           header: "Name of the vulnerability",
-          className: "min-w-[240px]",
-          render: (f: TrackerFinding) => (
-            <span className="block font-medium text-ink" title={f.description ?? undefined}>
-              {f.title}
+          className: "max-w-[340px]",
+          render: (r: { f: TrackerFinding }) => (
+            <span className="block" title={r.f.description ?? undefined}>
+              <span className="block truncate font-medium text-ink">{r.f.title}</span>
+              <span className="text-[10px] text-muted">{r.f.code}</span>
             </span>
           ),
         },
-        { key: "severity", header: "Severity", className: "whitespace-nowrap", render: (f: TrackerFinding) => <SeverityBadge value={f.severityValue} /> },
+        { key: "severity", header: "Severity", className: "whitespace-nowrap", render: (r: { f: TrackerFinding }) => <SeverityBadge value={r.f.severityValue} /> },
         ...usedIterations.map((num) => ({
           key: `i${num}`,
           header: `Iteration ${num}`,
           className: "whitespace-nowrap",
-          render: (f: TrackerFinding) => {
-            const state = f.iterationStates.find((s) => s.iterationNumber === num);
+          render: (r: { f: TrackerFinding }) => {
+            const state = r.f.iterationStates.find((s) => s.iterationNumber === num);
             if (!state) return <span className="text-muted">—</span>;
-            const isNew = state.statusValue === "new" && f.iterationStates.length === 1;
+            const isNew = state.statusValue === "new" && r.f.iterationStates.length === 1;
             return (
               <span className="inline-flex flex-col items-center gap-0.5">
                 <StatusBadge value={state.statusValue} label={isNew ? `New in I${num}` : state.statusLabel} />
@@ -243,9 +245,9 @@ function FindingsTab({
           key: "i2status",
           header: "Iteration 2 Status",
           className: "whitespace-nowrap",
-          render: (f: TrackerFinding) => {
+          render: (r: { f: TrackerFinding }) => {
             // Explicit fixed / not fixed verdict for I2 (user-requested column).
-            const i2 = f.iterationStates.find((s) => s.iterationNumber === 2);
+            const i2 = r.f.iterationStates.find((s) => s.iterationNumber === 2);
             if (!i2) return <span className="text-muted">—</span>;
             const isFixed = ["fixed", "not_fixed"].includes(i2.statusValue) ? i2.statusValue === "fixed" : null;
             if (isFixed === null) return <span className="text-muted">{i2.statusLabel}</span>;
@@ -260,9 +262,10 @@ function FindingsTab({
         {
           key: "actions",
           header: "",
-          render: (f) =>
+          className: "w-10",
+          render: (r: { f: TrackerFinding }) =>
             iterations.length ? (
-              <FindingStateDialog finding={{ id: f.id, code: f.code, title: f.title, severityValue: f.severityValue }} iterations={iterations.filter((i) => i.number <= 2)} />
+              <FindingStateDialog finding={{ id: r.f.id, code: r.f.code, title: r.f.title, severityValue: r.f.severityValue }} iterations={iterations.filter((i) => i.number <= 2)} />
             ) : null,
         },
       ]}

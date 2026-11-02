@@ -15,7 +15,7 @@ const fmtD = (iso: Date | string | null) =>
   iso ? new Date(iso).toLocaleDateString("en-GB") : "—";
 
 /** Full-cell hot zone (eats the default td padding, then re-pads itself). */
-const CELL_ZONE = "-mx-4 -my-2.5 flex min-h-[46px] items-center px-4 py-2.5 transition hover:bg-accent-soft/50";
+const CELL_ZONE = "-mx-3 -my-2 flex min-h-[40px] items-center px-3 py-2 transition hover:bg-accent-soft/50";
 
 function Floater({
   trigger,
@@ -187,7 +187,7 @@ export function IterationsFloater({ iterations }: { iterations: IterationFloater
         <span className="inline-flex items-center gap-1 whitespace-nowrap">
           {iterations.length > 0 ? `I${iterations[iterations.length - 1]!.number}` : "—"}
           {iterations.length > 1 ? (
-            <span className="rounded-full bg-accent/10 px-1.5 text-[10px] font-semibold text-accent-deep">×{iterations.length}</span>
+            <span className="rounded-none bg-accent/10 px-1.5 text-[10px] font-semibold text-accent-deep">×{iterations.length}</span>
           ) : null}
         </span>
       }
