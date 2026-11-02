@@ -258,6 +258,7 @@ interface ChatMessage {
   bodyText: string | null;
   bodyHtmlSanitized: string | null;
   sourceFile: string | null;
+  uploadedFile?: string | null; // the original .eml the user imported (order №)
   from: { email: string; displayName: string; effectiveRole: string; roleSource?: string | null; confidence?: number | null };
   recipients: { kind: string; email: string; name: string | null }[];
   attachments: { id: number; filename: string; sizeBytes: number | null }[];
@@ -547,7 +548,8 @@ function ChatThread({ subject, appDisplayName, messages }: { subject: string; ap
         </div>
 
         {/* Jump rail — click a date or a message to jump; the human-machine
-            shortcut for long vendor threads. */}
+            shortcut for long vendor threads. Also lists every UPLOADED .eml
+            in confirmation order (1..N, user direction). */}
         <aside className="hidden w-52 shrink-0 flex-col border-l border-stroke pl-3 xl:flex" aria-label="Conversation jump rail">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Jump to date</p>
           <div className="mt-1 flex flex-wrap gap-1">
@@ -561,6 +563,23 @@ function ChatThread({ subject, appDisplayName, messages }: { subject: string; ap
                 {d.label} <span className="text-[10px] text-muted">{d.count}</span>
               </button>
             ))}
+          </div>
+          <p className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-muted">Uploaded .eml files (in order)</p>
+          <div className="mt-1 max-h-44 flex-1 overflow-y-auto pr-1">
+            <ol className="space-y-1">
+              {messages.map((m, i) => (
+                <li key={m.id}>
+                  <button
+                    type="button"
+                    onClick={() => jumpTo(`msg-${m.id}`)}
+                    className="w-full truncate border bg-tint-b px-2 py-1 text-left text-[11px] text-ink-2 transition hover:bg-xlsx-data"
+                    title={`Jump to message ${i + 1}${m.uploadedFile ? ` · ${m.uploadedFile}` : ""}`}
+                  >
+                    <span className="font-semibold text-ink">{i + 1}.</span> {m.uploadedFile ?? `(stored) ${m.sourceFile ?? "—"}`}
+                  </button>
+                </li>
+              ))}
+            </ol>
           </div>
           <p className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-muted">Jump to message</p>
           <div className="mt-1 flex-1 overflow-y-auto pr-1" style={{ maxHeight: 320 }}>

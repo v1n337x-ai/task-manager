@@ -34,6 +34,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     });
     if (!thread) throw NotFoundError("Email thread");
 
+    // Original upload filenames — map each stored message back to the .eml the
+    // user imported (import_jobs preview holds messageIdSynthetic + filename),
+    // so the UI can list the uploaded files in confirmation order (user ask).
+    const importJobs = await prisma.importJob.findMany({
+      where: { type: "eml_batch" },
+      select: { filename: true, preview: true },
+    });
+    const fileBySyntheticId = new Map<string, string>();
+    for (const j of importJobs) {
+      const preview = j.preview as { row?: { messageIdSynthetic?: string; filename?: string } } | null;
+      const syn = preview?.row?.messageIdSynthetic;
+      if (syn && !fileBySyntheticId.has(syn)) fileBySyntheticId.set(syn, j.filename);
+    }
+
     const messages = thread.messages.map((m) => ({
       id: m.id,
       messageId: m.messageId,
@@ -43,6 +57,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       bodyHtmlSanitized: sanitizeEmailHtml(m.bodyHtml),
       rawHeaders: m.headersRaw,
       sourceFile: m.sourceFile,
+      uploadedFile: fileBySyntheticId.get(m.messageId) ?? null,
       from: {
         email: m.fromContact.emailAddress,
         displayName: m.fromContact.displayName,
