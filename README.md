@@ -85,6 +85,7 @@ Security headers (CSP/XFO/nosniff/referrer/permissions) in `next.config.ts`; sec
 2. **bcryptjs instead of native bcrypt.** Pure-JS implementation of the same bcrypt algorithm; avoids a Windows native build toolchain; identical security properties (cost default 12). Swapping to native `bcrypt` is a drop-in change of one module.
 3. **Two-iteration contract (user-directed, 2026-11).** The original iteration engine was open-ended and a third creation path existed in tests; per user direction the platform enforces EXACTLY Iteration 1 and Iteration 2: creation beyond I2 is rejected, every product surface displays only I1/I2, and any historical records beyond I2 remain stored (append-only, never deleted) but hidden.
 4. **Automatic participant roles (user-directed, 2026-11).** At EML ingestion participants are classified by a deterministic rule engine (vendor domain, retest/fix language, owner wording) with `roleSource=RULE` + confidence; unknown stays unknown. Human overrides and the AI-analysis proposal flow remain the review path.
+5. **Audit/history is backend-only (user-directed, 2026-11).** Every mutation continues to write append-only `audit_logs` rows (provenance is never destroyed), but NO audit/history viewer exists anywhere in the web app — dashboard "Recent activity", Settings audit panel and the application History tab were removed. Access stays available programmatically via `/api/audit` for compliance queries.
 
 ## Phase 2.1 — AI API Key Configuration (delivered)
 

@@ -152,15 +152,8 @@ export default async function SettingsPage() {
           </p>
         </section>
 
-        {/* AUDIT */}
-        <section className="panel px-5 py-4" aria-labelledby="s-audit">
-          <h2 id="s-audit" className="text-[13px] font-semibold uppercase tracking-wide text-ink">Audit</h2>
-          <p className="mt-1 text-[13px] text-muted">
-            Every mutation writes an audit row — sources distinguish Human / Excel Import / EML / AI / System
-            (brief section 35). The full audit viewer grows in Phase 3+.
-          </p>
-        </section>
-
+        {/* AUDIT — backend-only per user direction: rows are recorded in the
+            database and never surfaced in the UI. */}
         {/* SYSTEM */}
         <section className="panel px-5 py-4" aria-labelledby="s-system">
           <h2 id="s-system" className="text-[13px] font-semibold uppercase tracking-wide text-ink">System</h2>

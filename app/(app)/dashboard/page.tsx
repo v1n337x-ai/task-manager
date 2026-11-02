@@ -143,18 +143,6 @@ export default async function DashboardPage({
                 emptyTitle="No applications in scope"
               />
             </section>
-
-            <section aria-label="Recent activity" className="panel mt-6 px-5 py-4">
-              <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">Recent activity</h2>
-              <ul className="mt-2 space-y-1 text-[13px]">
-                {report.recentActivity.length === 0 ? <li className="text-muted">No recent events.</li> : null}
-                {report.recentActivity.map((r, i) => (
-                  <li key={i} className="text-ink-2">
-                    <span className="text-muted">{new Date(r.at).toLocaleString("en-GB")}</span> — {r.action} ({r.entityType} #{r.entityId})
-                  </li>
-                ))}
-              </ul>
-            </section>
           </>
         )}
       </PageBody>
