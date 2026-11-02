@@ -4,9 +4,9 @@ import { notFound } from "next/navigation";
 import { PageHeader, PageBody } from "@/components/page-header";
 import { KpiCard } from "@/components/kpi-card";
 import { DataTable } from "@/components/data-table";
-import { StatusBadge, SeverityBadge } from "@/components/badges";
+import { StatusBadge } from "@/components/badges";
 import { cn } from "@/lib/utils";
-import { StatusFillCell } from "@/components/status-fill";
+import { StatusFillCell, SeverityFillCell } from "@/components/status-fill";
 import { getApplicationTracker, type TrackerFinding, type ApplicationTrackerDetail } from "@/lib/services/tracker-service";
 import { prisma } from "@/lib/db";
 import { ExportExcelButton } from "../excel-actions";
@@ -220,7 +220,7 @@ function FindingsTab({
             </span>
           ),
         },
-        { key: "severity", header: "Severity", className: "whitespace-nowrap", render: (r: { f: TrackerFinding }) => <SeverityBadge value={r.f.severityValue} /> },
+        { key: "severity", header: "Severity", className: "whitespace-nowrap", render: (r: { f: TrackerFinding }) => <SeverityFillCell severityValue={r.f.severityValue} label={r.f.severityValue.charAt(0).toUpperCase() + r.f.severityValue.slice(1)} /> },
         ...usedIterations.map((num) => ({
           key: `i${num}`,
           header: `Iteration ${num}`,
@@ -229,7 +229,7 @@ function FindingsTab({
             const state = r.f.iterationStates.find((s) => s.iterationNumber === num);
             if (!state) return <span className="text-muted">—</span>;
             const isNew = state.statusValue === "new" && r.f.iterationStates.length === 1;
-            return <StatusBadge value={state.statusValue} label={isNew ? `New in I${num}` : state.statusLabel} />;
+            return <StatusFillCell value={isNew ? `New in I${num}` : state.statusLabel} />;
           },
         })),
         {
@@ -241,13 +241,8 @@ function FindingsTab({
             const i2 = r.f.iterationStates.find((s) => s.iterationNumber === 2);
             if (!i2) return <span className="text-muted">—</span>;
             const isFixed = ["fixed", "not_fixed"].includes(i2.statusValue) ? i2.statusValue === "fixed" : null;
-            if (isFixed === null) return <span className="text-muted">{i2.statusLabel}</span>;
-            return (
-              <StatusBadge
-                value={isFixed ? "fixed" : "not_fixed"}
-                label={isFixed ? "Fixed" : "Not Fixed"}
-              />
-            );
+            if (isFixed === null) return <StatusFillCell value={i2.statusLabel} />;
+            return <StatusFillCell value={isFixed ? "Fixed" : "Not Fixed"} />;
           },
         },
         {
