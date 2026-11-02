@@ -282,6 +282,115 @@ function initials(name: string): string {
   return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
 }
 
+/**
+ * NeatTextBody — renders raw .eml text bodies the way WhatsApp threads read:
+ * Outlook forwarded-header blocks ("From: … / Sent: … / To: … / Subject: …")
+ * become a small labeled ENVELOPE card (with wrapped-line continuation merged,
+ * e.g. a long Subject split over two lines), and the remaining content renders
+ * as tidy paragraphs/bullets. The original bytes are untouched — this only
+ * changes the RENDER.
+ */
+const HEADER_LINE = /^(from|sent|to|cc|bcc|subject|date|importance|attachments)\s*:\s*(.*)$/i;
+
+type NeatBlock = { type: "envelope"; pairs: [string, string][] } | { type: "text"; text: string };
+
+function parseNeatBlocks(body: string): NeatBlock[] {
+  const lines = body.replace(/\r\n/g, "\n").split("\n");
+  const blocks: NeatBlock[] = [];
+  let textBuf: string[] = [];
+  let envelope: [string, string][] | null = null;
+
+  const pushText = () => {
+    if (textBuf.length) {
+      const text = textBuf.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+      if (text) blocks.push({ type: "text", text });
+      textBuf = [];
+    }
+  };
+
+  for (const raw of lines) {
+    const line = raw.replace(/\s+$/, "");
+    const m = line.match(HEADER_LINE);
+    if (m) {
+      pushText();
+      // A header line always starts (or continues) an envelope block. Reuse the
+      // trailing envelope if the previous block is one, else open a new one.
+      const prev = blocks[blocks.length - 1];
+      let pairs: [string, string][];
+      if (prev && prev.type === "envelope") {
+        pairs = prev.pairs;
+      } else {
+        pairs = [];
+        blocks.push({ type: "envelope", pairs });
+      }
+      const label = m[1]!.charAt(0).toUpperCase() + m[1]!.slice(1).toLowerCase();
+      pairs.push([label, m[2]!.trim()]);
+      envelope = pairs;
+      continue;
+    }
+    if (envelope) {
+      // Continuation of the last header (Outlook wraps long values) or blank end.
+      if (line.trim() === "") {
+        if (envelope.length > 0) envelope = null;
+        continue;
+      }
+      
+      // Values wrap; keep absorbing until a blank line.
+      const last = envelope[envelope.length - 1];
+      if (last) last[1] = `${last[1]} ${line.trim()}`.trim();
+      continue;
+    }
+    textBuf.push(line.replace(/^\s*>\s?/, ""));
+  }
+  pushText();
+  return blocks;
+}
+
+function NeatTextBody({ body }: { body: string }) {
+  const blocks = parseNeatBlocks(body);
+  return (
+    <div className="mt-1.5 space-y-2 text-[13px] leading-relaxed text-ink-2">
+      {blocks.map((b, i) => {
+        if (b.type === "envelope") {
+          return (
+            <div key={`env${i}`} className="border-l-2 border-xlsx-band bg-tint-b/70 px-3 py-2">
+              <dl className="space-y-0.5">
+                {b.pairs.map(([label, value], j) => (
+                  <div key={j} className="flex gap-2">
+                    <dt className="w-16 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-muted">{label}</dt>
+                    <dd className="min-w-0 break-words text-[12px] text-ink-2">{value || "—"}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          );
+        }
+        return (
+          <div key={`t${i}`}>
+            {b.text.split(/\n/).map((line, j) => {
+              if (line.trim() === "") return <div key={j} className="h-2" />;
+              const bullet = /^[-–•]\s+/.exec(line);
+              const numbered = /^\d+[.)]\s+/.exec(line);
+              if (bullet || numbered) {
+                return (
+                  <p key={j} className="whitespace-pre-wrap pl-4">
+                    {line}
+                  </p>
+                );
+              }
+              return (
+                <p key={j} className="whitespace-pre-wrap">
+                  {line}
+                </p>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 const timeOf = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "");
 
 function ChatThread({ subject, appDisplayName, messages }: { subject: string; appDisplayName: string | null; messages: ChatMessage[] }) {
@@ -348,7 +457,7 @@ function ChatThread({ subject, appDisplayName, messages }: { subject: string; ap
                         dangerouslySetInnerHTML={{ __html: m.bodyHtmlSanitized }}
                       />
                     ) : m.bodyText ? (
-                      <p className="mt-1.5 whitespace-pre-wrap text-[13px] leading-relaxed text-ink-2">{m.bodyText}</p>
+                      <NeatTextBody body={m.bodyText} />
                     ) : (
                       <p className="mt-1 text-[12px] italic text-muted">empty body</p>
                     )}
