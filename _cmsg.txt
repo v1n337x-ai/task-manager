@@ -1,7 +1,0 @@
-Full UI reskin to the vapt.xlsx template (user direction: same color, same font, same style).
-
-Extracted the workbook's real DNA: fonts = Calibri 11/12 bold black (Aptos for heads) - web fonts switched to the Calibri stack (Bebas/Poppins dropped); palette = the workbook's severity fills C1272D red / F7931E orange / FCEE21 yellow (black text) / 39B54A green / 0070C0 blue (solid chips); chrome = band BCD4D8, data tint ECF2F3, THIN BLACK table gridlines (no zebra - white rows like the sheet), black hairline panels/cards, square everything.
-
-Topbar/page header = steel band with black text; sidebar white with black hairline; buttons = workbook slate (dk2 44546A) primary, red CTAs; dashboards/chart colors = the five severity fills; chat bubbles = white/peach with black border, role chips colored to workbook fills; login recolored to the workbook (black/slate gradient, red glow, square card).
-
-README documents. Verified in built CSS (fills + calibri present) and live server.
