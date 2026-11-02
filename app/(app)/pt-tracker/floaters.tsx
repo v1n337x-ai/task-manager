@@ -35,6 +35,7 @@ function Floater({
   const anchor = React.useRef<HTMLSpanElement | null>(null);
   const card = React.useRef<HTMLDivElement | null>(null);
   const grace = React.useRef<number | null>(null);
+  const idRef = React.useRef(`f-${Math.random().toString(36).slice(2)}`);
 
   const cancelGrace = React.useCallback(() => {
     if (grace.current !== null) {
@@ -58,36 +59,25 @@ function Floater({
       left: Math.max(12, Math.min(r.left, window.innerWidth - width - 16)),
     });
     setOpen(true);
+    window.dispatchEvent(new CustomEvent("tm-floater-open", { detail: idRef.current }));
   }, [width, cancelGrace]);
 
   React.useEffect(() => {
-    if (!open) return;
-    const onMove = (e: MouseEvent) => {
-      const zones: DOMRect[] = [];
-      if (anchor.current) zones.push(anchor.current.getBoundingClientRect());
-      if (card.current) zones.push(card.current.getBoundingClientRect());
-      const pad = 12;
-      const inside = zones.some(
-        (r) =>
-          e.clientX >= r.left - pad &&
-          e.clientX <= r.right + pad &&
-          e.clientY >= r.top - pad &&
-          e.clientY <= r.bottom + pad,
-      );
-      if (!inside) gracefulClose();
-      else cancelGrace();
+    const id = idRef.current;
+    const onOtherOpened = (e: Event) => {
+      if ((e as CustomEvent).detail !== id) gracefulClose();
     };
     const onScrollOrResize = () => gracefulClose();
+    window.addEventListener("tm-floater-open", onOtherOpened);
     window.addEventListener("scroll", onScrollOrResize, true);
     window.addEventListener("resize", onScrollOrResize);
-    document.addEventListener("mousemove", onMove);
     return () => {
+      window.removeEventListener("tm-floater-open", onOtherOpened);
       window.removeEventListener("scroll", onScrollOrResize, true);
       window.removeEventListener("resize", onScrollOrResize);
-      document.removeEventListener("mousemove", onMove);
       cancelGrace();
     };
-  }, [open, gracefulClose, cancelGrace]);
+  }, [gracefulClose, cancelGrace]);
 
   return (
     <>

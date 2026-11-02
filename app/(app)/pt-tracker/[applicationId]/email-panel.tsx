@@ -295,29 +295,32 @@ function ChatThread({ subject, appDisplayName, messages }: { subject: string; ap
         </p>
       </div>
 
-      {/* Chat area — bubbles scroll inside a fixed-height canvas */}
-      <div className="mt-3 min-h-[420px] flex-1 space-y-3 overflow-y-auto rounded-xl bg-tint-b p-4" style={{ maxHeight: 640 }}>
+      {/* Chat area — bubbles scroll inside a fixed-height canvas; contained
+          scrolling keeps the page from jumping (the delayed-scroll fix). */}
+      <div
+        className="mt-3 min-h-[420px] flex-1 space-y-3 overflow-y-auto overscroll-contain bg-tint-b p-4"
+        style={{ maxHeight: 640, scrollBehavior: "auto" }}
+      >
         {messages.map((m, i) => {
           const meta = roleMeta(m.from.effectiveRole);
           const side = meta.side;
           const isRight = side === "right";
-          const mine = i > 0 && messages[i - 1]!.from.email === m.from.email;
           const dayKey = m.sentAt ? new Date(m.sentAt).toDateString() : "";
           const prevSent = i > 0 ? messages[i - 1]!.sentAt : null;
           const prevDay = prevSent ? new Date(prevSent).toDateString() : "";
           return (
             <React.Fragment key={m.id}>
               {dayKey && dayKey !== prevDay ? (
-                <div className="flex justify-center">
+                <div className="flex justify-center" style={{ contentVisibility: "auto" }}>
                   <span className="rounded-none bg-card px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted shadow-sm">
                     {m.sentAt ? new Date(m.sentAt).toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "short" }) : "undated message"}
                   </span>
                 </div>
               ) : null}
-              <div className={`flex gap-2 ${isRight ? "flex-row-reverse" : ""}`}>
+              <div className={`flex gap-2 ${isRight ? "flex-row-reverse" : ""}`} style={{ contentVisibility: "auto", containIntrinsicSize: "auto 220px" }}>
                 {/* Avatar */}
                 <span
-                  className={`mt-1 hidden h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white shadow-sm sm:flex ${mine ? "" : ""}`}
+                  className={`mt-1 hidden h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white sm:flex`}
                   style={{ background: meta.dot }}
                   aria-hidden
                 >
@@ -327,7 +330,7 @@ function ChatThread({ subject, appDisplayName, messages }: { subject: string; ap
                 {/* Bubble */}
                 <div className={`flex max-w-[78%] flex-col ${isRight ? "items-end" : "items-start"}`}>
                   <div
-                    className={`w-full rounded-2xl border px-3.5 py-2.5 shadow-sm ${
+                    className={`w-full rounded-none border px-3.5 py-2.5 shadow-sm ${
                       isRight ? "border-[#171717] bg-xlsx-peach" : "border-[#171717] bg-card"
                     }`}
                   >
