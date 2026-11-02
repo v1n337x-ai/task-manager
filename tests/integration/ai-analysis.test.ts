@@ -150,13 +150,26 @@ describe.skipIf(!dbAvailable)("AI thread analysis (mock provider)", () => {
     }
   });
 
-  it("16-17. NO VAPT mutation from AI analysis (§58/§83)", async () => {
-    // Application X has NO findings in the DB; analysis must not create any.
-    const findings = await testDb.finding.findMany({ where: { applicationId: appIdGlobal } });
-    expect(findings.length).toBe(0);
-    // No iteration state was altered:
+  it("16-17. AI analysis alone never mutates VAPT data — the human approval is the write gate (§58/§83 + Phase 9.1)", async () => {
+    // Approvals in tests 7-9 applied ONE finding to the tracker (Phase 9.1):
+    const findingsBefore = await testDb.finding.count();
+    expect(findingsBefore).toBeGreaterThanOrEqual(1);
+    const decisions = await testDb.aiApprovalDecision.count();
+    expect(decisions).toBeGreaterThanOrEqual(1);
+
+    // Running the analysis again must NOT create/alter anything (§58: AI
+    // never writes alone — only APPROVED data reaches the tracker). The rate
+    // limiter has already been consumed by earlier tests in this file, so
+    // reset it first (this is the §53 guard, still covered by test 18).
+    const rl = await import("@/lib/auth/rate-limit");
+    rl.resetRateLimiter();
+    const { analyzeThread } = await import("@/lib/ai/analysis-service");
+    const run = await analyzeThread({ threadId, userId, ctx: {}, providerOverrideSlug: "mock" });
+    expect(run.status).toBe("needs_review");
+    expect(await testDb.finding.count()).toBe(findingsBefore);
+    // and the approved finding genuinely carries iteration state:
     const states = await testDb.findingIterationState.count();
-    expect(states).toBe(0);
+    expect(states).toBeGreaterThanOrEqual(1);
   });
 
   it("18. rate limiting guards the expensive endpoint (§53)", async () => {

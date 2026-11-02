@@ -169,6 +169,39 @@ export async function recordApprovalDecision(
     const statusId = (await prisma.masterValue.findUniqueOrThrow({ where: { domain_value: { domain: "extraction_status", value: statusValue } } })).id;
     await prisma.aiExtraction.update({ where: { id: extraction.id }, data: { status: statusId } });
   }
+
+  // User-requested pipeline completion (Phase 9.1): approving a
+  // `findingStatus:<idx>` item CREATES/UPDATES the tracker finding with the
+  // AI-proposed values — the human approval is the gate; the AI did not write
+  // alone. Rejections never touch the tracker.
+  if (input.decision === "approve" && input.itemKey?.startsWith("findingStatus:")) {
+    try {
+      const { applyApprovedFinding } = await import("@/lib/services/finding-apply-service");
+      const result = await applyApprovedFinding({ extractionId: extraction.id, itemKey: input.itemKey! }, actorUserId);
+      await recordAudit({
+        action: "ai_approval.finding_applied",
+        entityType: "Finding",
+        entityId: result.findingId,
+        newValue: JSON.stringify({ extractionId: extraction.id, itemKey: input.itemKey, code: result.code, created: result.created, iterationState: result.iterationLabel }),
+        source: "HUMAN",
+        actorUserId,
+        ip: ctx.ip,
+        userAgent: ctx.userAgent,
+      });
+    } catch (error) {
+      // The approval decision stands; only the tracker write reports honestly.
+      await recordAudit({
+        action: "ai_approval.finding_apply_failed",
+        entityType: "AiExtraction",
+        entityId: extraction.id,
+        newValue: JSON.stringify({ itemKey: input.itemKey, reason: String((error as Error).message ?? error).slice(0, 240) }),
+        source: "SYSTEM",
+        actorUserId,
+        ip: ctx.ip,
+        userAgent: ctx.userAgent,
+      });
+    }
+  }
 }
 
 export async function listExtractions(statusValue?: string) {

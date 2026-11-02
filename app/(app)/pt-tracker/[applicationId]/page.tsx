@@ -11,6 +11,7 @@ import { getApplicationTracker, type TrackerFinding, type ApplicationTrackerDeta
 import { prisma } from "@/lib/db";
 import { ExportExcelButton } from "../excel-actions";
 import { EmailPanel, type ThreadSummary } from "./email-panel";
+import { ImportFindingsButton } from "./import-findings-button";
 import { StateReviewPanel } from "./state-review-panel";
 import {
   FindingDialog,
@@ -122,7 +123,14 @@ export default async function ApplicationTrackerPage({
 
         <div className="mt-5">
           {activeTab === "overview" ? <OverviewTab detail={detail} statusValueFor={statusValueFor} /> : null}
-          {activeTab === "findings" ? <FindingsTab detail={detail} iterations={iterations} /> : null}
+          {activeTab === "findings" ? (
+            <div>
+              <div className="mb-3">
+                <ImportFindingsButton applicationId={id} />
+              </div>
+              <FindingsTab detail={detail} iterations={iterations} />
+            </div>
+          ) : null}
           {activeTab === "iterations" ? <IterationsTab detail={detail} /> : null}
           {/* Test Cases tab REMOVED from the UI (user direction 2026-11): TC
               identities live in the backend contract only. */}
