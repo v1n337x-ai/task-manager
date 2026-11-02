@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { AtSign, FilePlus2, Paperclip, Check, TriangleAlert, Loader2, Replace } from "lucide-react";
+import { AtSign, FilePlus2, Paperclip, Check, TriangleAlert, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -223,78 +223,11 @@ export function EmailPanel({
           ) : !threadDetail ? (
             <p className="text-[13px] text-muted">Select a thread to read the reconstructed conversation.</p>
           ) : (
-            <div>
-              <h3 className="font-display text-2xl text-ink">{threadDetail.thread.subject}</h3>
-              <p className="mt-0.5 text-[12px] text-muted">
-                {threadDetail.thread.application?.displayName ?? "Unassigned"} · {threadDetail.thread.messageCount} messages
-              </p>
-              <ol className="mt-4 space-y-5">
-                {threadDetail.messages.map((m) => {
-                  const role = m.from.effectiveRole;
-                  const roleChip: { label: string; cls: string } =
-                    role.includes("human")
-                      ? { label: `${role}`, cls: "bg-tint-a text-ink-2 border border-stroke" }
-                      : role === "pentester"
-                        ? { label: "PENTESTER", cls: "bg-accent/10 text-accent-deep border border-accent/30" }
-                        : role === "developer"
-                          ? { label: "DEVELOPER", cls: "bg-progress/10 text-progress border border-progress/30" }
-                          : role === "application_owner"
-                            ? { label: "APP OWNER", cls: "bg-tint-a text-ink-2 border border-stroke" }
-                            : role === "security_team"
-                              ? { label: "SECURITY", cls: "bg-tint-a text-ink-2 border border-stroke" }
-                              : role === "unknown"
-                                ? { label: "ROLE UNKNOWN", cls: "bg-band text-muted border border-stroke" }
-                                : { label: role.toUpperCase(), cls: "bg-band text-ink-2 border border-stroke" };
-                  const detection =
-                    m.from.roleSource === "RULE"
-                      ? "auto-detected from the .eml"
-                      : m.from.roleSource === "HUMAN"
-                        ? "human-set"
-                        : m.from.roleSource === "AI"
-                          ? "AI-proposed"
-                          : null;
-                  return (
-                    <li key={m.id} className="rounded-lg border border-stroke p-4">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="flex flex-wrap items-center gap-2 text-[14px] font-semibold text-ink">
-                            {m.from.displayName} <span className="text-muted">({m.from.email})</span>
-                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ${roleChip.cls}`} data-testid={`role-${role}`}>
-                              {roleChip.label}
-                            </span>
-                            {detection ? <span className="text-[10px] font-normal text-muted">{detection}</span> : null}
-                          </p>
-                          <p className="text-[11px] text-muted">{m.sentAt ? new Date(m.sentAt).toLocaleString("en-GB") : "no date"}</p>
-                        </div>
-                        <Badge variant={m.bodyHtmlSanitized ? "info" : "muted"}>{m.bodyHtmlSanitized ? "html (sanitized)" : "text"}</Badge>
-                      </div>
-                    <p className="mt-1 text-[13px] text-muted-2">
-                      to: {m.recipients.filter((r) => r.kind === "TO").map((r) => r.email).join(", ") || "—"}
-                      {m.recipients.some((r) => r.kind === "CC") ? ` · cc: ${m.recipients.filter((r) => r.kind === "CC").map((r) => r.email).join(", ")}` : ""}
-                    </p>
-                    {m.bodyHtmlSanitized ? (
-                      <div className="prose prose-sm mt-3 max-w-none overflow-hidden rounded-md bg-white p-3 text-[13px]" dangerouslySetInnerHTML={{ __html: m.bodyHtmlSanitized }} />
-                    ) : m.bodyText ? (
-                      <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap rounded-md bg-tint-b p-3 text-[12px] leading-snug text-ink-2">{m.bodyText}</pre>
-                    ) : (
-                      <p className="mt-2 text-[12px] italic text-muted">empty body</p>
-                    )}
-                    {m.attachments.length > 0 ? (
-                      <ul className="mt-3 flex flex-wrap gap-2">
-                        {m.attachments.map((a) => (
-                          <li key={a.id} className="flex items-center gap-1 rounded-full border border-stroke bg-band px-2 py-0.5 text-[11px] text-ink-2">
-                            <Paperclip className="h-3 w-3" aria-hidden /> {a.filename} ({Math.max(1, Math.round((a.sizeBytes ?? 0) / 1024))} KB)
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                    <p className="mt-2 text-[10px] text-muted">source: {m.sourceFile ?? "—"} · message-id: {m.messageId}</p>
-                  </li>
-                  );
-                })}
-              </ol>
-              <Replace className="hidden" aria-hidden />
-            </div>
+            <ChatThread
+              subject={threadDetail.thread.subject}
+              appDisplayName={threadDetail.thread.application?.displayName ?? null}
+              messages={threadDetail.messages}
+            />
           )}
         </div>
       </section>
@@ -313,18 +246,144 @@ export interface ThreadSummary {
 
 interface ThreadDetail {
   thread: { id: number; subject: string; application?: { displayName: string } | null; messageCount: number };
-  messages: {
-    id: number;
-    messageId: string;
-    subject: string | null;
-    sentAt: string | null;
-    bodyText: string | null;
-    bodyHtmlSanitized: string | null;
-    sourceFile: string | null;
-    from: { email: string; displayName: string; effectiveRole: string; roleSource?: string | null; confidence?: number | null };
-    recipients: { kind: string; email: string; name: string | null }[];
-    attachments: { id: number; filename: string; sizeBytes: number | null }[];
-  }[];
+  messages: ChatMessage[];
+}
+
+/** WhatsApp/Messenger-style conversation (originals stay verbatim + sha256). */
+interface ChatMessage {
+  id: number;
+  messageId: string;
+  subject: string | null;
+  sentAt: string | null;
+  bodyText: string | null;
+  bodyHtmlSanitized: string | null;
+  sourceFile: string | null;
+  from: { email: string; displayName: string; effectiveRole: string; roleSource?: string | null; confidence?: number | null };
+  recipients: { kind: string; email: string; name: string | null }[];
+  attachments: { id: number; filename: string; sizeBytes: number | null }[];
+}
+
+const ROLE_META: Record<string, { label: string; badge: string; dot: string; side: "left" | "right" }> = {
+  pentester: { label: "PENTESTER", badge: "bg-accent/10 text-accent-deep border border-accent/30", dot: "#E86B10", side: "left" },
+  developer: { label: "DEVELOPER", badge: "bg-progress/10 text-progress border border-progress/30", dot: "#2E86C1", side: "right" },
+  application_owner: { label: "APP OWNER", badge: "bg-tint-a text-ink-2 border border-stroke", dot: "#5D4A78", side: "right" },
+  security_team: { label: "SECURITY", badge: "bg-tint-a text-ink-2 border border-stroke", dot: "#2E862E", side: "left" },
+  unknown: { label: "ROLE UNKNOWN", badge: "bg-band text-muted border border-stroke", dot: "#9E9E9E", side: "left" },
+};
+
+function roleMeta(effectiveRole: string) {
+  const key = effectiveRole.replace(/\s*\(human override\)\s*/i, "").trim();
+  if (effectiveRole.includes("human")) return { label: `HUMAN · ${key.toUpperCase()}`, badge: "bg-good/10 text-good border border-good/30", dot: "#2E862E", side: key.includes("pentester") ? "left" : "right" } as const;
+  return ROLE_META[key] ?? { label: key.toUpperCase(), badge: "bg-band text-ink-2 border border-stroke", dot: "#9E9E9E", side: "left" } as const;
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).slice(0, 2);
+  return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
+}
+
+const timeOf = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "");
+
+function ChatThread({ subject, appDisplayName, messages }: { subject: string; appDisplayName: string | null; messages: ChatMessage[] }) {
+  return (
+    <div className="flex h-full flex-col">
+      {/* Chat header — sticky within the panel */}
+      <div className="border-b border-stroke pb-3">
+        <h3 className="font-display truncate text-2xl text-ink">{subject}</h3>
+        <p className="text-[12px] text-muted">
+          {appDisplayName ?? "Unassigned"} · {messages.length} messages · original .eml files preserved verbatim
+        </p>
+      </div>
+
+      {/* Chat area — bubbles scroll inside a fixed-height canvas */}
+      <div className="mt-3 min-h-[420px] flex-1 space-y-3 overflow-y-auto rounded-xl bg-tint-b p-4" style={{ maxHeight: 640 }}>
+        {messages.map((m, i) => {
+          const meta = roleMeta(m.from.effectiveRole);
+          const side = meta.side;
+          const isRight = side === "right";
+          const mine = i > 0 && messages[i - 1]!.from.email === m.from.email;
+          const dayKey = m.sentAt ? new Date(m.sentAt).toDateString() : "";
+          const prevSent = i > 0 ? messages[i - 1]!.sentAt : null;
+          const prevDay = prevSent ? new Date(prevSent).toDateString() : "";
+          return (
+            <React.Fragment key={m.id}>
+              {dayKey && dayKey !== prevDay ? (
+                <div className="flex justify-center">
+                  <span className="rounded-full bg-card px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted shadow-sm">
+                    {m.sentAt ? new Date(m.sentAt).toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "short" }) : "undated message"}
+                  </span>
+                </div>
+              ) : null}
+              <div className={`flex gap-2 ${isRight ? "flex-row-reverse" : ""}`}>
+                {/* Avatar */}
+                <span
+                  className={`mt-1 hidden h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white shadow-sm sm:flex ${mine ? "" : ""}`}
+                  style={{ background: meta.dot }}
+                  aria-hidden
+                >
+                  {initials(m.from.displayName)}
+                </span>
+
+                {/* Bubble */}
+                <div className={`flex max-w-[78%] flex-col ${isRight ? "items-end" : "items-start"}`}>
+                  <div
+                    className={`w-full rounded-2xl border px-3.5 py-2.5 shadow-sm ${
+                      isRight ? "border-accent/25 bg-accent-soft" : "border-stroke bg-card"
+                    }`}
+                  >
+                    <p className="flex flex-wrap items-center gap-2 text-[12px]">
+                      <span className={`font-semibold ${isRight ? "text-ink" : "text-ink-2"}`}>{m.from.displayName}</span>
+                      <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold tracking-wide ${meta.badge}`}>
+                        {meta.label}
+                      </span>
+                      {m.from.roleSource === "RULE" ? <span className="text-[9px] text-muted">auto-detected</span> : null}
+                      {m.from.roleSource === "HUMAN" ? <span className="text-[9px] text-muted">human-set</span> : null}
+                    </p>
+                    {m.bodyHtmlSanitized ? (
+                      <div
+                        className="prose prose-sm mt-2 max-w-none overflow-hidden text-[13px]"
+                        dangerouslySetInnerHTML={{ __html: m.bodyHtmlSanitized }}
+                      />
+                    ) : m.bodyText ? (
+                      <p className="mt-1.5 whitespace-pre-wrap text-[13px] leading-relaxed text-ink-2">{m.bodyText}</p>
+                    ) : (
+                      <p className="mt-1 text-[12px] italic text-muted">empty body</p>
+                    )}
+                    {m.attachments.length > 0 ? (
+                      <ul className="mt-2 flex flex-wrap gap-2">
+                        {m.attachments.map((a) => (
+                          <li key={a.id} className="flex items-center gap-1 rounded-full border border-stroke bg-white px-2 py-0.5 text-[11px] text-ink-2">
+                            <Paperclip className="h-3 w-3" aria-hidden /> {a.filename} ({Math.max(1, Math.round((a.sizeBytes ?? 0) / 1024))} KB)
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    <p className="mt-1.5 text-right text-[10px] text-muted" title={`${m.from.email} · id ${m.messageId}`}>
+                      {timeOf(m.sentAt)}
+                      {m.sentAt ? ` · ${new Date(m.sentAt).toLocaleDateString("en-GB")}` : ""}
+                    </p>
+                  </div>
+                  {/* Recipients faint line under the bubble (first message of a run only) */}
+                  {i === 0 || messages[i - 1]!.from.email !== m.from.email ? (
+                    <p className="mt-0.5 overflow-hidden text-ellipsis text-[10px] text-muted">
+                      to: {m.recipients.filter((r) => r.kind === "TO").map((r) => r.email).join(", ") || "—"}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            </React.Fragment>
+          );
+        })}
+      </div>
+
+      {/* Composer is intentionally absent: no mailbox/SMTP integration by design —
+          the typed record lives in audited actions, not ad-hoc emails. */}
+      <p className="mt-2 text-[11px] text-muted">
+        Read-only chat reconstruction from uploaded .eml files — originals are preserved verbatim (sha256). Follow-up requests happen through audited
+        actions, not ad-hoc mail.
+      </p>
+    </div>
+  );
 }
 
 export { Input, AtSign };

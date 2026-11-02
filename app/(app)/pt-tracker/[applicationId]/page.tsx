@@ -5,7 +5,7 @@ import { PageHeader, PageBody } from "@/components/page-header";
 import { KpiCard } from "@/components/kpi-card";
 import { DataTable } from "@/components/data-table";
 import { StatusBadge, SeverityBadge } from "@/components/badges";
-import { Timeline } from "@/components/timeline";
+import { cn } from "@/lib/utils";
 import { getApplicationTracker, type TrackerFinding, type ApplicationTrackerDetail } from "@/lib/services/tracker-service";
 import { prisma } from "@/lib/db";
 import { ExportExcelButton } from "../excel-actions";
@@ -20,7 +20,6 @@ import {
   type IterationLite,
   type TestCaseLite,
 } from "../detail-dialogs";
-import { cn } from "@/lib/utils";
 import { AppError } from "@/lib/errors";
 
 export const metadata: Metadata = { title: "Application" };
@@ -138,21 +137,7 @@ export default async function ApplicationTrackerPage({
           {activeTab === "state-review" ? (
             <StateReviewPanel applicationId={id} />
           ) : null}
-          {activeTab === "history" ? (
-            <section aria-label="History" className="panel px-5 py-4">
-              <Timeline
-                entries={detail.history.map((h) => ({
-                  at: new Date(h.at).toLocaleString("en-GB"),
-                  title: `${h.action} — ${h.entityType}${h.entityId ? ` #${h.entityId}` : ""}`,
-                  detail: h.actorLabel ? `${h.actorLabel} · ${h.source}` : h.source,
-                  accent: h.source === "SYSTEM" ? ("muted" as const) : ("accent" as const),
-                }))}
-              />
-              {detail.history.length === 0 ? (
-                <p className="text-[13px] text-muted">No events recorded yet for this application graph.</p>
-              ) : null}
-            </section>
-          ) : null}
+          {activeTab === "history" ? <HistoryTab entries={detail.history} /> : null}
         </div>
       </PageBody>
     </>
@@ -265,6 +250,92 @@ function FindingsTab({
       emptyTitle="No findings yet"
       emptyHint="Use “Add Finding”. Per-iteration state columns appear for Iteration 1 and Iteration 2 (the contract's two iterations)."
     />
+  );
+}
+
+/**
+ * History tab — the APPEND-ONLY audit ledger, presented neatly: grouped by
+ * day, consecutive duplicates collapsed with a ×N count, friendly action
+ * naming, and a permanent "nothing is ever deleted" note.
+ */
+function HistoryTab({
+  entries,
+}: {
+  entries: { at: string; action: string; entityType: string; entityId: string | number | null; actorLabel: string | null; source: string }[];
+}) {
+  const pretty = (action: string) =>
+    /iteration_state\.set/.test(action)
+      ? "finding state updated"
+      : /state_decision/.test(action)
+        ? "authoritative state decision"
+        : action.replace(/\./g, " · ").replace(/_/g, " ");
+
+  interface Node {
+    at: string;
+    ts: number;
+    action: string;
+    entityType: string;
+    entityId: string | number | null;
+    actorLabel: string | null;
+    source: string;
+  }
+  const rows = [...entries].map((h) => ({ ...h, ts: new Date(h.at).getTime() }));
+  const groups = new Map<string, Node[]>();
+  for (const r of rows) {
+    const day = new Date(r.at).toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "short", year: "numeric" });
+    (groups.get(day) ?? groups.set(day, []).get(day)!)?.push(r);
+  }
+
+  return (
+    <section aria-label="History" className="panel px-5 py-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">Audit history</h2>
+        <p className="text-[11px] text-muted">{rows.length} events · append-only — nothing is ever deleted or rewritten</p>
+      </div>
+
+      <div className="mt-4 max-h-[560px] space-y-5 overflow-y-auto pr-1">
+        {[...groups.entries()].map(([day, list]) => (
+          <div key={day}>
+            <p className="mb-2 inline-block rounded-full bg-tint-b px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted shadow-sm">{day}</p>
+            <ol className="space-y-1">
+              {list.map((e, i) => {
+                const prev = list[i - 1];
+                const repeat = prev && prev.action === e.action && prev.entityType === e.entityType && prev.entityId === e.entityId && prev.actorLabel === e.actorLabel;
+                if (repeat && i > 0) {
+                  const badge = list[i - 1]!;
+                  const count = Number(((badge as unknown as { _n?: number })._n ?? 1)) + 1;
+                  (list[i - 1] as unknown as { _n?: number })._n = count;
+                }
+                const n = (e as unknown as { _n?: number })._n ?? 0;
+                if (n > 1) return null; // rendered by its first occurrence
+                const lookSameAhead = false;
+                void lookSameAhead;
+                return (
+                  <li
+                    key={e.ts + e.action + String(e.entityId) + String(i)}
+                    className="flex items-start gap-3 rounded-lg border border-stroke bg-card px-3 py-2 shadow-sm"
+                  >
+                    <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${e.source === "SYSTEM" ? "bg-muted" : "bg-accent"}`} aria-hidden />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13px] font-medium text-ink-2">
+                        {pretty(e.action)} · {e.entityType}
+                        {e.entityId ? ` #${e.entityId}` : ""}
+                        {(e as unknown as { _n?: number })._n ? <span className="ml-2 rounded-full bg-band px-1.5 text-[10px] font-semibold text-muted">×{(e as unknown as { _n?: number })._n}</span> : null}
+                      </p>
+                      <p className="text-[11px] text-muted">
+                        {new Date(e.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                        {e.actorLabel ? ` · ${e.actorLabel}` : ""} · {e.source.toLowerCase()}
+                      </p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        ))}
+        {rows.length === 0 ? <p className="text-[13px] text-muted">No events recorded yet for this application graph.</p> : null}
+      </div>
+    </section>
   );
 }
 
