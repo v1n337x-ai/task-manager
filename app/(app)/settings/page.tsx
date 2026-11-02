@@ -80,14 +80,13 @@ export default async function SettingsPage() {
               { key: "created", header: "Registered", render: (s) => formatDate(s.createdAt) },
             ]}
             emptyTitle="No schema versions registered yet"
-            emptyHint="Phase 3 registers the PT Tracker 39-column contract on first import."
           />
         </section>
 
         {/* IMPORT / EXPORT */}
         <section className="panel px-5 py-4" aria-labelledby="s-io">
           <h2 id="s-io" className="text-[13px] font-semibold uppercase tracking-wide text-ink">Import / Export</h2>
-          <p className="mt-1 text-[13px] text-muted">Excel round-trip contract activates in Phase 3.</p>
+          <p className="mt-1 text-[13px] text-muted">Excel and PowerPoint jobs from across the platform.</p>
           <div className="grid gap-4 lg:grid-cols-2">
             <DataTable
               className="mt-3"
@@ -99,7 +98,6 @@ export default async function SettingsPage() {
                 { key: "created", header: "Created", render: (j) => formatDate(j.createdAt) },
               ]}
               emptyTitle="No import jobs yet"
-              emptyHint="Coming in Phase 3."
             />
             <DataTable
               className="mt-3"
@@ -111,7 +109,6 @@ export default async function SettingsPage() {
                 { key: "created", header: "Created", render: (j) => formatDate(j.createdAt) },
               ]}
               emptyTitle="No export jobs yet"
-              emptyHint="Excel export — Phase 3. PowerPoint report — Phase 4/5."
             />
           </div>
         </section>
@@ -133,13 +130,25 @@ export default async function SettingsPage() {
         <section className="panel px-5 py-4" aria-labelledby="s-email">
           <h2 id="s-email" className="text-[13px] font-semibold uppercase tracking-wide text-ink">Email Processing</h2>
           <p className="mt-1 text-[13px] text-muted">
-            EML upload, thread reconstruction and the conversation UI arrive in Phase 6. The database foundations
-            (threads, messages, participants, attachments) already exist. There is no mail-server configuration —
-            users will upload <code className="rounded bg-band px-1">.eml</code> files directly; the AI key configured
-            above is consumed by that future analysis.
+            EML upload, thread reconstruction and the conversation view are live per application
+            (PT Tracker → application → Email tab). Original files are preserved verbatim (sha256);
+            there is no mail-server configuration — users upload .eml files directly. The AI key
+            configured above powers finding/role analysis on those threads.
           </p>
-          <p className="mt-2 inline-flex rounded-full bg-band px-3 py-1 text-[12px] font-semibold text-muted">
-            Coming in Phase 6
+          <p className="mt-2 inline-flex rounded-full bg-good/10 px-3 py-1 text-[12px] font-semibold text-good">
+            Live (Phase 4/5)
+          </p>
+        </section>
+
+        {/* AUTHORITATIVE STATE */}
+        <section className="panel px-5 py-4" aria-labelledby="s-state">
+          <h2 id="s-state" className="text-[13px] font-semibold uppercase tracking-wide text-ink">Authoritative State</h2>
+          <p className="mt-1 text-[13px] text-muted">
+            Fixed / Not Fixed determination is live per application (PT Tracker → application → State Review tab).
+            Decisions are append-only with full provenance (AI extraction → evidence → human approval).
+          </p>
+          <p className="mt-2 inline-flex rounded-full bg-good/10 px-3 py-1 text-[12px] font-semibold text-good">
+            Live (Phase 6)
           </p>
         </section>
 

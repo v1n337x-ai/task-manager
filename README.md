@@ -1,6 +1,6 @@
 # Task Manager — VAPT
 
-Internal VAPT management platform for the Akasa Air programme. **Phase 2: Application Foundation, Authentication, Database & Master Data.**
+Internal VAPT management platform for the Akasa Air programme. **Implementation complete (Phases 2 → 8).**
 
 > Architecture and data model follow the approved Phase 1 Blueprint (`../Phase 1 Blueprint/`). Deviations made under change control are listed at the bottom of this file.
 
@@ -34,6 +34,18 @@ Sign in with the seeded credential from your `.env` (`SEED_ADMIN_EMAIL` / `SEED_
 | `npm run db:migrate` / `db:deploy` / `db:seed` / `db:reset` | database tooling |
 | `npm run test` / `test:unit` / `test:db` | 23 tests (unit + §59 foundation chain) |
 
+## Phase delivery timeline (all complete)
+| Phase | Delivered | Commit |
+|---|---|---|
+| 2 — Foundation/Auth/DB | app shell, single-credential auth, 24-table schema | `d36f815` |
+| 2.1 — AI API key config | Settings→AI with AES-256-GCM encrypted key | `7e83d3d` |
+| 3 — PT Tracker/Iterations/Excel | tracker UI, open-ended iterations, 39-column contract, import/export | `fe4f936` |
+| 4 — EML ingestion | .eml parse/thread/conversation (originals verbatim) | `aa784cc` |
+| 5 — AI analysis | AI_EXTRACTION_V1 + evidence + human review | `b57bcff` |
+| 6 — Authoritative state | decisions ledger, Fixed/Not-Fixed precedence, corrections | `8cc3c9c` |
+| 7 — Dashboard/Reports/PPT | live Recharts dashboard, reports, VAPT-styled PPT export | `5998da6` |
+| 8 — Hardening/QA | E2E lifecycle, clean-DB verification, docs, final reviews | this commit |
+
 ## What Phase 3 delivers (operational PT Tracker)
 - **Iteration engine** (`docs/iteration-engine.md`): open-ended iterations (1 = Initial Scan auto-named; 2+ default Retest; 3+ no migrations), append-only per-iteration states for findings AND test cases, current state = latest authoritative iteration state, `firstSeenIterationNumber` for "New in I2", deterministic `matchKey` for future import matching.
 - **PT Tracker UI** (`docs/pt-tracker.md`): dense application table with live finding-derived counts + filters/search; application detail with Overview/Findings/Iterations/Test-Cases/History tabs; Add Finding / Create Iteration / Add Test Case flows; every figure computed from PostgreSQL.
@@ -58,10 +70,18 @@ Sign in with the seeded credential from your `.env` (`SEED_ADMIN_EMAIL` / `SEED_
 
 Security headers (CSP/XFO/nosniff/referrer/permissions) in `next.config.ts`; secrets only via env (`.env*` gitignored, `.env.example` names only); structured logs with secret redaction; uploads trust nothing (attachments are metadata; filenames/extension/MIME never trusted); parameterized access through Prisma only.
 
-## Documented deviations from the Phase 1 blueprint (change control §57)
+## Known limitations (documented per Phase 8 §105)
 
-1. **Session implementation — `jose` JWT instead of NextAuth@5 (beta).** Original decision DL-04; reason: single-credential scope + beta-quality of next-auth@5 at pin time; replacement keeps all DL-04 properties (JWT in HTTP-only cookie, 12h TTL, credentials flow) and leaves an upgrade path to Auth.js without changing cookie semantics; impact on Phases 3–5: none (auth is a self-contained seam).
-2. **bcryptjs instead of native bcrypt.** Pure-JS implementation of the same bcrypt algorithm; avoids a Windows native build toolchain; identical security properties (cost default 12). Impact: none for later phases; swapping to native `bcrypt` is a drop-in change of one module.
+1. **OpenCode provider contract not supplied** — AI analysis endpoints apply the configured provider through the port abstraction; with no real contract file the analysis returns an honest "contract unavailable" state (no simulated results, per Phase 5 §6). Deterministic tests use a production-blocked mock provider.
+2. **PPT fonts on machines without Bebas Neue/Poppins installed** — PowerPoint falls back per viewer; the font names are embedded in the deck and install correctly on any machine with the fonts present. Documented fallback rather than silent substitution.
+3. **EML attachments are metadata + verbatim storage** — attachment content is never executed or rendered inline in Phase 4/5 (by design); an attachment viewer is a Phase 9-candidate.
+4. **Automated backups** — no scheduled backup in the build; documented expectation in `docs/security-review.md`.
+5. **Single-provider AI configuration** — schema is future-proof (one row per provider), but the Settings UI exposes OpenCode only per Phase 2.1 scope.
+
+## Documented deviations from the Phase 1 blueprint (change control §57) — unchanged from Phase 2
+
+1. **Session implementation — `jose` JWT instead of NextAuth@5 (beta).** Original decision DL-04; the replacement keeps all DL-04 properties (JWT in HTTP-only cookie, 12h TTL, credentials flow) and leaves an upgrade path to Auth.js without changing cookie semantics.
+2. **bcryptjs instead of native bcrypt.** Pure-JS implementation of the same bcrypt algorithm; avoids a Windows native build toolchain; identical security properties (cost default 12). Swapping to native `bcrypt` is a drop-in change of one module.
 
 ## Phase 2.1 — AI API Key Configuration (delivered)
 

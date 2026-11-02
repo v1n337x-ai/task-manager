@@ -208,16 +208,14 @@ export async function exportPptReport(params: {
       ["Application", "Pending", "Not Fixed", "Reopened", "CAR", "Latest Iteration"].map((h) => ({ text: h, options: { bold: true, color: A.WHITE, fill: { color: A.INK }, fontFace: "Poppins", fontSize: 10 } })),
     ];
     for (const a of notFixedApps) {
-      nfRows.push(
-        { text: a.displayName.slice(0, 34), options: { fontFace: "Poppins", fontSize: 10, color: A.INK } } as unknown as TableLike[],
-        [
-          { text: String(a.counts.pending), options: { fontFace: "Poppins", fontSize: 10 } },
-          { text: String(a.counts.notFixed), options: { fontFace: "Poppins", fontSize: 10, color: a.counts.notFixed ? A.RED : "666666" } },
-          { text: String(a.counts.reopened), options: { fontFace: "Poppins", fontSize: 10, color: a.counts.reopened ? A.HIGH : "666666" } },
-          { text: String(a.counts.car), options: { fontFace: "Poppins", fontSize: 10 } },
-          { text: a.latestIteration ? `I${a.latestIteration}` : "—", options: { fontFace: "Poppins", fontSize: 10, color: "666666" } },
-        ] as unknown as TableLike[],
-      );
+      nfRows.push([
+        { text: a.displayName.slice(0, 34), options: { fontFace: "Poppins", fontSize: 10, color: A.INK } },
+        { text: String(a.counts.pending), options: { fontFace: "Poppins", fontSize: 10 } },
+        { text: String(a.counts.notFixed), options: { fontFace: "Poppins", fontSize: 10, color: a.counts.notFixed ? A.RED : "666666" } },
+        { text: String(a.counts.reopened), options: { fontFace: "Poppins", fontSize: 10, color: a.counts.reopened ? A.HIGH : "666666" } },
+        { text: String(a.counts.car), options: { fontFace: "Poppins", fontSize: 10 } },
+        { text: a.latestIteration ? `I${a.latestIteration}` : "—", options: { fontFace: "Poppins", fontSize: 10, color: "666666" } },
+      ]);
     }
     remediation.addTable(nfRows, { x: 0.4, y: 1.5, w: 12.5, colW: [3.6, 1.2, 1.4, 1.4, 1.0, 1.6], border: { pt: 0.5, color: A.STROKE }, rowH: 0.32 });
   }
