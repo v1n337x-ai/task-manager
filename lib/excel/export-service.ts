@@ -195,6 +195,7 @@ export async function exportTrackerWorkbook(
   await workbook.xlsx.readFile(templatePath());
   const sheet = workbook.worksheets.find((ws) => ws.name === TRACKER_SHEET);
   if (!sheet) throw new AppError("INVALID_EXCEL_SCHEMA", 422, `Template sheet "${TRACKER_SHEET}" is missing.`);
+  applyAkasaLightTheme(sheet);
 
   const exportRows = await buildExportRows();
   if (exportRows.length > LAST_TEMPLATE_DATA_ROW - DATA_START_ROW + 1) {
@@ -337,6 +338,44 @@ export async function exportTrackerWorkbook(
 
 function engagementReportDate(e: TrackerExportRow): Date | null {
   return e.reportDate ?? e.iteration1?.reportDate ?? null;
+}
+
+/**
+ * Light Akasa Air skin, applied to the EXPORTED workbook only — column layout,
+ * header text, values, merged cells and column widths are NEVER moved or
+ * renamed (39-column contract stays binary-stable). Touches fills + font
+ * colors only: group-label row 1 (soft sunrise orange), header row 2 (light
+ * peach + deep plum), totals row (warm plum tint). Import reads values, so
+ * the round trip is unaffected.
+ */
+function applyAkasaLightTheme(sheet: ExcelJS.Worksheet): void {
+  const plum = "FF3D2054";
+  const deepOrange = "FFE0550C";
+
+  // Row 1 — severity group labels (merged "Critical/Open/Closed" pairs, AE..AN).
+  const groupRow = sheet.getRow(1);
+  groupRow.eachCell((cell) => {
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF2E8" } };
+    cell.font = { ...cell.font, bold: true, color: { argb: deepOrange }, size: cell.font?.size ?? 10 };
+  });
+  groupRow.commit();
+
+  // Row 2 — the contracted header row (A..AN).
+  const headerRow = sheet.getRow(2);
+  headerRow.eachCell((cell) => {
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFE3CF" } };
+    cell.font = { ...cell.font, bold: true, color: { argb: plum }, size: cell.font?.size ?? 11 };
+    cell.alignment = { ...cell.alignment, vertical: "middle", horizontal: "center", wrapText: true };
+  });
+  headerRow.commit();
+
+  // Totals row — SUM row (U..AN) gets a warm plum band; values/format untouched.
+  const totalsRow = sheet.getRow(TOTALS_ROW);
+  totalsRow.eachCell((cell) => {
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF6EFE7" } };
+    cell.font = { ...cell.font, bold: true, color: { argb: plum }, size: cell.font?.size ?? 11 };
+  });
+  totalsRow.commit();
 }
 
 
