@@ -29,3 +29,13 @@ Deterministic filename `VAPT_[Application]_YYYY-MM-DD.pptx` (sanitized §33). Au
 ## Consistency (§10/§87/§95)
 
 Dashboard = Reports = PPT for the same filters/timestamp — covered by the golden-data test (`tests/integration/reports-ppt.test.ts`) that unzips the generated deck and verifies KPI text equals the report snapshot.
+
+## Application reports screen (Phase 9.1 — user-requested redesign)
+
+The findings register table was REMOVED from the Reports page. Instead:
+
+1. **Application selector** — a dropdown scoping the whole page (`?application=<id>`).
+2. **Per-iteration summaries** — I1, I2, I3 … rows per selected application with live counts from `finding_iteration_states`, using the SAME Open/Closed buckets as the Excel export (Open = open/new/in_progress/not_retested; Closed = fixed + not fixed + reopened + CAR), plus dates, type, status and test-case count.
+3. **Iteration report PDFs** — manual uploads per application (optionally pinned to an iteration): `%PDF-` magic-byte validation (declared MIME never trusted), 20 MB cap (`REPORT_PDF_MAX_MB`), originals stored verbatim (sha256) under `REPORT_STORAGE_ROOT` (default `storage/reports`), download returns the exact bytes, deletion is superuser-only. Every upload/download/delete is audited.
+
+APIs: `POST/GET /api/applications/[applicationId]/reports` · `GET/DELETE /api/app-reports/[reportId]` (new migration `20261102093000_application_reports`).

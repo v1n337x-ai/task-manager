@@ -82,6 +82,7 @@ model User {
   exportJobs       ExportJob[]            @relation("export_job_user")
   aiApprovals      AiApprovalDecision[]   @relation("ai_decision_user")
   findingHistories FindingStatusHistory[] @relation("fsh_actor_user")
+  reportUploads    ApplicationReport[]    @relation("app_report_user")
 
   @@index([isActive])
   @@map("users")
@@ -184,6 +185,7 @@ model Application {
   findings           Finding[]
   emailThreads       EmailThread[]
   aiExtractions      AiExtraction[]
+  reportUploads      ApplicationReport[]
 
   @@index([applicationType])
   @@index([isActive])
@@ -282,6 +284,7 @@ model Iteration {
   testCases        TestCaseIteration[]
   findingStates    FindingIterationState[]
   findingHistories FindingStatusHistory[]
+  reportUploads    ApplicationReport[]
 
   @@unique([engagementId, number])
   @@index([engagementId])
@@ -421,6 +424,33 @@ model FindingStatusHistory {
   @@index([findingId, createdAt])
   @@index([source])
   @@map("finding_status_history")
+}
+
+// ---------------------------------------------------------------------------
+// Application PDF reports (user-requested Phase 9.1) — manual uploads of the
+// tester PDF report per application/iteration, mirroring the EML rule:
+// originals stored VERBATIM (sha256), only human uploads, audit on every call.
+// ---------------------------------------------------------------------------
+model ApplicationReport {
+  id               Int      @id @default(autoincrement())
+  applicationId    Int
+  iterationId      Int?
+  fileName         String // original file name (sanitized, display only — never trusted)
+  storedName       String   // server-side unique file name on disk
+  mimeType         String // validated via magic bytes (application/pdf), not from client
+  byteSize         Int
+  sha256           String
+  uploadedByUserId Int
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  iteration   Iteration?  @relation(fields: [iterationId], references: [id])
+  createdBy   User        @relation("app_report_user", fields: [uploadedByUserId], references: [id])
+
+  @@index([applicationId])
+  @@index([iterationId])
+  @@map("application_reports")
 }
 
 // ---------------------------------------------------------------------------
