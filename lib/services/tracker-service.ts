@@ -150,6 +150,7 @@ export async function listTrackerApps(filters: {
         ? { number: latest.number, name: latest.name, typeLabel: latest.iterationTypeRef.label, statusLabel: latest.statusRef.label }
         : null,
       iterations: [...(engagement?.iterations ?? [])]
+        .filter((it) => it.number <= 2)
         .sort((a, b) => a.number - b.number)
         .map((it) => ({
           number: it.number,
@@ -158,8 +159,7 @@ export async function listTrackerApps(filters: {
           statusLabel: it.statusRef.label,
           startDate: it.startDate,
           reportDate: it.reportDate,
-        })),
-      counts: {
+        })),      counts: {
         total: relevant.length,
         critical: relevant.filter((f) => f.severityRef.value === "critical").length,
         high: relevant.filter((f) => f.severityRef.value === "high").length,

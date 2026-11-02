@@ -78,9 +78,10 @@ describe.skipIf(!dbAvailable)("§59 end-to-end foundation chain", () => {
     expect(i2.number).toBe(2);
     iteration2Id = i2.id;
 
-    // Iteration 3 must work without schema redesign (§18-19).
-    const i3 = await svc.createIteration({ engagementId, iterationTypeValue: "follow_up" }, userId, {});
-    expect(i3.number).toBe(3);
+    // User-directed contract cap: EXACTLY I1 + I2 — no iteration 3 (change control 2026-11).
+    await expect(
+      svc.createIteration({ engagementId, iterationTypeValue: "follow_up" }, userId, {}),
+    ).rejects.toThrow(/exactly two iterations|Iteration 3/);
   });
 
   let findingId = 0;
@@ -273,13 +274,12 @@ describe.skipIf(!dbAvailable)("§52 master-data & iteration tests", () => {
     const eng = await svc.createEngagement({ applicationId: app.id, name: "Iteration Probe VAPT", scopeValue: "internal", assessmentSourceValue: "vapt" }, null, {});
     const i1 = await svc.createIteration({ engagementId: eng.id, iterationTypeValue: "initial_scan" }, null, {});
     const i2 = await svc.createIteration({ engagementId: eng.id, iterationTypeValue: "retest" }, null, {});
-    const i3 = await svc.createIteration({ engagementId: eng.id, iterationTypeValue: "retest" }, null, {});
-    const i4 = await svc.createIteration({ engagementId: eng.id, iterationTypeValue: "follow_up" }, null, {});
-    expect([i1.number, i2.number, i3.number, i4.number]).toEqual([1, 2, 3, 4]);
-    // Rule enforcement: iteration 1 must be initial scan, 2+ cannot be.
+    expect([i1.number, i2.number]).toEqual([1, 2]);
+    // Cap: exactly two iterations in this build (user-directed 2026-11).
     await expect(
-      svc.createIteration({ engagementId: eng.id, iterationTypeValue: "retest" }, null, {}),
-    ).resolves.toBeTruthy();
+      svc.createIteration({ engagementId: eng.id, iterationTypeValue: "follow_up" }, null, {}),
+    ).rejects.toThrow(/exactly two iterations|Iteration 3/);
+    // Rule enforcement: iteration 1 must be initial scan, 2+ cannot be.
     await expect(svc.createIteration({ engagementId: eng.id, iterationTypeValue: "initial_scan" }, null, {})).rejects.toThrow(/Initial Scan/);
   });
 });

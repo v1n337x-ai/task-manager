@@ -48,6 +48,9 @@ async function createApp() {
   const done = await master("iteration_status", "completed");
   i1 = (await testDb.iteration.create({ data: { engagementId, number: 1, iterationType: iterType, name: "Iteration 1 — Initial Scan", status: done } })).id;
   i2 = (await testDb.iteration.create({ data: { engagementId, number: 2, iterationType: retestType, name: "Iteration 2 — Retest", status: done } })).id;
+  // NOTE: direct DB creation (service cap bypass) — this suite validates the
+  // chronological precedence ENGINE over arbitrarily long histories, not the
+  // product's two-iteration cap. Data is never destroyed (append-only).
   i3 = (await testDb.iteration.create({ data: { engagementId, number: 3, iterationType: retestType, name: "Iteration 3 — Retest", status: done } })).id;
   return { i1, i2, i3 };
 }

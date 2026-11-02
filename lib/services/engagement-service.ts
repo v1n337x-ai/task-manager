@@ -141,6 +141,12 @@ export async function createIteration(input: IterationInput, actorUserId: number
   }
   const effectiveNumber = number ?? lastNumber + 1;
   iterationTypeQuirk(effectiveNumber, input.iterationTypeValue);
+  // User-directed contract cap (change control 2026-11): the tracker has
+  // EXACTLY I1 and I2. Iteration 3+ is not available — historical records
+  // beyond I2 are hidden by the UI, never deleted (append-only preserved).
+  if (effectiveNumber > 2) {
+    throw ValidationError("The PT Tracker contract carries exactly two iterations (Iteration 1 and Iteration 2). Iteration 3 is not available in this build (user-directed change control).");
+  }
 
   const name = input.name?.trim() || (input.iterationTypeValue === "initial_scan" ? `Iteration ${effectiveNumber} — Initial Scan` : `Iteration ${effectiveNumber}`);
   const row = await prisma.iteration.create({

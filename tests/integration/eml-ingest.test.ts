@@ -94,8 +94,17 @@ describe.skipIf(!dbAvailable)(".EML pipeline (test DB)", () => {
     expect(thread.messages[0]!.messageId).toBe("<chainA-0001@digialert.test>");
     expect(thread.messages[1]!.inReplyTo).toContain("chainA-0001");
     expect(thread.messages[2]!.references).toContain("chainA-0001");
-    // participant roles: UNKNOWN â€” AI classifies later (Phase 5 seam, Â§5)
-    for (const m of thread.messages) expect(m.fromContact.roleRef.value).toBe("unknown");
+    // participant roles: AUTO-DETECTED from the .eml (user-directed 2026-11) —
+    // the digialert vendor participants classify as pentester via the rule
+    // engine; unknown remains unknown only when no evidence exists.
+    for (const m of thread.messages) {
+      if (m.fromContact.emailAddress.includes("digialert")) {
+        expect(m.fromContact.roleRef.value).toBe("pentester");
+        expect(m.fromContact.roleSource).toBe("RULE");
+      } else {
+        expect(["unknown", "application_owner", "developer", "pentester"]).toContain(m.fromContact.roleRef.value);
+      }
+    }
     // participants directory: deduplicated addresses across the chain
     const participants = await testDb.emailParticipant.count();
     expect(participants).toBeGreaterThanOrEqual(3);

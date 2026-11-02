@@ -51,7 +51,12 @@ export default async function ApplicationTrackerPage({
   }
 
   const activeTab = ["overview", "findings", "iterations", "test-cases", "email", "state-review", "history"].includes(tab ?? "") ? tab! : "overview";
-  const iterations: IterationLite[] = detail.iterations.map((i) => ({ id: i.id, number: i.number, name: i.name }));
+  // Contract cap (user-directed 2026-11): EXACTLY I1 + I2 everywhere. Anything
+  // beyond I2 stays stored in the database (append-only) but never reaches the
+  // UI or the client payload.
+  const iterations: IterationLite[] = detail.iterations
+    .filter((i) => i.number <= 2)
+    .map((i) => ({ id: i.id, number: i.number, name: i.name }));
   const testCasesLite: TestCaseLite[] = detail.testCases.map((t) => ({ id: t.id, code: t.code, title: t.title }));
   const baseUrl = `/pt-tracker/${id}`;
 
@@ -209,7 +214,9 @@ function FindingsTab({
 }) {
   const allIterationsUsed = new Set<number>();
   detail.findings.forEach((f) => f.iterationStates.forEach((s) => allIterationsUsed.add(s.iterationNumber)));
-  const usedIterations = [...allIterationsUsed].sort((a, b) => a - b);
+  // Contract: exactly I1 + I2 (user-directed cap) — iteration numbers above 2
+  // stay in the database (append-only) but are never displayed.
+  const usedIterations = [...allIterationsUsed].sort((a, b) => a - b).filter((n) => n <= 2);
 
   const currentOf = (f: TrackerFinding): string =>
     f.iterationStates.length
@@ -227,12 +234,17 @@ function FindingsTab({
         { key: "sev", header: "Severity", render: (f) => <SeverityBadge value={f.severityValue} /> },
         ...usedIterations.map((num) => ({
           key: `i${num}`,
-          header: `I${num}`,
+          header: `I${num} Status`,
           render: (f: TrackerFinding) => {
             const state = f.iterationStates.find((s) => s.iterationNumber === num);
             if (!state) return <span className="text-muted">—</span>;
             const isNew = state.statusValue === "new" && f.iterationStates.length === 1;
-            return <StatusBadge value={state.statusValue} label={isNew ? `New in I${num}` : state.statusLabel} />;
+            return (
+              <span className="inline-flex flex-col items-center gap-0.5">
+                <StatusBadge value={state.statusValue} label={isNew ? `New in I${num}` : state.statusLabel} />
+                <span className="text-[10px] text-muted">sev: {state.severityValue}</span>
+              </span>
+            );
           },
         })),
         { key: "current", header: "Current", render: (f: TrackerFinding) => <StatusBadge value={currentOf(f)} /> },
@@ -246,12 +258,12 @@ function FindingsTab({
           header: "",
           render: (f) =>
             iterations.length ? (
-              <FindingStateDialog finding={{ id: f.id, code: f.code, title: f.title, severityValue: f.severityValue }} iterations={iterations} />
+              <FindingStateDialog finding={{ id: f.id, code: f.code, title: f.title, severityValue: f.severityValue }} iterations={iterations.filter((i) => i.number <= 2)} />
             ) : null,
         },
       ]}
       emptyTitle="No findings yet"
-      emptyHint="Use “Add Finding”. Per-iteration states appear as columns once iterations exist (iteration 3+ adds columns dynamically)."
+      emptyHint="Use “Add Finding”. Per-iteration state columns appear for Iteration 1 and Iteration 2 (the contract's two iterations)."
     />
   );
 }
@@ -263,10 +275,12 @@ function IterationsTab({
   detail: ApplicationTrackerDetail;
   statusValueFor: (label: string) => string;
 }) {
+  // Contract cap: display only I1/I2 (older data stays in the database).
+  const visible = detail.iterations.filter((i) => i.number <= 2);
   return (
     <DataTable
       caption="Iterations"
-      rows={detail.iterations}
+      rows={visible}
       columns={[
         { key: "n", header: "#", render: (i) => <strong>I{i.number}</strong> },
         { key: "name", header: "Name", render: (i) => i.name },

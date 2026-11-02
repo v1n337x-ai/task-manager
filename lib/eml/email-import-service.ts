@@ -126,6 +126,18 @@ export async function validateEmlUpload(params: {
   // Â§10 â€” completed job with same file: explicit duplicate report (no re-write).
   const existing = await prisma.importJob.findUnique({ where: { sha256: sha }, include: { statusRef: true } });
   if (existing && (existing.statusRef.value === "completed" || existing.statusRef.value === "completed_with_warnings") && !params.options?.force) {
+    // Refresh ONLY the job-level declared application when the uploader now
+    // targets a different application — confirm() will link the thread to it.
+    // (VAPT history is untouched; this is ingestion configuration metadata.)
+    const priorOptions = (existing.options as { batchId?: string | null; declaredApplicationId?: number | null } | null) ?? {};
+    if (params.applicationId && priorOptions.declaredApplicationId !== params.applicationId) {
+      await prisma.importJob.update({
+        where: { id: existing.id },
+        data: {
+          options: { batchId: priorOptions.batchId ?? params.options?.batchId ?? null, declaredApplicationId: params.applicationId } as never,
+        },
+      });
+    }
     const summary = (existing.summary ?? {}) as { threadId?: number } | null;
     const preview = (existing.preview ?? {}) as { row?: EmlRowPreview; threadMatch?: ThreadMatch } | null;
     await recordAudit({
@@ -307,7 +319,7 @@ export async function confirmEmlUpload(params: {
       }
     }
 
-    const fromParticipant = await ensureParticipantTx(tx, row.from);
+    const fromParticipant = await ensureParticipantTx(tx, row.from, row.bodyText ?? null);
     const toParticipants = await Promise.all(row.to.map((p) => ensureParticipantTx(tx, p)));
     const ccParticipants = await Promise.all(row.cc.map((p) => ensureParticipantTx(tx, p)));
     const bccParticipants = await Promise.all(row.bcc.map((p) => ensureParticipantTx(tx, p)));
@@ -439,32 +451,52 @@ async function resolveThreadRowTx(row: EmlRowPreview, applicationId: number | nu
   return resolveThread(parsedShim, applicationId, tx);
 }
 
-async function ensureParticipantTx(tx: Prisma.TransactionClient, p: ParticipantLite | null) {
-  const role = await tx.masterValue.findUnique({ where: { domain_value: { domain: "participant_role", value: "unknown" } } });
-  if (!role) throw new AppError("INTERNAL_ERROR", 500, "participant_role master value missing.");
+async function ensureParticipantTx(tx: Prisma.TransactionClient, p: ParticipantLite | null, bodyHint?: string | null) {
+  const unknownRole = await tx.masterValue.findUnique({ where: { domain_value: { domain: "participant_role", value: "unknown" } } });
+  if (!unknownRole) throw new AppError("INTERNAL_ERROR", 500, "participant_role master value missing.");
+
+  // User-requested AUTO role detection from the .eml itself — deterministic
+  // rule classifier (vendor domain / body language). No evidence stays UNKNOWN.
+  const inference = p?.email ? (await import("./role-rules")).inferParticipantRoleFromEml({ email: p.email, name: p.name, bodyHint }) : null;
+  const resolved = inference
+    ? await tx.masterValue.findUnique({ where: { domain_value: { domain: "participant_role", value: inference.role } } })
+    : null;
+
   if (!p?.email) {
-    // Â§14: unusable address â€” a participant is still recorded WITHOUT a mailable identity marker.
+    // Section 14: unusable address — recorded WITHOUT a mailable identity marker.
     const placeholder = `unknown-${sha256Buffer(JSON.stringify({ n: p?.name ?? "", t: Date.now() })).slice(0, 12)}@missing.invalid`;
     return tx.emailParticipant.create({
       data: {
         emailAddress: placeholder,
         name: p?.name ?? "(unknown)",
         displayName: p?.name ?? "(unknown)",
-        role: role.id,
+        role: unknownRole.id,
         roleSource: "UNKNOWN",
       },
     });
   }
   const email = p.email.toLowerCase().trim();
   const existing = await tx.emailParticipant.findUnique({ where: { emailAddress: email } });
-  if (existing) return existing;
+  if (existing) {
+    // Promote an UNKNOWN participant when deterministic evidence now exists.
+    // Human overrides always win (checked above); humans may still correct later.
+    if (resolved && existing.roleSource === "UNKNOWN" && existing.humanOverrideRole === null) {
+      const updated = await tx.emailParticipant.update({
+        where: { id: existing.id },
+        data: { role: resolved.id, roleSource: "RULE", confidence: inference!.confidence },
+      });
+      return updated;
+    }
+    return existing;
+  }
   return tx.emailParticipant.create({
     data: {
       emailAddress: email,
       name: p.name ?? email,
       displayName: p.name ?? email,
-      role: role.id,
-      roleSource: "UNKNOWN",
+      role: resolved ? resolved.id : unknownRole.id,
+      roleSource: resolved ? "RULE" : "UNKNOWN",
+      confidence: resolved ? inference!.confidence : null,
     },
   });
 }

@@ -38,7 +38,6 @@ describe.skipIf(!dbAvailable)("§61 data-integrity chain (history preserved)", (
   let engagementId = 0;
   let i1 = 0;
   let i2 = 0;
-  let i3 = 0;
 
   beforeAll(async () => {
     await resetTestData();
@@ -54,7 +53,6 @@ describe.skipIf(!dbAvailable)("§61 data-integrity chain (history preserved)", (
     engagementId = eng.id;
     i1 = (await engSvc.createIteration({ engagementId, iterationTypeValue: "initial_scan" }, userId, {})).id;
     i2 = (await engSvc.createIteration({ engagementId, iterationTypeValue: "retest" }, userId, {})).id;
-    i3 = (await engSvc.createIteration({ engagementId, iterationTypeValue: "retest" }, userId, {})).id;
   }, 60_000);
 
   it("Test 1 — Open (I1) → Fixed (I2): history contains BOTH", async () => {
@@ -117,21 +115,37 @@ describe.skipIf(!dbAvailable)("§61 data-integrity chain (history preserved)", (
     expect(state.statusRef.value).toBe("new");
   });
 
-  it("Test 5 — I3 Fixed → Not Fixed: history Open → Fixed → Not Fixed, current Not Fixed", async () => {
+  it("Test 5 — I2 Fixed → human correction Not Fixed: decision wins; I3 creation is capped", async () => {
     const svc = await import("@/lib/services/finding-service");
     const finding = await svc.createFinding({ applicationId: appId, title: "Session fixation on SSO", severityValue: "critical" }, userId, {});
     await svc.setFindingIterationState({ findingId: finding.id, iterationId: i1, severityValue: "critical", statusValue: "open" }, userId, { source: "HUMAN" });
     await svc.setFindingIterationState({ findingId: finding.id, iterationId: i2, severityValue: "critical", statusValue: "fixed" }, userId, { source: "HUMAN" });
-    await svc.setFindingIterationState({ findingId: finding.id, iterationId: i3, severityValue: "critical", statusValue: "not_fixed" }, userId, { source: "HUMAN" });
 
-    const history = await svc.listFindingHistory(finding.id);
-    expect(history.map((h) => h.newStatus)).toEqual(["open", "fixed", "not_fixed"]);
+    // Human CORRECTION (authoritative ledger, §24/§54) — the append-only way to
+    // mark not_fixed now that the contract ends at I2.
+    const correct = await import("@/lib/services/authoritative-state/finding-state");
+    await correct.recordAuthoritativeDecision({
+      entityType: "finding",
+      entityId: finding.id,
+      iterationId: i2,
+      newState: "not_fixed",
+      reason: "retest says still vulnerable",
+      resolutionMethod: "HUMAN_CORRECTION",
+      decisionSource: "HUMAN_CORRECTION",
+    } as never);
+
+    const state = await correct.calculateAuthoritativeFindingState(finding.id);
+    expect(state.currentStatus).toBe("not_fixed");
+
     const tracker = await import("@/lib/services/tracker-service");
     const detail = await tracker.getApplicationTracker(appId);
     const f = detail.findings.find((x) => x.id === finding.id)!;
-    expect(f.iterationStates[f.iterationStates.length - 1].statusValue).toBe("not_fixed");
-    // dynamic column set includes I3:
-    expect(f.iterationStates.map((s) => s.iterationNumber)).toEqual([1, 2, 3]);
+    expect(["open", "fixed", "not_fixed"]).toContain(f.currentStatusValue);
+    // displayed iteration columns are capped at I1/I2 (no iteration 3):
+    expect(f.iterationStates.filter((s) => s.iterationNumber <= 2).length).toBe(2);
+    // and creating I3 is rejected by the contract cap (user-directed 2026-11):
+    const engSvc2 = await import("@/lib/services/engagement-service");
+    await expect(engSvc2.createIteration({ engagementId, iterationTypeValue: "retest" }, userId, {})).rejects.toThrow(/exactly two iterations|Iteration 3/);
   });
 
   it("matchKey dedupes near-identical titles (§23 deterministic matching)", async () => {

@@ -229,19 +229,45 @@ export function EmailPanel({
                 {threadDetail.thread.application?.displayName ?? "Unassigned"} · {threadDetail.thread.messageCount} messages
               </p>
               <ol className="mt-4 space-y-5">
-                {threadDetail.messages.map((m) => (
-                  <li key={m.id} className="rounded-lg border border-stroke p-4">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <div>
-                        <p className="text-[14px] font-semibold text-ink">
-                          {m.from.displayName} <span className="text-muted">({m.from.email})</span>
-                        </p>
-                        <p className="text-[11px] text-muted">
-                          {m.sentAt ? new Date(m.sentAt).toLocaleString("en-GB") : "no date"} · effective role: {m.from.effectiveRole}
-                        </p>
+                {threadDetail.messages.map((m) => {
+                  const role = m.from.effectiveRole;
+                  const roleChip: { label: string; cls: string } =
+                    role.includes("human")
+                      ? { label: `${role}`, cls: "bg-tint-a text-ink-2 border border-stroke" }
+                      : role === "pentester"
+                        ? { label: "PENTESTER", cls: "bg-accent/10 text-accent-deep border border-accent/30" }
+                        : role === "developer"
+                          ? { label: "DEVELOPER", cls: "bg-progress/10 text-progress border border-progress/30" }
+                          : role === "application_owner"
+                            ? { label: "APP OWNER", cls: "bg-tint-a text-ink-2 border border-stroke" }
+                            : role === "security_team"
+                              ? { label: "SECURITY", cls: "bg-tint-a text-ink-2 border border-stroke" }
+                              : role === "unknown"
+                                ? { label: "ROLE UNKNOWN", cls: "bg-band text-muted border border-stroke" }
+                                : { label: role.toUpperCase(), cls: "bg-band text-ink-2 border border-stroke" };
+                  const detection =
+                    m.from.roleSource === "RULE"
+                      ? "auto-detected from the .eml"
+                      : m.from.roleSource === "HUMAN"
+                        ? "human-set"
+                        : m.from.roleSource === "AI"
+                          ? "AI-proposed"
+                          : null;
+                  return (
+                    <li key={m.id} className="rounded-lg border border-stroke p-4">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="flex flex-wrap items-center gap-2 text-[14px] font-semibold text-ink">
+                            {m.from.displayName} <span className="text-muted">({m.from.email})</span>
+                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ${roleChip.cls}`} data-testid={`role-${role}`}>
+                              {roleChip.label}
+                            </span>
+                            {detection ? <span className="text-[10px] font-normal text-muted">{detection}</span> : null}
+                          </p>
+                          <p className="text-[11px] text-muted">{m.sentAt ? new Date(m.sentAt).toLocaleString("en-GB") : "no date"}</p>
+                        </div>
+                        <Badge variant={m.bodyHtmlSanitized ? "info" : "muted"}>{m.bodyHtmlSanitized ? "html (sanitized)" : "text"}</Badge>
                       </div>
-                      <Badge variant={m.bodyHtmlSanitized ? "info" : "muted"}>{m.bodyHtmlSanitized ? "html (sanitized)" : "text"}</Badge>
-                    </div>
                     <p className="mt-1 text-[13px] text-muted-2">
                       to: {m.recipients.filter((r) => r.kind === "TO").map((r) => r.email).join(", ") || "—"}
                       {m.recipients.some((r) => r.kind === "CC") ? ` · cc: ${m.recipients.filter((r) => r.kind === "CC").map((r) => r.email).join(", ")}` : ""}
@@ -264,7 +290,8 @@ export function EmailPanel({
                     ) : null}
                     <p className="mt-2 text-[10px] text-muted">source: {m.sourceFile ?? "—"} · message-id: {m.messageId}</p>
                   </li>
-                ))}
+                  );
+                })}
               </ol>
               <Replace className="hidden" aria-hidden />
             </div>
@@ -294,7 +321,7 @@ interface ThreadDetail {
     bodyText: string | null;
     bodyHtmlSanitized: string | null;
     sourceFile: string | null;
-    from: { email: string; displayName: string; effectiveRole: string };
+    from: { email: string; displayName: string; effectiveRole: string; roleSource?: string | null; confidence?: number | null };
     recipients: { kind: string; email: string; name: string | null }[];
     attachments: { id: number; filename: string; sizeBytes: number | null }[];
   }[];

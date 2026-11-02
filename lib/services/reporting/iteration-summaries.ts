@@ -73,7 +73,10 @@ export async function getApplicationIterationSummaries(applicationId: number): P
     },
   });
 
-  const rows: IterationSummaryRow[] = iterations.map((it) => {
+  // Contract cap (user-directed 2026-11): summaries show exactly I1 and I2.
+  const capped = iterations.filter((it) => it.number <= 2);
+
+  const rows: IterationSummaryRow[] = capped.map((it) => {
     const counts = {
       critical: 0, high: 0, medium: 0, low: 0, info: 0,
       total: it.findingStates.length,
