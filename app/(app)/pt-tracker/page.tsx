@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/badges";
 import { FilterBar, FilterChip } from "@/components/filter-bar";
 import { DbUnavailableState } from "@/components/states";
 import { ImportExcelDialog, ExportExcelButton, RefreshButton } from "./excel-actions";
+import { DetailsFloater, IterationsFloater, SevStat } from "./floaters";
 import { listTrackerApps, summarize } from "@/lib/services/tracker-service";
 import { formatDate } from "@/lib/utils";
 
@@ -124,24 +125,25 @@ export default async function PtTrackerPage({
         ) : (
           <DataTable
             className="mt-4"
-            caption="Application tracker"
+            caption="Application tracker — PT Tracker v1.0 columns (minimized via floaters)"
             rows={rows}
             columns={[
-              { key: "sno", header: "S.No", className: "w-14 text-center text-muted", render: (r) => r.sNo ?? "—" },
+              { key: "sno", header: "S.No", className: "w-12 text-center text-muted", render: (r) => r.sNo ?? "—" },
               {
                 key: "name",
                 header: "Application",
-                className: "min-w-[170px]",
+                className: "min-w-[160px]",
                 render: (r) => (
                   <Link href={`/pt-tracker/${r.id}`} className="font-medium text-progress underline-offset-4 hover:underline" data-testid={`app-${r.id}`}>
                     {r.displayName}
                   </Link>
                 ),
               },
+              { key: "scope", header: "Int. / Ext.", className: "whitespace-nowrap", render: (r) => <span className="text-muted-2">{r.scopeLabel}</span> },
               {
                 key: "url",
-                header: "URL",
-                className: "max-w-[240px]",
+                header: "Web URL / API",
+                className: "max-w-[210px]",
                 render: (r) =>
                   r.target ? (
                     <a
@@ -149,7 +151,7 @@ export default async function PtTrackerPage({
                       target="_blank"
                       rel="noopener noreferrer"
                       title={r.target}
-                      className="block max-w-[230px] truncate text-[12px] text-muted-2 hover:text-accent-deep hover:underline"
+                      className="block max-w-[200px] truncate text-[12px] text-muted-2 hover:text-accent-deep hover:underline"
                     >
                       {r.target}
                     </a>
@@ -157,18 +159,57 @@ export default async function PtTrackerPage({
                     <span className="text-muted">—</span>
                   ),
               },
-              { key: "assess", header: "Assessment", className: "whitespace-nowrap", render: (r) => <span className="text-[12px] text-muted-2">{r.assessmentTypeLabel}</span> },
-              { key: "ptstatus", header: "PT Status", className: "whitespace-nowrap", render: (r) => <StatusBadge value={r.statusLabel.toLowerCase().replace(/ /g, "_")} label={r.statusLabel} /> },
-              { key: "iter", header: "Iteration", className: "text-center whitespace-nowrap", render: (r) => (r.latestIteration ? `I${r.latestIteration.number}` : "—") },
-              { key: "total", header: "Total", className: "text-center whitespace-nowrap", render: (r) => <strong>{r.counts.total}</strong> },
-              { key: "crit", header: "Crit", className: "text-center whitespace-nowrap", render: (r) => r.counts.critical },
-              { key: "high", header: "High", className: "text-center whitespace-nowrap", render: (r) => r.counts.high },
-              { key: "med", header: "Med", className: "text-center whitespace-nowrap", render: (r) => r.counts.medium },
-              { key: "low", header: "Low", className: "text-center whitespace-nowrap", render: (r) => r.counts.low },
-              { key: "pending", header: "Pending", className: "text-center whitespace-nowrap", render: (r) => r.counts.pending },
-              { key: "fixed", header: "Fixed", className: "text-center whitespace-nowrap", render: (r) => r.counts.fixed },
+              { key: "type", header: "Type", className: "whitespace-nowrap", render: (r) => <span className="text-muted-2">{r.typeName}</span> },
+              { key: "source", header: "Source / tool", className: "whitespace-nowrap", render: (r) => <span className="text-[12px] text-muted-2">{r.assessmentTypeLabel}</span> },
+              {
+                key: "overall",
+                header: "Overall Status",
+                className: "whitespace-nowrap",
+                render: (r) => <StatusBadge value={r.overallStatusLabel.toLowerCase().replace(/ /g, "_")} label={r.overallStatusLabel} />,
+              },
+              { key: "vulncount", header: "Total Vuln Count", className: "text-center whitespace-nowrap", render: (r) => <strong>{r.counts.total}</strong> },
+              { key: "scan", header: "Scan/Report Date", className: "whitespace-nowrap", render: (r) => <span className="text-muted text-[12px]">{r.reportDate ? formatDate(r.reportDate) : "—"}</span> },
+              { key: "critical", header: "Critical", className: "text-center whitespace-nowrap px-2", render: (r) => <SevStat sev="critical" total={r.counts.critical} open={r.openBySeverity.critical} closed={r.closedBySeverity.critical} /> },
+              { key: "high", header: "High", className: "text-center whitespace-nowrap px-2", render: (r) => <SevStat sev="high" total={r.counts.high} open={r.openBySeverity.high} closed={r.closedBySeverity.high} /> },
+              { key: "medium", header: "Medium", className: "text-center whitespace-nowrap px-2", render: (r) => <SevStat sev="medium" total={r.counts.medium} open={r.openBySeverity.medium} closed={r.closedBySeverity.medium} /> },
+              { key: "low", header: "Low", className: "text-center whitespace-nowrap px-2", render: (r) => <SevStat sev="low" total={r.counts.low} open={r.openBySeverity.low} closed={r.closedBySeverity.low} /> },
+              { key: "info", header: "Info", className: "text-center whitespace-nowrap px-2", render: (r) => <SevStat sev="info" total={r.counts.info} open={r.openBySeverity.info} closed={r.closedBySeverity.info} /> },
               { key: "car", header: "CAR", className: "text-center whitespace-nowrap", render: (r) => r.counts.car },
-              { key: "updated", header: "Last Update", className: "whitespace-nowrap", render: (r) => <span className="text-muted">{formatDate(r.updatedAt)}</span> },
+              { key: "total", header: "Total", className: "text-center whitespace-nowrap", render: (r) => r.counts.total },
+              { key: "pending", header: "Pending", className: "text-center whitespace-nowrap", render: (r) => r.counts.pending },
+              { key: "closed", header: "Vulns Closed", className: "text-center whitespace-nowrap", render: (r) => r.closed },
+              {
+                key: "iterations",
+                header: "Iterations ⓘ",
+                className: "text-center whitespace-nowrap",
+                render: (r) => (
+                  <IterationsFloater
+                    iterations={r.iterations.map((it) => ({
+                      number: it.number,
+                      name: it.name,
+                      statusLabel: it.statusLabel,
+                      reportDate: it.reportDate ? it.reportDate.toISOString() : null,
+                    }))}
+                  />
+                ),
+              },
+              {
+                key: "details",
+                header: "Details ⓘ",
+                className: "w-10 text-center",
+                render: (r) => (
+                  <DetailsFloater
+                    fields={[
+                      { label: "Mail Subject", value: r.mailSubject },
+                      { label: "Requested date", value: r.requestedDate ? formatDate(r.requestedDate) : null },
+                      { label: "POC Akasa Air", value: r.poc },
+                      { label: "Digialert Team", value: r.assignedMembers },
+                      { label: "Comments", value: r.comments },
+                      { label: "Mail-thread key", value: r.engagementName },
+                    ]}
+                  />
+                ),
+              },
             ]}
             emptyTitle="No applications match"
             emptyHint="Adjust filters or import the PT Tracker workbook (fixed 39-column Excel contract)."

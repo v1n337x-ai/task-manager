@@ -6,6 +6,15 @@
 import { prisma } from "@/lib/db";
 import { NotFoundError } from "@/lib/errors";
 
+export interface TrackerIterationInfo {
+  number: number;
+  name: string;
+  typeLabel: string;
+  statusLabel: string;
+  startDate: Date | null;
+  reportDate: Date | null;
+}
+
 export interface TrackerAppRow {
   id: number;
   sNo: number | null;
@@ -15,10 +24,19 @@ export interface TrackerAppRow {
   scopeLabel: string;
   environmentLabel: string;
   statusLabel: string;
+  overallStatusLabel: string; // engagement status — Excel "Overall Status"
   target: string | null;
   assessmentTypeLabel: string;
   engagementName: string | null;
+  mailSubject: string | null; // Excel "Mail Subject"
+  poc: string | null; // Excel "POC Akasa Air"
+  assignedMembers: string | null; // Excel "Digialert Team - Assigned member"
+  requestedDate: Date | null; // Excel "Requested date"
+  reportDate: Date | null; // Excel "Scan/Report Date"
+  comments: string | null; // Excel "Comments"
   latestIteration: { number: number; name: string; typeLabel: string; statusLabel: string } | null;
+  /** ALL iterations ascending (floaters show every I1..In including >2). */
+  iterations: TrackerIterationInfo[];
   counts: {
     total: number;
     critical: number;
@@ -33,6 +51,11 @@ export interface TrackerAppRow {
     newInLatestIteration: number;
     testCases: number;
   };
+  /** Excel Open/Closed matrix pairs (AE..AN semantics — identical buckets). */
+  openBySeverity: { critical: number; high: number; medium: number; low: number; info: number };
+  closedBySeverity: { critical: number; high: number; medium: number; low: number; info: number };
+  /** Excel "Vulnerabilities  Closed" (fixed only). */
+  closed: number;
   active: boolean;
   updatedAt: Date;
 }
@@ -62,6 +85,8 @@ export async function listTrackerApps(filters: {
       scopeRef: true,
       environmentRef: true,
       statusRef: true,
+      primaryPoc: { select: { fullName: true } },
+      assignedMembers: { include: { contact: { select: { fullName: true } } } },
       engagements: {
         include: {
           sourceRef: true,
@@ -111,12 +136,29 @@ export async function listTrackerApps(filters: {
       scopeLabel: app.scopeRef.label,
       environmentLabel: app.environmentRef.label,
       statusLabel: app.statusRef.label,
+      overallStatusLabel: engagement?.statusRef?.label ?? "—",
       target: app.webUrl ?? app.apiFqdn ?? app.rawTarget,
       assessmentTypeLabel: engagement?.sourceRef?.label ?? "—",
       engagementName: engagement?.name ?? null,
+      mailSubject: engagement?.mailSubject ?? null,
+      poc: app.primaryPoc?.fullName ?? null,
+      assignedMembers: app.assignedMembers.length ? app.assignedMembers.map((m) => m.contact.fullName).join(" / ") : null,
+      requestedDate: engagement?.requestedDate ?? null,
+      reportDate: engagement?.reportDate ?? null,
+      comments: engagement?.notes ?? null,
       latestIteration: latest
         ? { number: latest.number, name: latest.name, typeLabel: latest.iterationTypeRef.label, statusLabel: latest.statusRef.label }
         : null,
+      iterations: [...(engagement?.iterations ?? [])]
+        .sort((a, b) => a.number - b.number)
+        .map((it) => ({
+          number: it.number,
+          name: it.name,
+          typeLabel: it.iterationTypeRef.label,
+          statusLabel: it.statusRef.label,
+          startDate: it.startDate,
+          reportDate: it.reportDate,
+        })),
       counts: {
         total: relevant.length,
         critical: relevant.filter((f) => f.severityRef.value === "critical").length,
@@ -138,7 +180,28 @@ export async function listTrackerApps(filters: {
       },
       active: app.isActive,
       updatedAt: app.updatedAt,
+      openBySeverity: { critical: 0, high: 0, medium: 0, low: 0, info: 0 },
+      closedBySeverity: { critical: 0, high: 0, medium: 0, low: 0, info: 0 },
+      closed: 0,
     };
+
+    // Excel Open/Closed matrix (AE..AN) — buckets IDENTICAL to export-service.
+    const openBySeverity = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+    const closedBySeverity = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+    let closedCount = 0;
+    for (const f of relevant) {
+      const sev = f.severityRef.value;
+      const st = f.statusRef.value;
+      if (OPEN_STATES.includes(st)) {
+        openBySeverity[sev as keyof typeof openBySeverity] += 1;
+      } else if (st === "fixed") {
+        closedBySeverity[sev as keyof typeof closedBySeverity] += 1;
+        closedCount += 1;
+      }
+    }
+    row.openBySeverity = openBySeverity;
+    row.closedBySeverity = closedBySeverity;
+    row.closed = closedCount;
 
     if (filters.severity) {
       const sev = filters.severity;
