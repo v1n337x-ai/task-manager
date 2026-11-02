@@ -127,29 +127,48 @@ export default async function PtTrackerPage({
             caption="Application tracker"
             rows={rows}
             columns={[
-              { key: "sno", header: "S.No", render: (r) => r.sNo ?? "—" },
+              { key: "sno", header: "S.No", className: "w-14 text-center text-muted", render: (r) => r.sNo ?? "—" },
               {
                 key: "name",
                 header: "Application",
+                className: "min-w-[170px]",
                 render: (r) => (
                   <Link href={`/pt-tracker/${r.id}`} className="font-medium text-progress underline-offset-4 hover:underline" data-testid={`app-${r.id}`}>
                     {r.displayName}
                   </Link>
                 ),
               },
-              { key: "url", header: "URL", render: (r) => <span className="text-muted">{(r.target ?? "—").slice(0, 42)}</span> },
-              { key: "assess", header: "Assessment", render: (r) => <span className="text-[12px] text-muted-2">{r.assessmentTypeLabel}</span> },
-              { key: "ptstatus", header: "PT Status", render: (r) => <StatusBadge value={r.statusLabel.toLowerCase().replace(/ /g, "_")} label={r.statusLabel} /> },
-              { key: "iter", header: "Iteration", render: (r) => (r.latestIteration ? `I${r.latestIteration.number}` : "—") },
-              { key: "total", header: "Total", render: (r) => <strong>{r.counts.total}</strong> },
-              { key: "crit", header: "Crit", render: (r) => r.counts.critical },
-              { key: "high", header: "High", render: (r) => r.counts.high },
-              { key: "med", header: "Med", render: (r) => r.counts.medium },
-              { key: "low", header: "Low", render: (r) => r.counts.low },
-              { key: "pending", header: "Pending", render: (r) => r.counts.pending },
-              { key: "fixed", header: "Fixed", render: (r) => r.counts.fixed },
-              { key: "car", header: "CAR", render: (r) => r.counts.car },
-              { key: "updated", header: "Last Update", render: (r) => <span className="text-muted">{formatDate(r.updatedAt)}</span> },
+              {
+                key: "url",
+                header: "URL",
+                className: "max-w-[240px]",
+                render: (r) =>
+                  r.target ? (
+                    <a
+                      href={r.target}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={r.target}
+                      className="block max-w-[230px] truncate text-[12px] text-muted-2 hover:text-accent-deep hover:underline"
+                    >
+                      {r.target}
+                    </a>
+                  ) : (
+                    <span className="text-muted">—</span>
+                  ),
+              },
+              { key: "assess", header: "Assessment", className: "whitespace-nowrap", render: (r) => <span className="text-[12px] text-muted-2">{r.assessmentTypeLabel}</span> },
+              { key: "ptstatus", header: "PT Status", className: "whitespace-nowrap", render: (r) => <StatusBadge value={r.statusLabel.toLowerCase().replace(/ /g, "_")} label={r.statusLabel} /> },
+              { key: "iter", header: "Iteration", className: "text-center whitespace-nowrap", render: (r) => (r.latestIteration ? `I${r.latestIteration.number}` : "—") },
+              { key: "total", header: "Total", className: "text-center whitespace-nowrap", render: (r) => <strong>{r.counts.total}</strong> },
+              { key: "crit", header: "Crit", className: "text-center whitespace-nowrap", render: (r) => r.counts.critical },
+              { key: "high", header: "High", className: "text-center whitespace-nowrap", render: (r) => r.counts.high },
+              { key: "med", header: "Med", className: "text-center whitespace-nowrap", render: (r) => r.counts.medium },
+              { key: "low", header: "Low", className: "text-center whitespace-nowrap", render: (r) => r.counts.low },
+              { key: "pending", header: "Pending", className: "text-center whitespace-nowrap", render: (r) => r.counts.pending },
+              { key: "fixed", header: "Fixed", className: "text-center whitespace-nowrap", render: (r) => r.counts.fixed },
+              { key: "car", header: "CAR", className: "text-center whitespace-nowrap", render: (r) => r.counts.car },
+              { key: "updated", header: "Last Update", className: "whitespace-nowrap", render: (r) => <span className="text-muted">{formatDate(r.updatedAt)}</span> },
             ]}
             emptyTitle="No applications match"
             emptyHint="Adjust filters or import the PT Tracker workbook (fixed 39-column Excel contract)."
