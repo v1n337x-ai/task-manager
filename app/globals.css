@@ -1,72 +1,67 @@
 @import "tailwindcss";
 
 /*
- * Design tokens — AKASA AIR brand theme (Phase 9 visual refresh):
- * Sunrise Orange primary accent (#FF6D1F), deep-plum ink (#3D2054),
- * ivory-lavender surfaces, sky-blue progress, VAPT severity palette
- * (contract) untouched. Bebas Neue display + Poppins body (DL-08).
- * Danger surfaces keep a dedicated #CF1325 token (never orange).
+ * Design tokens — VAPT.XLSX template theme (user direction 2026-11:
+ * "same color, same font, same style, everything of xl in the web app").
+ * Font: Calibri (11/12, black). Palette: the workbook's own fills —
+ * Critical C1272D · High F7931E · Medium FCEE21 · Low 39B54A · Info 0070C0;
+ * chrome band BCD4D8, data tint ECF2F3, peach FCE4D6, green E2EFDA;
+ * thin black borders; square corners. NO decorative plums/oranges.
  */
 @theme {
-  /* Akasa brand */
-  --color-accent: #ff6d1f; /* sunrise orange — CTAs, active states, brand rule */
-  --color-accent-deep: #e0550c;
-  --color-accent-soft: #fff2ea;
+  /* Workbook typography */
+  --font-display: "Calibri", "Segoe UI", Arial, sans-serif;
+  --font-body: "Calibri", "Segoe UI", Arial, sans-serif;
 
-  /* Ink family = deep plum (Akasa wordmark feel) */
-  --color-ink: #3d2054;
-  --color-ink-2: #4a3563;
-  --color-ink-3: #5d4a78;
-  --color-muted: #857896;
-  --color-muted-2: #6e617f;
+  /* Ink = black like the workbook text */
+  --color-ink: #171717;
+  --color-ink-2: #2f2f2f;
+  --color-ink-3: #444444;
+  --color-muted: #7a7a7a;
+  --color-muted-2: #5f5f5f;
 
-  /* Surfaces */
+  /* Surfaces: white paper + workbook tints */
   --color-page: #ffffff;
-  --color-page-soft: #faf8fc;
+  --color-page-soft: #ffffff;
   --color-card: #ffffff;
-  --color-band: #f4f0f8;
-  --color-stroke: #e7e1ee;
-  --color-stroke-soft: #dcd4e6;
-  --color-tint-a: #f6effa;
-  --color-tint-b: #fbf8fd;
+  --color-band: #eff1f2;
+  --color-stroke: #b7b7b7;
+  --color-stroke-soft: #d9d9d9;
+  --color-tint-a: #e6ecee;
+  --color-tint-b: #ecf2f3;
 
-  /* Semantics — severity colors now follow the WORKBOOK's own Office theme
-     accents (user-directed 2026-11: "same color code of xl"). */
-  --color-danger: #cf1325;
-  --color-progress: #2e86c1;
-  --color-good: #2e862e;
-  --color-sev-critical: #c00000; /* red */
-  --color-sev-high: #ed7d31; /* orange */
-  --color-sev-medium: #ffc000; /* amber/yellow */
-  --color-sev-low: #70ad47; /* green */
-  --color-sev-info: #5b9bd5; /* blue — workbook accent1 */
-  /* Excel-tint fills (the workbook's own highlight colors) */
-  --color-sev-critical-soft: #f4cccc;
-  --color-sev-high-soft: #fce4d6;
-  --color-sev-medium-soft: #fff2cc;
-  --color-sev-low-soft: #e2efda;
-  --color-sev-info-soft: #deeaf6;
-  /* Excel darker-text colors (accent darker-25/50 as Excel renders) */
-  --color-sev-critical-text: #9c0006;
-  --color-sev-high-text: #974706;
-  --color-sev-medium-text: #7f6000;
-  --color-sev-low-text: #375623;
-  --color-sev-info-text: #1f4e79;
+  /* Actions: workbook slate (theme dk2) for primary; red for CTAs */
+  --color-accent: #c1272d;
+  --color-accent-deep: #8e1c21;
+  --color-accent-soft: #e6ecee;
+  --color-slate: #44546a;
 
-  /* The workbook's own chrome colors — tables use these (Excel-identical). */
-  --color-xlsx-band: #bcd4d8; /* severity/header band */
-  --color-xlsx-data: #ecf2f3; /* data-cell tint */
-  --color-xlsx-peach: #fce4d6; /* highlight (Pending header family) */
-  --color-xlsx-green: #e2efda; /* green highlight (Closed family) */
+  /* Severity — the workbook's OWN fills */
+  --color-danger: #c1272d;
+  --color-progress: #0070c0;
+  --color-good: #39b54a;
+  --color-sev-critical: #c1272d;
+  --color-sev-high: #f7931e;
+  --color-sev-medium: #fcee21;
+  --color-sev-low: #39b54a;
+  --color-sev-info: #0070c0;
+  --color-sev-critical-text: #ffffff;
+  --color-sev-high-text: #ffffff;
+  --color-sev-medium-text: #171717;
+  --color-sev-low-text: #ffffff;
+  --color-sev-info-text: #ffffff;
 
-  --font-display: var(--font-bebas), "Arial Narrow", sans-serif;
-  --font-body: var(--font-poppins), "Segoe UI", sans-serif;
+  /* Workbook chrome */
+  --color-xlsx-band: #bcd4d8;
+  --color-xlsx-data: #ecf2f3;
+  --color-xlsx-peach: #fce4d6;
+  --color-xlsx-green: #e2efda;
 
   --radius-card: 0px;
   --radius-panel: 0px;
 
-  --shadow-sm: 0 1px 2px rgb(61 32 84 / 6%);
-  --shadow-card: 0 1px 3px rgb(61 32 84 / 7%), 0 4px 14px rgb(61 32 84 / 5%);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 6%);
+  --shadow-card: 0 1px 3px rgb(0 0 0 / 8%);
 }
 
 html,
@@ -79,93 +74,93 @@ body {
   color: var(--color-ink-2);
   font-family: var(--font-body);
   font-size: 14px;
-  line-height: 1.55;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
 
 ::selection {
-  background: var(--color-accent-soft);
+  background: var(--color-xlsx-band);
   color: var(--color-ink);
 }
 
 .font-display {
   font-family: var(--font-display);
-  letter-spacing: 0.01em;
+  font-weight: 700;
+  letter-spacing: 0;
 }
 
-/* Slim, theme-matched scrollbars (no overlap from fat native bars). */
+/* Slim scrollbars */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--color-stroke-soft) transparent;
+  scrollbar-color: #b7b7b7 transparent;
 }
 *::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 *::-webkit-scrollbar-thumb {
-  background: var(--color-stroke-soft);
-  border-radius: 999px;
+  background: #b7b7b7;
+  border-radius: 0;
   border: 3px solid transparent;
   background-clip: content-box;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: var(--color-muted);
+  background: #7a7a7a;
   background-clip: content-box;
   border: 3px solid transparent;
 }
 
-/* Topbar / page header band: deep-plum gradient + sunrise-orange rule. */
+/* Topbar / page header: the workbook band — steel with black text + black rule. */
 .brand-band {
-  background: linear-gradient(120deg, #3d2054 0%, #492a63 55%, #5c3479 100%);
-  color: #ffffff;
-  border-bottom: 3px solid var(--color-accent);
+  background: var(--color-xlsx-band);
+  color: var(--color-ink-2);
+  border-bottom: 2px solid #171717;
 }
 
-/* Sidebar rail tint to separate from the canvas. */
+/* Sidebar rail: plain white with black hairline. */
 .side-rail {
   background: var(--color-card);
-  border-right: 1px solid var(--color-stroke);
+  border-right: 1px solid var(--color-stroke-soft);
 }
 
-/* PPT-derived KPI card anatomy: white squares (no curves per user direction),
-   accent bar, soft lift on hover. */
+/* KPI/stat cards: white, black hairline, square. */
 .kpi-card {
   background: var(--color-card);
   border: 1px solid var(--color-stroke);
   border-radius: 0;
-  box-shadow: var(--shadow-card);
+  box-shadow: none;
   position: relative;
   overflow: hidden;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: background 0.12s ease;
 }
 .kpi-card:hover {
-  transform: translateY(-1px);
+  background: var(--color-xlsx-data);
 }
 .kpi-card::before {
   content: "";
   position: absolute;
   inset: 0 0 auto 0;
   height: 4px;
-  background: var(--kpi-accent, var(--color-accent));
+  background: var(--kpi-accent, var(--color-sev-critical));
 }
 
-/* Panel — square (no curves), gently elevated. */
+/* Panels: white + thin black hairline, square. */
 .panel {
   background: var(--color-card);
   border: 1px solid var(--color-stroke);
   border-radius: 0;
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
 }
 
-/* Tables: Excel-identical chrome (band + tint), square corners, sticky header.
-   The wrapper always scrolls horizontally instead of squeezing columns. */
+/* Tables: THE workbook grid — steel header band, black text, thin black
+   gridlines, white rows (no zebra), hover = data tint. Sticky header. */
 .tm-table {
   background: var(--color-card);
-  border: 1px solid var(--color-xlsx-band);
+  border: 1px solid #171717;
   border-radius: 0;
   overflow: hidden;
   width: 100%;
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
 }
 .tm-table .overflow-x-auto {
   border-radius: inherit;
@@ -177,43 +172,49 @@ body {
 }
 .tm-table thead th {
   background: var(--color-xlsx-band);
-  color: var(--color-ink);
-  font-weight: 600;
+  color: #171717;
+  font-weight: 700;
   text-align: left;
   white-space: nowrap;
-  border-bottom: 2px solid var(--color-accent);
+  border-bottom: 2px solid #171717;
+  border-right: 1px solid #171717;
+  font-size: 12px;
 }
 .tm-table thead th:first-child {
   border-top-left-radius: 0;
+  border-left: none;
 }
 .tm-table thead th:last-child {
   border-top-right-radius: 0;
+  border-right: none;
 }
-.tm-table tbody tr + tr td,
-.tm-table tbody tr + tr th {
-  border-top: 1px solid var(--color-stroke-soft);
+.tm-table tbody td {
+  border-bottom: 1px solid #171717;
 }
-.tm-table tbody tr:nth-child(even) {
-  background: var(--color-xlsx-data);
+.tm-table tbody tr td:first-child {
+  border-left: 1px solid #171717;
+}
+.tm-table tbody tr td:last-child {
+  border-right: 1px solid #171717;
 }
 .tm-table tbody tr:hover {
-  background: var(--color-accent-soft);
+  background: var(--color-xlsx-data);
 }
 .tm-table td {
   overflow-wrap: anywhere;
 }
 
-/* Inputs: calm plum focus. */
+/* Inputs: black focus like a filled cell selection. */
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-sev-info);
   outline-offset: 1px;
-  border-color: var(--color-accent);
+  border-color: var(--color-sev-info);
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-sev-info);
   outline-offset: 2px;
 }
 

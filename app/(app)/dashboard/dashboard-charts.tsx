@@ -24,7 +24,7 @@ import {
 
 // VAPT severity palette (user-directed): Critical red · High orange ·
 // Medium amber · Low green · Info blue.
-const SEVERITY_COLORS = ["#C00000", "#ED7D31", "#FFC000", "#70AD47", "#5B9BD5"];
+const SEVERITY_COLORS = ["#C1272D", "#F7931E", "#FCEE21", "#39B54A", "#0070C0"];
 const GRID = "#E7E1EE";
 const AXIS = "#857896";
 const INK = "#3D2054";

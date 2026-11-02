@@ -91,7 +91,7 @@ export default async function ApplicationTrackerPage({
             <ExportExcelButton />
             <Link
               href="/pt-tracker"
-              className="inline-flex h-9 items-center rounded-lg bg-card px-4 text-[13px] font-semibold text-ink-2 shadow-sm transition hover:bg-band"
+              className="inline-flex h-9 items-center rounded-none bg-xlsx-band px-4 text-[13px] font-semibold text-ink-2 transition hover:bg-xlsx-data"
             >
               Back to PT Tracker
             </Link>
@@ -233,12 +233,7 @@ function FindingsTab({
             const state = r.f.iterationStates.find((s) => s.iterationNumber === num);
             if (!state) return <span className="text-muted">—</span>;
             const isNew = state.statusValue === "new" && r.f.iterationStates.length === 1;
-            return (
-              <span className="inline-flex flex-col items-center gap-0.5">
-                <StatusBadge value={state.statusValue} label={isNew ? `New in I${num}` : state.statusLabel} />
-                <span className="text-[10px] text-muted">sev: {state.severityValue}</span>
-              </span>
-            );
+            return <StatusBadge value={state.statusValue} label={isNew ? `New in I${num}` : state.statusLabel} />;
           },
         })),
         {

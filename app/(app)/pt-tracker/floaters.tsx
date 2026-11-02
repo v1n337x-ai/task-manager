@@ -122,11 +122,11 @@ function Floater({
 /* Severity cell — the whole cell is the hover zone; the Excel Open/Closed pair appears. */
 
 const SEV_DOT: Record<string, string> = {
-  critical: "#C00000",
-  high: "#ED7D31",
-  medium: "#FFC000",
-  low: "#70AD47",
-  info: "#5B9BD5",
+  critical: "#C1272D",
+  high: "#F7931E",
+  medium: "#FCEE21",
+  low: "#39B54A",
+  info: "#0070C0",
 };
 
 export function SevStat({ sev, total, open, closed }: { sev: "critical" | "high" | "medium" | "low" | "info"; total: number; open: number; closed: number }) {

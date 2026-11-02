@@ -100,7 +100,7 @@ export default async function PtTrackerPage({
             {type ? <input type="hidden" name="type" value={type} /> : null}
             {fixedState ? <input type="hidden" name="fixedState" value={fixedState} /> : null}
             {severity ? <input type="hidden" name="severity" value={severity} /> : null}
-            <button type="submit" className="rounded-lg bg-accent px-3 py-1.5 text-[12px] font-semibold text-white">Search</button>
+            <button type="submit" className="rounded-none bg-slate px-3 py-1.5 text-[12px] font-semibold text-white">Search</button>
           </form>
           <span className="text-[12px] text-muted">Fixed/NotFixed:</span>
           <FilterChip href={trackerUrl({ type, status, scope, severity, iteration: iterationParam })} active={false}>All</FilterChip>

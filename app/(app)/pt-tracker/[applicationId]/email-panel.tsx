@@ -264,17 +264,17 @@ interface ChatMessage {
 }
 
 const ROLE_META: Record<string, { label: string; badge: string; dot: string; side: "left" | "right" }> = {
-  pentester: { label: "PENTESTER", badge: "bg-accent/10 text-accent-deep", dot: "#E86B10", side: "left" },
-  developer: { label: "DEVELOPER", badge: "bg-progress/10 text-progress", dot: "#2E86C1", side: "right" },
-  application_owner: { label: "APP OWNER", badge: "bg-tint-a text-ink-2", dot: "#5D4A78", side: "right" },
-  security_team: { label: "SECURITY", badge: "bg-tint-a text-ink-2", dot: "#2E862E", side: "left" },
-  unknown: { label: "ROLE UNKNOWN", badge: "bg-band text-muted", dot: "#9E9E9E", side: "left" },
+  pentester: { label: "PENTESTER", badge: "bg-sev-critical text-sev-critical-text", dot: "#C1272D", side: "left" },
+  developer: { label: "DEVELOPER", badge: "bg-sev-info text-sev-info-text", dot: "#0070C0", side: "right" },
+  application_owner: { label: "APP OWNER", badge: "bg-slate text-white", dot: "#44546A", side: "right" },
+  security_team: { label: "SECURITY", badge: "bg-sev-low text-sev-low-text", dot: "#39B54A", side: "left" },
+  unknown: { label: "ROLE UNKNOWN", badge: "bg-band text-muted", dot: "#7a7a7a", side: "left" },
 };
 
 function roleMeta(effectiveRole: string) {
   const key = effectiveRole.replace(/\s*\(human override\)\s*/i, "").trim();
-  if (effectiveRole.includes("human")) return { label: `HUMAN · ${key.toUpperCase()}`, badge: "bg-good/10 text-good", dot: "#2E862E", side: key.includes("pentester") ? "left" : "right" } as const;
-  return ROLE_META[key] ?? { label: key.toUpperCase(), badge: "bg-band text-ink-2 border border-stroke", dot: "#9E9E9E", side: "left" } as const;
+  if (effectiveRole.includes("human")) return { label: `HUMAN · ${key.toUpperCase()}`, badge: "bg-sev-low text-sev-low-text", dot: "#39B54A", side: key.includes("pentester") ? "left" : "right" } as const;
+  return ROLE_META[key] ?? { label: key.toUpperCase(), badge: "bg-band text-ink-2", dot: "#7a7a7a", side: "left" } as const;
 }
 
 function initials(name: string): string {
@@ -328,7 +328,7 @@ function ChatThread({ subject, appDisplayName, messages }: { subject: string; ap
                 <div className={`flex max-w-[78%] flex-col ${isRight ? "items-end" : "items-start"}`}>
                   <div
                     className={`w-full rounded-2xl border px-3.5 py-2.5 shadow-sm ${
-                      isRight ? "border-accent/25 bg-accent-soft" : "border-stroke bg-card"
+                      isRight ? "border-[#171717] bg-xlsx-peach" : "border-[#171717] bg-card"
                     }`}
                   >
                     <p className="flex flex-wrap items-center gap-2 text-[12px]">

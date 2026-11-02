@@ -10,11 +10,11 @@ const badgeVariants = cva(
       variant: {
         // Severity chips follow the WORKBOOK's Excel look (user direction):
         // light accent-tint fill + darker accent text — no border strokes.
-        critical: "bg-sev-critical-soft text-sev-critical-text",
-        high: "bg-sev-high-soft text-sev-high-text",
-        medium: "bg-sev-medium-soft text-sev-medium-text",
-        low: "bg-sev-low-soft text-sev-low-text",
-        info: "bg-sev-info-soft text-sev-info-text",
+        critical: "bg-sev-critical text-sev-critical-text",
+        high: "bg-sev-high text-sev-high-text",
+        medium: "bg-sev-medium text-sev-medium-text",
+        low: "bg-sev-low text-sev-low-text",
+        info: "bg-sev-info text-sev-info-text",
         good: "bg-sev-low-soft text-sev-low-text",
         progress: "bg-xlsx-peach text-sev-critical-text",
         accent: "bg-accent text-white",
