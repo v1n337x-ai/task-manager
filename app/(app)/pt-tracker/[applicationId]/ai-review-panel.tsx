@@ -83,7 +83,7 @@ export function AiReview({ threadId, threadSubject }: { threadId: number; thread
       const csrf = document.cookie.split(";").map((c) => c.trim()).find((c) => c.startsWith("tm_csrf="))?.split("=").slice(1).join("");
       const res = await fetch("/api/ai/analyze/thread", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...(csrf ? { "x-csrf-token": csrf } : {}), "x-ai-provider-override": "mock" },
+        headers: { "Content-Type": "application/json", ...(csrf ? { "x-csrf-token": csrf } : {}) },
         body: JSON.stringify({ threadId }),
       });
       const data = await res.json();
@@ -106,7 +106,7 @@ export function AiReview({ threadId, threadSubject }: { threadId: number; thread
       const csrf = document.cookie.split(";").map((c) => c.trim()).find((c) => c.startsWith("tm_csrf="))?.split("=").slice(1).join("");
       const res = await fetch(`/api/ai/extractions/${extraction.id}/reanalyze`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...(csrf ? { "x-csrf-token": csrf } : {}), "x-ai-provider-override": "mock" },
+        headers: { "Content-Type": "application/json", ...(csrf ? { "x-csrf-token": csrf } : {}) },
         body: JSON.stringify({ threadId }),
       });
       const data = await res.json();

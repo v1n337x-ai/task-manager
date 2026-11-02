@@ -105,7 +105,7 @@ dbDescribe.skipIf(!dbAvailable)("AI configuration service (test DB)", () => {
     expect(row.encryptedApiKey).toBeNull();
   });
 
-  dbIt("connection test is honest (UNAVAILABLE — no invented provider contract, §15)", async () => {
+  dbIt("connection test is honest without server config (UNAVAILABLE, §15; with config it performs a real /api/info check)", async () => {
     const svc = await import("@/lib/services/ai-config-service");
     await svc.saveAiConfig({ provider: "opencode", apiKey: "honest-probe-0000" }, userId, {});
     const result = await svc.runConnectionTest("opencode", userId, {});

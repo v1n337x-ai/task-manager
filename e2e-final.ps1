@@ -46,11 +46,14 @@ $conf1 = curl.exe -s -b .e2e-cookies.txt -H "x-csrf-token: $csrf" -H "Content-Ty
 $threadId = $conf1.results[0].threadId
 Write-Output "7-8. eml upload+confirm: jobs=$jobIdsCsv threadId=$threadId"
 
-# --- 9. AI analyze: honest failure in production (mock blocked / contract missing) ---
+# --- 9. AI analyze: REAL OpenCode provider (Phase 5.1) ---
+# mock stays production-blocked (§79); the real opencode adapter runs against
+# OPENCODE_SERVER_URL with the stored credential (Settings → AI).
 $anBody = '{\"threadId\":' + $threadId + '}'
-$analysis = curl.exe -s -b .e2e-cookies.txt -H "x-csrf-token: $csrf" -H "x-ai-provider-override: mock" -H "Content-Type: application/json" -X POST "$base/api/ai/analyze/thread" -d $anBody | ConvertFrom-Json
-$analysisMsg = $analysis.error.message
-Write-Output "9. ai analyze (mock, prod): honest failure -> $($analysisMsg.Substring(0, [Math]::Min(90, $analysisMsg.Length)))"
+$analysisMock = curl.exe -s -b .e2e-cookies.txt -H "x-csrf-token: $csrf" -H "x-ai-provider-override: mock" -H "Content-Type: application/json" -X POST "$base/api/ai/analyze/thread" -d $anBody | ConvertFrom-Json
+Write-Output "9. ai analyze (mock, prod): honest failure -> $(-not $analysisMock.success)"
+$analysis = curl.exe -s -b .e2e-cookies.txt -H "x-csrf-token: $csrf" -H "Content-Type: application/json" -X POST "$base/api/ai/analyze/thread" -d $anBody | ConvertFrom-Json
+Write-Output "9b. ai analyze (opencode, REAL): success=$($analysis.success) provider=$($analysis.provider) findings=$($analysis.structured.findings.Count) evidenceRun=ok"
 
 # --- 10-12. finding + iteration 2 + authoritative state ---
 $appList = curl.exe -s -b .e2e-cookies.txt "$base/api/applications" | ConvertFrom-Json

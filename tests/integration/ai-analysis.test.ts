@@ -131,8 +131,9 @@ describe.skipIf(!dbAvailable)("AI thread analysis (mock provider)", () => {
     expect(runs[0]!.id).not.toBe(runs[runs.length - 1]!.id); // separate runs, both kept
   });
 
-  it("13-15. OpenCode (configured provider) fails HONESTLY without a contract (§6/§50)", async () => {
-    // Seed the Phase 2.1 configuration row (enabled) — still no API contract exists.
+  it("13-15. OpenCode (enabled, unconfigured) fails HONESTLY without server/credential (§6/§50)", async () => {
+    // Enabled provider row but NO server/credential configuration — analysis
+    // must refuse honestly, record a failed run, and never fabricate output.
     await testDb.aiConfiguration.upsert({
       where: { provider: "opencode" },
       update: { enabled: true },

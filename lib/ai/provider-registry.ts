@@ -1,9 +1,23 @@
 /**
- * Provider registry (§5). "opencode" is configured in Settings but has NO
- * implemented API contract in this build (honest §6 gate). The "mock" provider
- * is a deterministic TEST fixture (§79) — never selectable in production.
+ * Provider registry (§5). "opencode" carries the REAL, live-verified OpenCode
+ * v2 HTTP contract (lib/ai/opencode.ts — Phase 5.1). The "mock" provider is a
+ * deterministic TEST fixture (§79) — never selectable in production.
  */
-import type { AiProviderPort, AiAnalyzeContextInput, AiProviderAnalyzeResult } from "./providers";
+import type {
+  AiProviderPort,
+  AiAnalyzeContextInput,
+  AiProviderAnalyzeResult,
+  ProviderPortOptions,
+} from "./providers";
+import { ProviderUnavailableError } from "./providers";
+import {
+  OpenCodeConfigError,
+  fetchOpenCodeDefaultModel,
+  generateOpenCodeText,
+  getOpenCodeBaseUrl,
+  parseOpenCodeModelRef,
+} from "./opencode";
+import { buildExtractionPrompt } from "./prompt";
 
 /** Naive but DETERMINISTIC keyword extraction over the given context — test-only. */
 function mockAnalyze(context: AiAnalyzeContextInput): AiProviderAnalyzeResult {
@@ -118,21 +132,57 @@ function mockAnalyze(context: AiAnalyzeContextInput): AiProviderAnalyzeResult {
 
 export function listRunProviders(): { slug: string; contractAvailable: boolean; testOnly: boolean }[] {
   return [
-    { slug: "opencode", contractAvailable: false, testOnly: false },
+    { slug: "opencode", contractAvailable: true, testOnly: false },
     { slug: "mock", contractAvailable: true, testOnly: true },
   ];
 }
 
-export function resolveProviderPort(slug: string, isProduction: boolean): AiProviderPort {
+/** Real OpenCode port — configuration arrives via ProviderPortOptions (never hardcoded). */
+function opencodePort(options: ProviderPortOptions): AiProviderPort {
+  const configuredModel = options.model?.trim() || process.env.OPENCODE_MODEL?.trim() || null;
+  return {
+    slug: "opencode",
+    modelRaw: configuredModel,
+    contractAvailable: true,
+    analyze: async (context) => {
+      const serverUrl = options.serverUrl?.trim() || getOpenCodeBaseUrl();
+      const credential = options.credential?.trim() || process.env.OPENCODE_SERVER_PASSWORD?.trim() || "";
+      if (!serverUrl || !credential) {
+        throw new ProviderUnavailableError("opencode");
+      }
+      let modelRef;
+      if (configuredModel) {
+        modelRef = parseOpenCodeModelRef(configuredModel);
+      } else {
+        const discovered = await fetchOpenCodeDefaultModel({ baseUrl: serverUrl, credential, fetchImpl: options.fetchImpl });
+        if ("model" in discovered) modelRef = discovered.model;
+        else throw new Error(discovered.message);
+      }
+
+      const result = await generateOpenCodeText({
+        baseUrl: serverUrl,
+        credential,
+        model: modelRef,
+        prompt: buildExtractionPrompt(context),
+        fetchImpl: options.fetchImpl,
+      });
+      if ("text" in result) {
+        return {
+          ok: true,
+          structured: result.text,
+          provider: "opencode",
+          modelRaw: `${modelRef.providerID}/${modelRef.id}`,
+          warnings: [],
+        };
+      }
+      throw new Error(result.message);
+    },
+  };
+}
+
+export function resolveProviderPort(slug: string, isProduction: boolean, options: ProviderPortOptions = {}): AiProviderPort {
   if (slug === "opencode") {
-    return {
-      slug: "opencode",
-      modelRaw: null,
-      contractAvailable: false,
-      analyze: async () => {
-        throw new ProviderUnavailablePortError();
-      },
-    };
+    return opencodePort(options);
   }
   if (slug === "mock") {
     if (isProduction) {
@@ -148,11 +198,8 @@ export function resolveProviderPort(slug: string, isProduction: boolean): AiProv
   throw new UnknownProviderSlugError(slug);
 }
 
-class ProviderUnavailablePortError extends Error {
-  constructor() {
-    super("OpenCode provider contract is not implemented in this build — no endpoint to call (§6).");
-  }
-}
+export { OpenCodeConfigError };
+
 class MockProviderProductionError extends Error {
   constructor() {
     super("Mock AI provider is unavailable in production environments.");

@@ -42,6 +42,7 @@ Sign in with the seeded credential from your `.env` (`SEED_ADMIN_EMAIL` / `SEED_
 | 3 — PT Tracker/Iterations/Excel | tracker UI, open-ended iterations, 39-column contract, import/export | `fe4f936` |
 | 4 — EML ingestion | .eml parse/thread/conversation (originals verbatim) | `aa784cc` |
 | 5 — AI analysis | AI_EXTRACTION_V1 + evidence + human review | `b57bcff` |
+| 5.1 — Real OpenCode adapter | live-verified v2 contract (`/api/info`, generate/text, basic auth) | this commit |
 | 6 — Authoritative state | decisions ledger, Fixed/Not-Fixed precedence, corrections | `8cc3c9c` |
 | 7 — Dashboard/Reports/PPT | live Recharts dashboard, reports, VAPT-styled PPT export | `5998da6` |
 | 8 — Hardening/QA | E2E lifecycle, clean-DB verification, docs, final reviews | this commit |
@@ -70,9 +71,9 @@ Sign in with the seeded credential from your `.env` (`SEED_ADMIN_EMAIL` / `SEED_
 
 Security headers (CSP/XFO/nosniff/referrer/permissions) in `next.config.ts`; secrets only via env (`.env*` gitignored, `.env.example` names only); structured logs with secret redaction; uploads trust nothing (attachments are metadata; filenames/extension/MIME never trusted); parameterized access through Prisma only.
 
-## Known limitations (documented per Phase 8 §105)
+## Known limitations (documented, changed in Phase 5.1)
 
-1. **OpenCode provider contract not supplied** — AI analysis endpoints apply the configured provider through the port abstraction; with no real contract file the analysis returns an honest "contract unavailable" state (no simulated results, per Phase 5 §6). Deterministic tests use a production-blocked mock provider.
+1. **OpenCode provider — implemented (Phase 5.1) with runtime prerequisites.** The real OpenCode v2 HTTP contract is implemented and was verified live (`GET /api/info`, `POST /api/experimental/generate/text`, basic auth `opencode:<credential>`). It requires an accessible OpenCode server (`opencode service status` / `opencode serve`) and a stored credential (Settings → AI or `OPENCODE_SERVER_PASSWORD`); without them analysis honestly refuses instead of simulating output.
 2. **PPT fonts on machines without Bebas Neue/Poppins installed** — PowerPoint falls back per viewer; the font names are embedded in the deck and install correctly on any machine with the fonts present. Documented fallback rather than silent substitution.
 3. **EML attachments are metadata + verbatim storage** — attachment content is never executed or rendered inline in Phase 4/5 (by design); an attachment viewer is a Phase 9-candidate.
 4. **Automated backups** — no scheduled backup in the build; documented expectation in `docs/security-review.md`.

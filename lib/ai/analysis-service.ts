@@ -13,6 +13,7 @@ import { checkRateLimit } from "@/lib/auth/rate-limit";
 import { AI_EXTRACTION_V1, PROMPT_VERSION, type AiExtractionV1 } from "@/lib/ai/schema";
 import { buildAnalysisContext, type ContextBuildResult } from "@/lib/ai/context";
 import { resolveProviderPort } from "@/lib/ai/provider-registry";
+import { decryptSecret } from "@/lib/crypto/secrets";
 import type { EvidenceSourceType } from "@prisma/client";
 export interface ThreadAnalysisRun {
   extractionId: number;
@@ -95,7 +96,10 @@ export async function analyzeThread(params: {
   }
   let port;
   try {
-    port = resolveProviderPort(slug, isProduction());
+    // Real ports receive their credential ONLY through this in-memory options
+    // object — plaintext never touches the database, logs, or audit trail.
+    const portOptions = slug === "opencode" && configured?.encryptedApiKey ? { credential: decryptSecret(configured.encryptedApiKey) } : {};
+    port = resolveProviderPort(slug, isProduction(), portOptions);
   } catch {
     throw new AppError("VALIDATION_ERROR", 422, `Unknown AI provider "${slug}".`);
   }
@@ -235,7 +239,11 @@ export async function analyzeThread(params: {
 function sanitizeFailure(error: unknown): string {
   const text = String(error);
   // §50/§55 — provider failures surface safely; no keys, no bodies.
-  if (/not implemented|contract/i.test(text)) return "AI provider contract unavailable — analysis cannot run until the provider configuration is supplied. No data was altered.";
+  // Provider-configuration gaps (server/credential not supplied or server
+  // unreachable) map to the honest contract-unavailable message.
+  if (/not implemented|contract|not usable right now|configuration is supplied|configuration error/i.test(text)) {
+    return "AI provider contract unavailable — analysis cannot run until the provider configuration is supplied. No data was altered.";
+  }
   if (/malformed|invalid JSON|schema/i.test(text)) return "AI response failed validation against AI_EXTRACTION_V1.";
   if (/timeout|rate/i.test(text)) return "AI provider timed out or rate-limited the request.";
   if (/auth|key/i.test(text)) return "AI provider authentication failed.";
