@@ -42,13 +42,10 @@ export function severityFillClass(severityValue: string): string {
   return SEV_FILL[severityValue.toLowerCase().trim()] ?? "bg-xlsx-data text-ink-2";
 }
 
-/** Thin black line edging so the filled cell keeps the workbook gridline. */
-const LINE = "ring-1 ring-[#171717]/60";
-
 export function StatusFillCell({ value }: { value: string }) {
   return (
     <span className="-mx-3 -my-2 flex min-h-[40px] items-center justify-center px-3 py-2 text-center text-[12px] font-bold leading-tight">
-      <span className={cn("block w-full", statusFillClass(value), LINE)}>{value}</span>
+      <span className={cn("block w-full", statusFillClass(value))}>{value}</span>
     </span>
   );
 }
@@ -62,7 +59,7 @@ export function SeverityFillCell({
 }) {
   return (
     <span className="-mx-3 -my-2 flex min-h-[40px] items-center justify-center px-3 py-2 text-center text-[12px] font-bold leading-tight">
-      <span className={cn("block w-full", severityFillClass(severityValue), LINE)}>{label}</span>
+      <span className={cn("block w-full", severityFillClass(severityValue))}>{label}</span>
     </span>
   );
 }
