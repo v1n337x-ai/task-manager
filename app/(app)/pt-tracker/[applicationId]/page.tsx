@@ -6,6 +6,7 @@ import { KpiCard } from "@/components/kpi-card";
 import { DataTable } from "@/components/data-table";
 import { StatusBadge, SeverityBadge } from "@/components/badges";
 import { cn } from "@/lib/utils";
+import { StatusFillCell } from "@/components/status-fill";
 import { getApplicationTracker, type TrackerFinding, type ApplicationTrackerDetail } from "@/lib/services/tracker-service";
 import { prisma } from "@/lib/db";
 import { ExportExcelButton } from "../excel-actions";
@@ -14,9 +15,7 @@ import { StateReviewPanel } from "./state-review-panel";
 import {
   FindingDialog,
   IterationDialog,
-  TestCaseDialog,
   FindingStateDialog,
-  TestCaseStateDialog,
   type IterationLite,
   type TestCaseLite,
 } from "../detail-dialogs";
@@ -87,7 +86,6 @@ export default async function ApplicationTrackerPage({
               latestIterationNumber={detail.latestIterationNumber}
             />
             <IterationDialog applicationId={id} />
-            <TestCaseDialog applicationId={id} />
             <ExportExcelButton />
             <Link
               href="/pt-tracker"
@@ -105,7 +103,6 @@ export default async function ApplicationTrackerPage({
             ["overview", "Overview"],
             ["findings", "Findings"],
             ["iterations", "Iterations"],
-            ["test-cases", "Test Cases"],
             ["email", "Email"],
             ["state-review", "State Review"],
           ] as [string, string][]).map(([key, label]) => (
@@ -126,10 +123,9 @@ export default async function ApplicationTrackerPage({
         <div className="mt-5">
           {activeTab === "overview" ? <OverviewTab detail={detail} statusValueFor={statusValueFor} /> : null}
           {activeTab === "findings" ? <FindingsTab detail={detail} iterations={iterations} /> : null}
-          {activeTab === "iterations" ? <IterationsTab detail={detail} statusValueFor={statusValueFor} /> : null}
-          {activeTab === "test-cases" ? (
-            <TestCasesTab detail={detail} iterations={iterations} statusValueFor={statusValueFor} />
-          ) : null}
+          {activeTab === "iterations" ? <IterationsTab detail={detail} /> : null}
+          {/* Test Cases tab REMOVED from the UI (user direction 2026-11): TC
+              identities live in the backend contract only. */}
           {activeTab === "email" ? (
             <EmailPanel applicationId={id} threads={emailThreads} />
           ) : null}
@@ -278,10 +274,8 @@ function FindingsTab({
 
 function IterationsTab({
   detail,
-  statusValueFor,
 }: {
   detail: ApplicationTrackerDetail;
-  statusValueFor: (label: string) => string;
 }) {
   // Contract cap: display only I1/I2 (older data stays in the database).
   const visible = detail.iterations.filter((i) => i.number <= 2);
@@ -293,24 +287,11 @@ function IterationsTab({
         { key: "n", header: "#", render: (i) => <strong>I{i.number}</strong> },
         { key: "name", header: "Name", render: (i) => i.name },
         { key: "type", header: "Type", render: (i) => i.typeLabel },
-        { key: "status", header: "Status", render: (i) => <StatusBadge value={statusValueFor(i.statusLabel)} label={i.statusLabel} /> },
+        { key: "status", header: "Status", className: "whitespace-nowrap", render: (i) => <StatusFillCell value={i.statusLabel} /> },
         { key: "start", header: "Start", render: (i) => (i.startDate ? new Date(i.startDate).toLocaleDateString("en-GB") : "—") },
         { key: "report", header: "Report", render: (i) => (i.reportDate ? new Date(i.reportDate).toLocaleDateString("en-GB") : "—") },
-        {
-          key: "snapshot",
-          header: "Imported snapshot",
-          render: (i) =>
-            i.importSnapshot ? (
-              <span
-                className="text-muted"
-                title="Snapshot stores the imported workbook aggregate for audit context — live counts always derive from findings (§36)."
-              >
-                {JSON.stringify((i.importSnapshot as { counts?: unknown }).counts ?? {}).slice(0, 48)}…
-              </span>
-            ) : (
-              <span className="text-muted">—</span>
-            ),
-        },
+        // Imported-snapshot column removed (user direction 2026-11): the raw
+        // workbook aggregate stays in the DB for audit, never on screen.
       ]}
       emptyTitle="No iterations yet"
       emptyHint="Iteration 1 is created as “Initial Scan”; retests never overwrite it."
@@ -318,52 +299,8 @@ function IterationsTab({
   );
 }
 
-function TestCasesTab({
-  detail,
-  iterations,
-  statusValueFor,
-}: {
-  detail: ApplicationTrackerDetail;
-  iterations: IterationLite[];
-  statusValueFor: (label: string) => string;
-}) {
-  return (
-    <DataTable
-      caption="Test cases with per-iteration states"
-      rows={detail.testCases}
-      columns={[
-        { key: "code", header: "Test Case ID", render: (t) => <span className="font-semibold text-ink">{t.code}</span> },
-        { key: "title", header: "Test Case", render: (t) => t.title },
-        {
-          key: "iters",
-          header: "Iteration states",
-          render: (t) => (
-            <span className="flex flex-wrap gap-1">
-              {t.iterations.length === 0 ? <span className="text-muted">not yet run</span> : null}
-              {t.iterations.map((s) => (
-                <StatusBadge key={s.iterationNumber} value={s.status} label={`I${s.iterationNumber}: ${s.label}`} />
-              ))}
-            </span>
-          ),
-        },
-        {
-          key: "status",
-          header: "Current",
-          render: (t) => <StatusBadge value={statusValueFor(t.currentStatusLabel)} label={t.currentStatusLabel} />,
-        },
-        { key: "findings", header: "Findings", render: (t) => detail.findings.filter((f) => f.testCaseId === t.id).length },
-        {
-          key: "actions",
-          header: "",
-          render: (t) =>
-            iterations.length ? <TestCaseStateDialog testCase={{ id: t.id, code: t.code, title: t.title }} iterations={iterations} /> : null,
-        },
-      ]}
-      emptyTitle="No test cases yet"
-      emptyHint="Test cases keep stable TC identities across every iteration — removal is recorded as a state, never a deletion (§22)."
-    />
-  );
-}
+// TestCasesTab REMOVED from the UI (user direction 2026-11) - TC data stays in the backend contract.
+
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (

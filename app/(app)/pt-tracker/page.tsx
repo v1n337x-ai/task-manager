@@ -3,11 +3,11 @@ import Link from "next/link";
 import { PageHeader, PageBody } from "@/components/page-header";
 import { KpiCard } from "@/components/kpi-card";
 import { DataTable } from "@/components/data-table";
-import { StatusBadge } from "@/components/badges";
 import { FilterBar, FilterChip } from "@/components/filter-bar";
 import { DbUnavailableState } from "@/components/states";
 import { ImportExcelDialog, ExportExcelButton, RefreshButton } from "./excel-actions";
 import { DetailsFloater, IterationsFloater, SevStat } from "./floaters";
+import { StatusFillCell } from "@/components/status-fill";
 import { listTrackerApps, summarize } from "@/lib/services/tracker-service";
 import { formatDate } from "@/lib/utils";
 
@@ -165,7 +165,7 @@ export default async function PtTrackerPage({
                 key: "overall",
                 header: "Overall Status",
                 className: "whitespace-nowrap",
-                render: (r) => <StatusBadge value={r.overallStatusLabel.toLowerCase().replace(/ /g, "_")} label={r.overallStatusLabel} />,
+                render: (r) => <StatusFillCell value={r.overallStatusLabel} />,
               },
               { key: "vulncount", header: "Total Vuln Count", className: "text-center whitespace-nowrap", render: (r) => <strong>{r.counts.total}</strong> },
               { key: "scan", header: "Scan/Report Date", className: "whitespace-nowrap", render: (r) => <span className="text-muted text-[12px]">{r.reportDate ? formatDate(r.reportDate) : "—"}</span> },

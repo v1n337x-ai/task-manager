@@ -51,10 +51,8 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
   const sidebar = (
-    <div className="flex h-full flex-col">
-      <div className="px-4 pb-2 pt-5">
-        <BrandMenu />
-      </div>
+    <div className="flex h-full flex-col pt-5">
+      {/* Brand appears ONLY in the topbar (user direction: no duplicate). */}
       <div className="mx-3 mb-4 h-px bg-stroke" aria-hidden />
       <nav className="flex-1 space-y-6 px-3" aria-label="Main navigation">
         {NAV_GROUPS.map((group) => (
