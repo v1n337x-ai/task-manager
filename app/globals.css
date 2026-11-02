@@ -35,23 +35,23 @@
   --color-danger: #cf1325;
   --color-progress: #2e86c1;
   --color-good: #2e862e;
-  --color-sev-critical: #ed7d31; /* workbook accent2 */
-  --color-sev-high: #4472c4; /* workbook accent5 */
-  --color-sev-medium: #ffc000; /* workbook accent4 */
-  --color-sev-low: #70ad47; /* workbook accent6 */
-  --color-sev-info: #a5a5a5; /* workbook accent3 */
+  --color-sev-critical: #c00000; /* red */
+  --color-sev-high: #ed7d31; /* orange */
+  --color-sev-medium: #ffc000; /* amber/yellow */
+  --color-sev-low: #70ad47; /* green */
+  --color-sev-info: #5b9bd5; /* blue — workbook accent1 */
   /* Excel-tint fills (the workbook's own highlight colors) */
-  --color-sev-critical-soft: #fce4d6;
-  --color-sev-high-soft: #dce6f2;
+  --color-sev-critical-soft: #f4cccc;
+  --color-sev-high-soft: #fce4d6;
   --color-sev-medium-soft: #fff2cc;
   --color-sev-low-soft: #e2efda;
-  --color-sev-info-soft: #e7e6e6;
+  --color-sev-info-soft: #deeaf6;
   /* Excel darker-text colors (accent darker-25/50 as Excel renders) */
-  --color-sev-critical-text: #974706;
-  --color-sev-high-text: #1f3864;
+  --color-sev-critical-text: #9c0006;
+  --color-sev-high-text: #974706;
   --color-sev-medium-text: #7f6000;
   --color-sev-low-text: #375623;
-  --color-sev-info-text: #404040;
+  --color-sev-info-text: #1f4e79;
 
   /* The workbook's own chrome colors — tables use these (Excel-identical). */
   --color-xlsx-band: #bcd4d8; /* severity/header band */

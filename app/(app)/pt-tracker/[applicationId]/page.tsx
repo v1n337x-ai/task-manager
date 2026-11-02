@@ -204,23 +204,29 @@ function FindingsTab({
   // stay in the database (append-only) but are never displayed.
   const usedIterations = [...allIterationsUsed].sort((a, b) => a - b).filter((n) => n <= 2);
 
-  const currentOf = (f: TrackerFinding): string =>
-    f.iterationStates.length
-      ? f.iterationStates.reduce((a, b) => (b.iterationNumber > a.iterationNumber ? b : a)).statusValue
-      : f.currentStatusValue;
-
+  // Excel-style layout (user-provided vapt.xlsx): # | Name of the vulnerability |
+  // Severity | (both iterations separately) | + one explicit I2 status column.
   return (
     <DataTable
-      caption="Findings summary"
+      caption="Findings summary — vapt.xlsx layout"
       rows={detail.findings}
       columns={[
-        { key: "code", header: "Finding ID", render: (f: TrackerFinding) => <span className="font-semibold text-ink">{f.code}</span> },
-        { key: "tc", header: "Test Case", render: (f) => f.testCaseCode ?? "—" },
-        { key: "title", header: "Title", render: (f) => <span title={f.description ?? undefined}>{f.title}</span> },
-        { key: "sev", header: "Severity", render: (f) => <SeverityBadge value={f.severityValue} /> },
+        { key: "no", header: "#", className: "w-12 text-center text-muted", render: (f: TrackerFinding) => f.code },
+        {
+          key: "name",
+          header: "Name of the vulnerability",
+          className: "min-w-[240px]",
+          render: (f: TrackerFinding) => (
+            <span className="block font-medium text-ink" title={f.description ?? undefined}>
+              {f.title}
+            </span>
+          ),
+        },
+        { key: "severity", header: "Severity", className: "whitespace-nowrap", render: (f: TrackerFinding) => <SeverityBadge value={f.severityValue} /> },
         ...usedIterations.map((num) => ({
           key: `i${num}`,
-          header: `I${num} Status`,
+          header: `Iteration ${num}`,
+          className: "whitespace-nowrap",
           render: (f: TrackerFinding) => {
             const state = f.iterationStates.find((s) => s.iterationNumber === num);
             if (!state) return <span className="text-muted">—</span>;
@@ -233,11 +239,23 @@ function FindingsTab({
             );
           },
         })),
-        { key: "current", header: "Current", render: (f: TrackerFinding) => <StatusBadge value={currentOf(f)} /> },
         {
-          key: "firstSeen",
-          header: "First Seen",
-          render: (f) => (f.firstSeenIterationNumber ? `I${f.firstSeenIterationNumber}` : "—"),
+          key: "i2status",
+          header: "Iteration 2 Status",
+          className: "whitespace-nowrap",
+          render: (f: TrackerFinding) => {
+            // Explicit fixed / not fixed verdict for I2 (user-requested column).
+            const i2 = f.iterationStates.find((s) => s.iterationNumber === 2);
+            if (!i2) return <span className="text-muted">—</span>;
+            const isFixed = ["fixed", "not_fixed"].includes(i2.statusValue) ? i2.statusValue === "fixed" : null;
+            if (isFixed === null) return <span className="text-muted">{i2.statusLabel}</span>;
+            return (
+              <StatusBadge
+                value={isFixed ? "fixed" : "not_fixed"}
+                label={isFixed ? "Fixed" : "Not Fixed"}
+              />
+            );
+          },
         },
         {
           key: "actions",
@@ -249,7 +267,7 @@ function FindingsTab({
         },
       ]}
       emptyTitle="No findings yet"
-      emptyHint="Use “Add Finding”. Per-iteration state columns appear for Iteration 1 and Iteration 2 (the contract's two iterations)."
+      emptyHint="Use “Add Finding”. Iteration 1 and Iteration 2 appear as separate columns (the contract's two iterations)."
     />
   );
 }
