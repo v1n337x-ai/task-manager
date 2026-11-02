@@ -5,7 +5,7 @@ import { KpiCard } from "@/components/kpi-card";
 import { DbUnavailableState, EmptyState } from "@/components/states";
 import { DataTable } from "@/components/data-table";
 import { generateDashboardReport } from "@/lib/services/reporting/report-service";
-import { DashboardCharts } from "./dashboard-charts";
+import { SeverityDoughnut, StatusBars, ApplicationBars } from "./dashboard-charts";
 import { ExportPptButton } from "./export-ppt-button";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -71,32 +71,40 @@ export default async function DashboardPage({
               <KpiCard label="CAR verified" number={report.carVerified} accent="medium" />
             </section>
 
-            <section aria-label="Severity KPIs" className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-5">
-              <KpiCard label="Critical" number={report.severityBreakdown.critical} accent="critical" />
-              <KpiCard label="High" number={report.severityBreakdown.high} accent="high" />
-              <KpiCard label="Medium" number={report.severityBreakdown.medium} accent="medium" />
-              <KpiCard label="Low" number={report.severityBreakdown.low} accent="low" />
-              <KpiCard label="Info" number={report.severityBreakdown.info} accent="info" />
+            {/* Slide-3 layout: doughnut + status side by side; the top-applications
+                panel spans the full width and scrolls internally (never stretches
+                or overlaps as more data lands). */}
+            <section aria-label="Charts" className="mt-6 grid gap-6 lg:grid-cols-2">
+              <SeverityDoughnut
+                data={[
+                  { name: "Critical", value: report.severityBreakdown.critical },
+                  { name: "High", value: report.severityBreakdown.high },
+                  { name: "Medium", value: report.severityBreakdown.medium },
+                  { name: "Low", value: report.severityBreakdown.low },
+                  { name: "Info", value: report.severityBreakdown.info },
+                ]}
+              />
+              <StatusBars
+                data={[
+                  { name: "Open/Pending", value: report.statusBreakdown.open },
+                  { name: "Fixed", value: report.statusBreakdown.fixed },
+                  { name: "Not Fixed", value: report.statusBreakdown.notFixed },
+                  { name: "Reopened", value: report.statusBreakdown.reopened },
+                  { name: "CAR", value: report.statusBreakdown.car },
+                ]}
+              />
             </section>
 
-            <DashboardCharts
-              severity={[
-                { name: "Critical", value: report.severityBreakdown.critical },
-                { name: "High", value: report.severityBreakdown.high },
-                { name: "Medium", value: report.severityBreakdown.medium },
-                { name: "Low", value: report.severityBreakdown.low },
-                { name: "Info", value: report.severityBreakdown.info },
-              ]}
-              status={[
-                { name: "Open/Pending", value: report.statusBreakdown.open },
-                { name: "Fixed", value: report.statusBreakdown.fixed },
-                { name: "Not Fixed", value: report.statusBreakdown.notFixed },
-                { name: "Reopened", value: report.statusBreakdown.reopened },
-                { name: "CAR", value: report.statusBreakdown.car },
-              ]}
-              applications={report.applications.filter((a) => a.counts.total > 0).slice(0, 12).map((a) => ({ name: a.displayName, value: a.counts.total }))}
-            />
-
+            <div className="mt-6">
+              <ApplicationBars
+                title="Applications by findings"
+                data={report.applications
+                  .filter((a) => a.counts.total > 0)
+                  .sort((a, b) => b.counts.total - a.counts.total)
+                  .slice(0, 15)
+                  .map((a) => ({ name: a.displayName, value: a.counts.total }))}
+              />
+            </div>
             {report.totalFindings === 0 ? (
               <EmptyState
                 className="mt-6"
