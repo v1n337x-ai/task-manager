@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { AiReview } from "./ai-review-panel";
+import { PstImportButton } from "./pst-import-button";
 
 function csrf(): string | null {
   const raw = document.cookie
@@ -51,6 +52,7 @@ export function EmailPanel({
   const [activeThread, setActiveThread] = React.useState<ThreadSummary | null>(threads[0] ?? null);
   const [threadDetail, setThreadDetail] = React.useState<ThreadDetail | null>(null);
   const [detailLoading, setDetailLoading] = React.useState(false);
+  const [pstOpen, setPstOpen] = React.useState(false);
 
   async function upload() {
     if (files.length === 0) return;
@@ -115,9 +117,23 @@ export function EmailPanel({
     <div className="space-y-5">
       <section className="panel px-5 py-4" aria-label="EML upload">
         <div className="flex items-center justify-between gap-3">
-          <h3 className="text-[13px] font-semibold uppercase tracking-wide text-ink">Upload .EML files</h3>
-          <Badge variant="muted">drag &amp; drop or picker · .eml only</Badge>
+          <h3 className="text-[13px] font-semibold uppercase tracking-wide text-ink">Upload .EML files — or a .pst archive</h3>
+          <div className="flex items-center gap-2">
+            <Badge variant="muted">drag &amp; drop or picker · .eml or .pst</Badge>
+            <button
+              type="button"
+              onClick={() => setPstOpen((v) => !v)}
+              className="border border-stroke bg-xlsx-band px-3 py-2 text-[13px] font-semibold text-ink-2 transition hover:bg-xlsx-data"
+            >
+              Import .pst
+            </button>
+          </div>
         </div>
+        {pstOpen ? (
+          <div className="mt-3 border-t border-stroke pt-3">
+            <PstImportButton applicationId={applicationId} />
+          </div>
+        ) : null}
         <p className="mt-1 text-[13px] text-muted">
           Original files are preserved verbatim (sha256) with full headers. Parsing is deterministic (Message-ID →
           In-Reply-To → References → normalized subject + participants); nothing is written until you confirm.
