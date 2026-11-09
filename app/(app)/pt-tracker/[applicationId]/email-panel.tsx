@@ -913,15 +913,32 @@ function NeatTextBody({ body, messageId }: { body: string; messageId?: number })
  * thread" and collapsed behind the same toggle as text bodies.
  */
 function splitHtmlQuote(html: string): { head: string; quoted: string | null } {
+  // OWA / Outlook web: a separator <hr> followed by a div whose bold labels
+  // stack the forwarded headers (<b>From:</b> <b>Sent:</b> <b>To:</b> …).
+  // Sanitizer strips ids/styles, so detect on the <hr> + <b>From:</b> pair.
+  const hr = /<hr(?=[\s>])/.exec(html);
+  if (hr && hr.index !== undefined) {
+    const windowHtml = html.slice(hr.index, hr.index + 1500);
+    if (/<b>From:\s*<\/b>/i.test(windowHtml) || /<b>Sent:\s*<\/b>/i.test(windowHtml)) {
+      return { head: html.slice(0, hr.index), quoted: html.slice(hr.index) };
+    }
+  }
+  // OWA quoted container (present when sanitizer keeps ids; harmless fallback).
+  const owa = /id="x_divRplyFwdMsg"/i.exec(html);
+  if (owa && owa.index !== undefined) {
+    const containerStart = html.lastIndexOf("<div", owa.index);
+    const splitAt = containerStart >= 0 ? containerStart : owa.index;
+    return { head: html.slice(0, splitAt), quoted: html.slice(splitAt) };
+  }
+  // Blockquote-wrapped chains (Gmail / Outlook desktop / Apple Mail).
   const bq = /<blockquote[\s>]/i.exec(html);
   if (bq && bq.index !== undefined) {
     return { head: html.slice(0, bq.index), quoted: html.slice(bq.index) };
   }
-  // Outlook / forwarded-mail marker: the quoted block opens with a div/p whose
-  // text is a "From: … Sent: … To: … Subject: …" header stack. Strip tags from
-  // a window to validate the marker, then split at the element boundary so the
-  // quoted chain collapses instead of rendering inline inside the later bubble.
-  const marker = /<(div|p)(?:\s[^>]*)?>\s*From:\s+/i.exec(html);
+  // Generic forwarded-header marker: a div/p opening with "From:" (tags like
+  // <font>/<b> may sit between the element and the label), validated by a
+  // nearby Sent:/To:/Subject: line.
+  const marker = /<(div|p)(?:\s[^>]*)?>\s*(?:<[^>]+>\s*)*From:\s+/i.exec(html);
   if (marker && marker.index !== undefined) {
     const windowText = html
       .slice(marker.index, marker.index + 1500)
