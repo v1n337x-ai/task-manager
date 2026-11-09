@@ -781,7 +781,7 @@ function renderNeatBlocks(blocks: NeatBlock[], offset = 0) {
               return (
                 <div
                   key={j}
-                  data-anchor={dateValue ? `qd-${dateValue.toDateString()}` : undefined}
+                  data-anchor={dateValue ? `qd-${dayKeyOf(dateValue)}` : undefined}
                   className="flex gap-2"
                 >
                   <dt className="w-[4.5rem] shrink-0 pt-[1px] text-[10px] font-semibold uppercase tracking-wide text-muted">{label}</dt>
@@ -898,9 +898,28 @@ function NeatTextBody({ body, messageId }: { body: string; messageId?: number })
 /**
  * MessageBody — one readable renderer for both HTML and text mail. Long
  * Outlook chains are clamped; "Show full email" expands them in place.
+ *
+ * HTML Outlook replies carry the entire quoted chain inline. Without folding,
+ * an earlier message appears to live inside a later bubble (e.g. a 21 Oct
+ * quote inside a 22 Oct reply, duplicating the standalone 21 Oct message).
+ * So the first <blockquote> onward is treated as "earlier mail in this
+ * thread" and collapsed behind the same toggle as text bodies.
  */
+function splitHtmlQuote(html: string): { head: string; quoted: string | null } {
+  const m = /<blockquote[\s>]/i.exec(html);
+  if (!m || m.index === undefined) return { head: html, quoted: null };
+  return { head: html.slice(0, m.index), quoted: html.slice(m.index) };
+}
+
 function MessageBody({ message }: { message: ChatMessage }) {
   const [expanded, setExpanded] = React.useState(false);
+  const htmlParts = React.useMemo(
+    () =>
+      message.bodyHtmlSanitized
+        ? splitHtmlQuote(message.bodyHtmlSanitized)
+        : { head: "", quoted: null as string | null },
+    [message.bodyHtmlSanitized],
+  );
 
   // Rail dates that live inside an HTML body ask the bubble to open so the
   // click always has a visible effect (text bodies fold via NeatTextBody).
@@ -916,6 +935,7 @@ function MessageBody({ message }: { message: ChatMessage }) {
   if (message.bodyHtmlSanitized) {
     const plain = message.bodyHtmlSanitized.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
     const long = plain.length > 1_500;
+    const headHtml = htmlParts.head;
     return (
       <div className="mt-2 min-w-0">
         <div
@@ -923,9 +943,23 @@ function MessageBody({ message }: { message: ChatMessage }) {
             "message-html prose prose-sm max-w-none break-words text-[13px] leading-relaxed text-ink-2 [overflow-wrap:anywhere] [&_img]:max-w-full [&_pre]:whitespace-pre-wrap [&_table]:min-w-full",
             !expanded && long && "max-h-[420px] overflow-hidden",
           )}
-          dangerouslySetInnerHTML={{ __html: message.bodyHtmlSanitized }}
+          dangerouslySetInnerHTML={{ __html: headHtml }}
         />
-        {long ? (
+        {htmlParts.quoted ? (
+          <>
+            <button type="button" onClick={() => setExpanded((v) => !v)} className={toggleClass}>
+              {expanded
+                ? "Hide earlier mail in this thread"
+                : `Show earlier mail in this thread (${htmlParts.quoted.length.toLocaleString("en-GB")} characters)`}
+            </button>
+            {expanded ? (
+              <div
+                className="message-html prose prose-sm max-w-none break-words border-l-2 border-stroke pl-3 text-[13px] leading-relaxed text-ink-2 opacity-90 [overflow-wrap:anywhere] [&_img]:max-w-full [&_pre]:whitespace-pre-wrap [&_table]:min-w-full"
+                dangerouslySetInnerHTML={{ __html: htmlParts.quoted }}
+              />
+            ) : null}
+          </>
+        ) : long ? (
           <button type="button" onClick={() => setExpanded((v) => !v)} className={toggleClass}>
             {expanded ? "Show less" : "Show full email"}
           </button>
@@ -938,7 +972,7 @@ function MessageBody({ message }: { message: ChatMessage }) {
   return <p className="mt-1 text-[12px] italic text-muted">empty body</p>;
 }
 
-const timeOf = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "");
+const timeOf = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: CALENDAR_TZ }) : "");
 
 const QUOTED_DATE_LINE = /^(?:Sent|Date):\s*(.+)$/gim;
 const MONTHS: Record<string, number> = {
@@ -1027,7 +1061,7 @@ function MessageGroupCard({ group, showDay }: { group: MessageGroupData; showDay
               <footer className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[10px] text-muted">
                 <span>To: {message.recipients.filter((r) => r.kind === "TO").map((r) => r.email).join(", ") || "—"}</span>
                 <time dateTime={message.sentAt ?? undefined} title={`${message.from.email} · id ${message.messageId}`}>
-                  {timeOf(message.sentAt)}{message.sentAt ? ` · ${new Date(message.sentAt).toLocaleDateString("en-GB")}` : ""}
+                  {timeOf(message.sentAt)}{message.sentAt ? ` · ${new Date(message.sentAt).toLocaleDateString("en-GB", { timeZone: CALENDAR_TZ })}` : ""}
                 </time>
               </footer>
             </article>
@@ -1038,31 +1072,60 @@ function MessageGroupCard({ group, showDay }: { group: MessageGroupData; showDay
   );
 }
 
+/**
+ * All tracker mail is IST. Calendar-day grouping is pinned to Asia/Kolkata so
+ * a message's day tile always matches the date written in the mail itself,
+ * regardless of the viewer's machine timezone: a 21 Oct 19:00 UTC mail is
+ * 22 Oct IST and must sit under 22 Oct, not under whatever day toDateString()
+ * happens to produce in the browser's local zone.
+ */
+const CALENDAR_TZ = "Asia/Kolkata";
+
+function dayKeyOf(d: Date): string {
+  return d.toLocaleDateString("en-CA", { timeZone: CALENDAR_TZ });
+}
+
+function dayLabelOf(d: Date): string {
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", timeZone: CALENDAR_TZ });
+}
+
+/** Drop duplicate rows for the same mail (Message-ID) so one message never renders on two day tiles. */
+function dedupeMessages(messages: ChatMessage[]): ChatMessage[] {
+  const seen = new Set<string>();
+  return messages.filter((m) => {
+    const key = m.messageId || `row:${m.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function ChatThread({ subject, appDisplayName, messages }: { subject: string; appDisplayName: string | null; messages: ChatMessage[] }) {
   const scrollRef = React.useRef<HTMLDivElement | null>(null);
+  const uniqueMessages = React.useMemo(() => dedupeMessages(messages), [messages]);
   // Jump rail data: per-day anchors. Includes dates of actual messages PLUS
   // the dates inside quoted reply headers — a single archived .eml often
   // contains a whole chain, and those dates must be jumpable too.
   const days = React.useMemo(() => {
     const map = new Map<string, DayEntry>();
-    const labelOf = (d: Date) => d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+    const labelOf = dayLabelOf;
 
-    for (const m of messages) {
+    for (const m of uniqueMessages) {
       if (!m.sentAt) continue;
       const d = new Date(m.sentAt);
       if (Number.isNaN(d.getTime())) continue;
-      const key = d.toDateString();
+      const key = dayKeyOf(d);
       const prev = map.get(key);
       map.set(key, { key, label: labelOf(d), count: (prev?.count ?? 0) + 1, anchor: prev?.anchor ?? `msg-${m.id}` });
     }
 
-    for (const m of messages) {
+    for (const m of uniqueMessages) {
       const body = m.bodyText ?? "";
       if (!body) continue;
       for (const match of body.matchAll(QUOTED_DATE_LINE)) {
         const d = parseQuotedDate(match[1] ?? "");
         if (!d) continue;
-        const key = d.toDateString();
+        const key = dayKeyOf(d);
         if (!map.has(key)) {
           map.set(key, { key, label: labelOf(d), count: 0, anchor: `msg-${m.id}`, quotedAnchor: `qd-${key}` });
         }
@@ -1070,7 +1133,7 @@ function ChatThread({ subject, appDisplayName, messages }: { subject: string; ap
     }
 
     return [...map.values()].sort((a, b) => new Date(a.key).getTime() - new Date(b.key).getTime());
-  }, [messages]);
+  }, [uniqueMessages]);
 
   // Group all messages by calendar date and sender. Each sender/date
   // combination gets one consistent card, even when another participant
@@ -1079,11 +1142,11 @@ function ChatThread({ subject, appDisplayName, messages }: { subject: string; ap
   const groupedMessages = React.useMemo<MessageGroupData[]>(() => {
     const groups: MessageGroupData[] = [];
     const groupByKey = new Map<string, MessageGroupData>();
-    for (const message of messages) {
+    for (const message of uniqueMessages) {
       const date = message.sentAt ? new Date(message.sentAt) : null;
-      const dayKey = date && !Number.isNaN(date.getTime()) ? date.toDateString() : "undated";
+      const dayKey = date && !Number.isNaN(date.getTime()) ? dayKeyOf(date) : "undated";
       const dayLabel = date && !Number.isNaN(date.getTime())
-        ? date.toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "short", year: "numeric" })
+        ? date.toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "short", year: "numeric", timeZone: CALENDAR_TZ })
         : "Undated";
       const senderKey = message.from.email.toLowerCase();
       const key = `${dayKey}|${senderKey}`;
@@ -1103,12 +1166,12 @@ function ChatThread({ subject, appDisplayName, messages }: { subject: string; ap
   const sideCounts = React.useMemo(() => {
     let left = 0;
     let right = 0;
-    for (const m of messages) {
+    for (const m of uniqueMessages) {
       if (roleMeta(m.from.effectiveRole).side === "right") right += 1;
       else left += 1;
     }
     return { left, right };
-  }, [messages]);
+  }, [uniqueMessages]);
 
   // Scroll the chat canvas itself — never the page. Rect maths (not offsetTop)
   // because offsetTop is relative to a page-level offsetParent, which sent the
@@ -1139,7 +1202,7 @@ function ChatThread({ subject, appDisplayName, messages }: { subject: string; ap
         <h3 className="font-display truncate text-[26px] font-bold leading-tight text-ink">{subject}</h3>
         <p className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-muted" data-testid="side-split">
           <span className="rounded-full bg-accent-soft px-2.5 py-1 font-semibold text-accent-deep">
-            {appDisplayName ?? "Unassigned"} · {messages.length} messages · grouped by date and sender
+            {appDisplayName ?? "Unassigned"} · {uniqueMessages.length} messages · grouped by date and sender
           </span>
           <span className="rounded-full bg-[#f6edff] px-2.5 py-1">
             <span className="font-semibold text-sev-critical">pentester/defense: {sideCounts.left}</span>
@@ -1203,7 +1266,7 @@ function ChatThread({ subject, appDisplayName, messages }: { subject: string; ap
           <p className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-muted">Uploaded .eml files (in order)</p>
           <div className="mt-1 max-h-44 flex-1 overflow-y-auto pr-1">
             <ol className="space-y-1">
-              {messages.map((m, i) => (
+              {uniqueMessages.map((m, i) => (
                 <li key={m.id}>
                   <button
                     type="button"
@@ -1220,13 +1283,13 @@ function ChatThread({ subject, appDisplayName, messages }: { subject: string; ap
           <p className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-muted">Jump to message</p>
           <div className="mt-1 flex-1 overflow-y-auto pr-1" style={{ maxHeight: 320 }}>
             <ul className="space-y-1">
-              {messages.map((m, i) => (
+              {uniqueMessages.map((m, i) => (
                 <li key={m.id}>
                   <button
                     type="button"
                     onClick={() => jumpTo(`msg-${m.id}`)}
                     className="w-full truncate border border-stroke bg-card px-2 py-1 text-left text-[11px] text-ink-2 transition hover:bg-xlsx-data"
-                    title={`${tidyName(m.from.displayName)} — ${m.sentAt ? new Date(m.sentAt).toLocaleString("en-GB") : "no date"}`}
+                    title={`${tidyName(m.from.displayName)} — ${m.sentAt ? new Date(m.sentAt).toLocaleString("en-GB", { timeZone: CALENDAR_TZ }) : "no date"}`}
                   >
                     <span className="font-semibold">{i + 1}.</span>{" "}
                     <span className={roleMeta(m.from.effectiveRole).side === "right" ? "text-sev-info" : "text-sev-critical"}>
