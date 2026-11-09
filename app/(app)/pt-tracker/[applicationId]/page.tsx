@@ -8,9 +8,12 @@ import { StatusBadge } from "@/components/badges";
 import { cn } from "@/lib/utils";
 import { StatusFillCell, SeverityFillCell } from "@/components/status-fill";
 import { getApplicationTracker, type TrackerFinding, type ApplicationTrackerDetail } from "@/lib/services/tracker-service";
+import { listApplications } from "@/lib/services/application-service";
+import { listAll } from "@/lib/services/master-data-service";
 import { prisma } from "@/lib/db";
 import { ExportExcelButton } from "../excel-actions";
 import { EmailPanel, type ThreadSummary } from "./email-panel";
+import { RowActions } from "../../master-data/application-dialogs";
 import { ImportFindingsButton } from "./import-findings-button";
 import { StateReviewPanel } from "./state-review-panel";
 import {
@@ -59,6 +62,13 @@ export default async function ApplicationTrackerPage({
   const testCasesLite: TestCaseLite[] = detail.testCases.map((t) => ({ id: t.id, code: t.code, title: t.title }));
   const baseUrl = `/pt-tracker/${id}`;
 
+  const [applicationDto, masterValues] = await Promise.all([
+    listApplications()
+      .then((list) => list.find((a) => a.id === id) ?? null)
+      .catch(() => null),
+    listAll().catch(() => []),
+  ]);
+
   const threadRows = await prisma.emailThread.findMany({
     where: { applicationId: id },
     include: { messages: { orderBy: { sentAt: "desc" }, take: 1 } },
@@ -80,6 +90,7 @@ export default async function ApplicationTrackerPage({
         subtitle={`${detail.application.typeName} · ${detail.application.scopeLabel} · ${detail.application.environmentLabel} · ${detail.application.statusLabel}${detail.engagement ? ` · ${detail.engagement.assessmentTypeLabel}` : ""}${detail.latestIterationNumber ? ` · latest I${detail.latestIterationNumber}` : ""}`}
         actions={
           <div className="flex items-center gap-2">
+            {applicationDto ? <RowActions application={applicationDto} masterValues={masterValues} /> : null}
             <FindingDialog
               applicationId={id}
               iterations={iterations}
