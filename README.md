@@ -8,22 +8,107 @@ Internal VAPT management platform for the Akasa Air programme. **Implementation 
 
 Next.js **15.5.28** (App Router) · React 19.3 · TypeScript strict · Tailwind CSS 4.3 · shadcn-style Radix components · PostgreSQL 16 · Prisma 6.19.3 · Zod 3.25 · jose · bcryptjs · Recharts 3 (installed, Phase 4) · ExcelJS (Phase 3) · pptxgenjs (Phase 4/5) · Vitest.
 
-## Quick start
+## Overview
 
+This repository contains the complete Task Manager source for the VAPT workflow. **A clean clone does not include application, finding, email thread, report, or other operational data.** Those records are stored locally in PostgreSQL and are created or imported after the app is running.
+
+## Clean-install build (no operational data required)
+
+### Prerequisites
+
+- Node.js **20.9 or newer**
+- PostgreSQL **16**
+- Docker Desktop, if you want to run PostgreSQL locally
+- Git
+
+### 1. Clone the repository
+
+```powershell
+git clone https://github.com/v1n337x-ai/task-manager.git
+cd task-manager
 ```
-docker run -d --name tm-postgres -p 5432:5432 -v tmpgdata:/var/lib/postgresql/data \
-  -e POSTGRES_USER=task_manager -e POSTGRES_PASSWORD=task_manager_dev -e POSTGRES_DB=task_manager \
+
+### 2. Configure the environment
+
+```powershell
+copy .env.example .env
+```
+
+Edit `.env` and set at least:
+
+```dotenv
+DATABASE_URL=postgresql://task_manager:CHANGE_ME@localhost:5432/task_manager?schema=public
+AUTH_SECRET=<random 64-byte secret>
+APPLICATION_SECRET=<another random 64-byte secret>
+APP_ENCRYPTION_KEY=<a third random 64-byte secret>
+NODE_ENV=development
+SEED_ADMIN_EMAIL=admin@example.com
+SEED_ADMIN_PASSWORD=ChangeMeAtLeast10Chars!
+```
+
+Never commit `.env` to Git. These secrets are local-only and never uploaded from the repository.
+
+### 3. Start PostgreSQL
+
+Optional Docker command:
+
+```powershell
+docker run -d --name tm-postgres `
+  -p 5432:5432 `
+  -v tm-postgres-data:/var/lib/postgresql/data `
+  -e POSTGRES_USER=task_manager `
+  -e POSTGRES_PASSWORD=task_manager_dev `
+  -e POSTGRES_DB=task_manager `
   postgres:16-alpine
-docker exec tm-postgres psql -U task_manager -d task_manager -c "CREATE DATABASE task_manager_test OWNER task_manager;"
-
-copy .env.example .env    # fill DATABASE_URL, AUTH_SECRET, APPLICATION_SECRET, SEED_ADMIN_PASSWORD
-npm install
-npm run db:migrate        # (db:deploy for CI) then:
-npm run db:seed
-npm run dev               # http://localhost:3210 (redirects to /login)
 ```
 
-Sign in with the seeded credential from your `.env` (`SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`).
+If PostgreSQL is already installed, create the database and user manually.
+
+### 4. Install dependencies and initialize the empty database
+
+```powershell
+npm install
+npx prisma migrate deploy
+npm run db:seed
+```
+
+`db:seed` creates only:
+- the initial admin account
+- master-data values required to start the app
+
+It does **not** seed applications, findings, emails, PDFs, or customer data.
+
+### 5. Build and start the application
+
+```powershell
+npm run build
+npm start
+```
+
+Open:
+
+```text
+http://localhost:3210
+```
+
+Sign in using the seed email/password you placed in `.env`.
+
+### 6. Optional production check
+
+```powershell
+npm run typecheck
+npm run lint
+npm run test:unit
+```
+
+## Adding data after first login
+
+- Import the PT Tracker workbook from the application settings.
+- Upload `.eml` files under **Email**.
+- Attach tester PDFs from **Reports**.
+- Configure OpenCode from **Settings → AI** if AI thread analysis is required.
+
+None of those data files need to be present to build or run the empty system.
 
 ## Scripts
 
