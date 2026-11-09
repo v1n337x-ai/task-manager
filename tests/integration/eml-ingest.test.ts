@@ -94,7 +94,7 @@ describe.skipIf(!dbAvailable)(".EML pipeline (test DB)", () => {
     expect(thread.messages[0]!.messageId).toBe("<chainA-0001@security-vendor.test>");
     expect(thread.messages[1]!.inReplyTo).toContain("chainA-0001");
     expect(thread.messages[2]!.references).toContain("chainA-0001");
-    // participant roles: AUTO-DETECTED from the .eml (user-directed 2026-11) —
+    // participant roles: AUTO-DETECTED from the .eml (user-directed 2026-11) ï¿½
     // the security-vendor vendor participants classify as pentester via the rule
     // engine; unknown remains unknown only when no evidence exists.
     for (const m of thread.messages) {
@@ -127,7 +127,7 @@ describe.skipIf(!dbAvailable)(".EML pipeline (test DB)", () => {
     expect(result.preview.attachments.length).toBe(1);
     expect(result.preview.attachments[0]!.filename).toBe("report-notes.txt");
     const stored = fs.readFileSync(path.resolve(result.preview.attachments[0]!.storageReference!));
-    expect(stored.toString()).toBe("Cash Portal check notes");
+    expect(stored.toString()).toBe("Customer Portal check notes");
     expect(result.preview.hasTextBody).toBe(true);
     expect(result.preview.hasHtmlBody).toBe(true);
     expect(result.preview.subjectOriginal).toContain("Report with attachment");
@@ -135,7 +135,7 @@ describe.skipIf(!dbAvailable)(".EML pipeline (test DB)", () => {
     const confirmed = await confirmEmlUpload({ jobId: result.jobId, userId, ctx: {} });
     const message = await testDb.emailMessage.findUniqueOrThrow({ where: { id: confirmed.messageId! } });
     expect(message.bodyHtml).toContain("<strong>markup</strong>");
-    // §2: the DB preserves the ORIGINAL html; sanitization happens at read-time.
+    // ï¿½2: the DB preserves the ORIGINAL html; sanitization happens at read-time.
     const { sanitizeEmailHtml } = await import("@/lib/eml/sanitize");
     expect(sanitizeEmailHtml(message.bodyHtml) ?? "").not.toContain("<script");
     const attachments = await testDb.emailAttachment.findMany({ where: { messageId: message.id } });

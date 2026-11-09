@@ -31,7 +31,7 @@ Fields per brief: name (verbatim registry key), display_name, type, scope (inter
 
 ## Application aliases (§16-17)
 
-`application_aliases` stores verbatim alias + deterministic `normalized` key lowercased/trimmed. Type auto-inference: URL → FQDN → package (com./org./io. namespace) → name; overridable. Uniqueness **(application, normalized)** with friendly conflict message. The name + display name are seeded as aliases on creation — groundwork for the Phase 5/6 EML matching ("Cash Portal ≈ CashPortal ≈ cash-portal ≈ UAT Cash Portal").
+`application_aliases` stores verbatim alias + deterministic `normalized` key lowercased/trimmed. Type auto-inference: URL → FQDN → package (com./org./io. namespace) → name; overridable. Uniqueness **(application, normalized)** with friendly conflict message. The name + display name are seeded as aliases on creation — groundwork for the Phase 5/6 EML matching ("Customer Portal ≈ CustomerPortal ≈ customer-portal ≈ UAT Customer Portal").
 
 ## Contacts (POCs / assigned members)
 

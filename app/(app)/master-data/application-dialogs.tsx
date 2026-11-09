@@ -93,7 +93,7 @@ export function ApplicationDialogs({ masterValues }: { masterValues: MasterValue
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <Label htmlFor="name">Application name</Label>
-                <Input id="name" name="name" required placeholder="e.g. Cash Portal Phase-1" />
+                <Input id="name" name="name" required placeholder="e.g. Customer Portal" />
               </div>
               <div>
                 <Label htmlFor="displayName">Display name</Label>
@@ -139,11 +139,11 @@ export function ApplicationDialogs({ masterValues }: { masterValues: MasterValue
               </div>
               <div>
                 <Label htmlFor="apiFqdn">API / FQDN</Label>
-                <Input id="apiFqdn" name="apiFqdn" placeholder="api.example.Task Managerair.com" />
+                <Input id="apiFqdn" name="apiFqdn" placeholder="api.example.com" />
               </div>
               <div>
                 <Label htmlFor="rawTarget">Other target (APK/bundle)</Label>
-                <Input id="rawTarget" name="rawTarget" placeholder="com.app.Task Managerair.staging" />
+                <Input id="rawTarget" name="rawTarget" placeholder="com.example.app.staging" />
               </div>
             </div>
 
@@ -319,7 +319,7 @@ export function RowActions({
           <DialogHeader>
             <DialogTitle>Aliases — {application.displayName}</DialogTitle>
             <DialogDescription>
-              Future EML/AI matching resolves “Cash Portal ≈ CashPortal ≈ cash-portal ≈ UAT Cash Portal”.
+              Future EML/AI matching resolves “Customer Portal ≈ CustomerPortal ≈ customer-portal ≈ UAT Customer Portal”.
             </DialogDescription>
           </DialogHeader>
 

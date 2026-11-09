@@ -213,7 +213,7 @@ model ApplicationAssignedMember {
 model ApplicationAlias {
   id            Int      @id @default(autoincrement())
   applicationId Int
-  alias         String // verbatim ("Cash Portal UAT", "cash-portal", subject fragment)
+  alias         String // verbatim ("Customer Portal UAT", "customer-portal", subject fragment)
   aliasType     Int // FK -> alias_type master value
   normalized    String // lowercase, trimmed, punctuation-normalized for matching
   isPrimary     Boolean  @default(false) // mark one anchor alias per application
@@ -235,7 +235,7 @@ model ApplicationAlias {
 model Engagement {
   id               Int       @id @default(autoincrement())
   applicationId    Int
-  name             String // e.g. "Cash Portal Phase-1 VAPT"
+  name             String // e.g. "Customer Portal VAPT"
   scope            Int // FK -> scope master value
   assessmentSource Int // FK -> assessment_source (source / tool)
   target           String? // URL / APK / FQDN actually engaged

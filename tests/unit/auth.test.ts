@@ -71,16 +71,16 @@ describe("login validation schema", () => {
 
 describe("alias normalization (EML/AI seam, §16-17)", () => {
   it("treats spelling variants as one normalized key", () => {
-    const expected = "cash portal";
-    expect(normalizeAlias("Cash Portal")).toBe(expected);
-    expect(normalizeAlias("  cash  Portal ")).toBe(expected);
+    const expected = "customer portal";
+    expect(normalizeAlias("Customer Portal")).toBe(expected);
+    expect(normalizeAlias("  customer  Portal ")).toBe(expected);
   });
 
   it("infers alias types by shape", () => {
-    expect(inferAliasType("https://uat.qp.Task Managerair.com/cash-portal")).toBe("url");
-    expect(inferAliasType("cargo.Task Managerair.com")).toBe("fqdn");
-    expect(inferAliasType("com.app.Task Managerair.staging")).toBe("package");
-    expect(inferAliasType("Cash Portal UAT")).toBe("name");
+    expect(inferAliasType("https://uat.example.com/customer-portal")).toBe("url");
+    expect(inferAliasType("cargo.example.com")).toBe("fqdn");
+    expect(inferAliasType("com.example.app.staging")).toBe("package");
+    expect(inferAliasType("Customer Portal UAT")).toBe("name");
   });
 });
 
