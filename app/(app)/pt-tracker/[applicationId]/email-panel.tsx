@@ -912,7 +912,7 @@ function NeatTextBody({ body, messageId }: { body: string; messageId?: number })
  * So the first <blockquote> onward is treated as "earlier mail in this
  * thread" and collapsed behind the same toggle as text bodies.
  */
-function splitHtmlQuote(html: string): { head: string; quoted: string | null } {
+export function splitHtmlQuote(html: string): { head: string; quoted: string | null } {
   // OWA / Outlook web: a separator <hr> followed by a div whose bold labels
   // stack the forwarded headers (<b>From:</b> <b>Sent:</b> <b>To:</b> …).
   // Sanitizer strips ids/styles, so detect on the <hr> + <b>From:</b> pair.
