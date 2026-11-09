@@ -355,12 +355,12 @@ function splitPeople(text: string | null): string[] {
   return text.split(/[\/,]/).map((t) => t.trim()).filter((t) => t.length > 1);
 }
 
-const ORG_TOKENS: [RegExp, string][] = [
-  [/iween/i, "security-vendor (iWeen)"],
-  [/volody/i, "Volody"],
-  [/smartcargo|smartkargo/i, "SmartKargo"],
-  [/haptik/i, "Haptik"],
-];
+/**
+ * Vendor-recognition tokens observed in contact strings (e.g.
+ * "Himanshu Kumawat - Haptik"). A generic install has no roster, so org
+ * inference is disabled by default — deploys add their own entries here.
+ */
+const ORG_TOKENS: [RegExp, string][] = [];
 
 function inferOrg(person: string): { fullName: string; org: string | null } {
   for (const [rx, org] of ORG_TOKENS) {

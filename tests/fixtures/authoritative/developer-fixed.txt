@@ -1,1 +1,0 @@
-The vulnerability has been fixed and deployed to production.

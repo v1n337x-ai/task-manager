@@ -20,6 +20,9 @@ import {
   CANONICAL_SCOPE_TO_RAW,
   CANONICAL_STATUS_TO_RAW,
   CANONICAL_TYPE_TO_RAW,
+  FINDING_CAR_STATUS,
+  FINDING_CLOSED_STATUSES,
+  FINDING_OPEN_STATUSES,
   TRACKER_SHEET,
   TRACKER_COLUMNS,
   DATA_START_ROW,
@@ -111,11 +114,15 @@ export async function buildExportRows(): Promise<TrackerExportRow[]> {
   };
   for (const f of findings) {
     const entry = perApp.get(f.applicationId) ?? { open: emptyBucket(), closed: emptyBucket(), car: 0, notFixedOpen: 0 };
-    if (f.statusRef.value === "fixed") bump(entry.closed, f.severityRef.value);
-    else if (f.statusRef.value === "accepted_risk") entry.car += 1;
-    else if (["open", "new", "not_fixed", "not_retested"].includes(f.statusRef.value)) {
+    const st = f.statusRef.value;
+    // Unified buckets: Open = not yet fixed/closed;
+    // Closed = fixed + not fixed + reopened + CAR (+ removed / out_of_scope).
+    if (FINDING_OPEN_STATUSES.has(st)) {
       bump(entry.open, f.severityRef.value);
       entry.notFixedOpen += 1;
+    } else if (FINDING_CLOSED_STATUSES.has(st)) {
+      bump(entry.closed, f.severityRef.value);
+      if (st === FINDING_CAR_STATUS) entry.car += 1;
     }
     perApp.set(f.applicationId, entry);
   }

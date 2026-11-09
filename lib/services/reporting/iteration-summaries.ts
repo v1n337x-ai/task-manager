@@ -7,6 +7,7 @@
  */
 import { prisma } from "@/lib/db";
 import { NotFoundError } from "@/lib/errors";
+import { FINDING_CAR_STATUS, FINDING_CLOSED_STATUSES, FINDING_OPEN_STATUSES } from "@/lib/excel/contract";
 
 export interface IterationSummaryRow {
   iterationId: number;
@@ -34,13 +35,13 @@ export interface IterationSummaryRow {
   testCases: number;
 }
 
-/** Buckets IDENTICAL to lib/excel/export-service.ts (single source of truth). */
-const OPEN_STATUSES = new Set(["open", "new", "in_progress", "not_retested"]);
+/** Buckets shared with the Excel export — see lib/excel/contract.ts. */
+const OPEN_STATUSES = FINDING_OPEN_STATUSES;
 const FIXED = "fixed";
 const NOT_FIXED = "not_fixed";
 const REOPENED = "reopened";
-const CAR = "accepted_risk";
-const CLOSED_SET = new Set([FIXED, NOT_FIXED, REOPENED, CAR, "out_of_scope", "removed"]);
+const CAR = FINDING_CAR_STATUS;
+const CLOSED_SET = FINDING_CLOSED_STATUSES;
 
 export interface ApplicationIterationSummary {
   application: {
