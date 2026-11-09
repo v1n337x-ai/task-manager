@@ -14,7 +14,15 @@ const eslintConfig = [
     },
   },
   {
-    ignores: [".next/**", "node_modules/**", "prisma/migrations/**", "next-env.d.ts"],
+    ignores: [
+      ".next/**",
+      "node_modules/**",
+      "prisma/migrations/**",
+      "next-env.d.ts",
+      // operational one-off driver scripts (importers, AI batch runners) —
+      // run manually; never part of the app source
+      "_*.{cjs,mjs,ts}",
+    ],
   },
   { files: ["lib/logger.ts", "prisma/seed.ts", "tests/**"], rules: { "no-console": "off" } },
 ];

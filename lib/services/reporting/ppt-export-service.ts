@@ -4,9 +4,13 @@
  * with accent bars), 16:9, from ONE report snapshot (§29). Content validation
  * + export job + audit (§34/§35/§32).
  */
+import path from "node:path";
+import fs from "node:fs";
 import { prisma } from "@/lib/db";
 import { AppError, NotFoundError } from "@/lib/errors";
 import { recordAudit } from "@/lib/audit";
+import { getStoredTemplate } from "@/lib/services/ppt-template-service";
+import { buildTemplateValueUpdate } from "@/lib/services/ppt-template-engine";
 import { sanitizeReportSegment, generateDashboardReport, type FiltersAlias as ReportFiltersAlias, type DashboardReport } from "./report-service";
 
 const A = {
@@ -20,6 +24,8 @@ const A = {
   LOW: "4A90D9",
   PAGE: "FFFFFF",
   GOOD: "2E862E",
+  ORANGE: "F37021",
+  VIOLET: "9B7BB5",
 };
 
 interface PptFactory {
@@ -37,6 +43,7 @@ interface PptxLike {
 interface SlideLike {
   background: { color: string };
   addText: (text: string | TextLike[], opts: Record<string, unknown>) => void;
+  addImage: (opts: Record<string, unknown>) => void;
   addTable: (rows: Array<TableLike[]>, opts: Record<string, unknown>) => void;
   addChart: (type: string, data: { name: string; labels: string[]; values: number[] }[], opts: Record<string, unknown>) => void;
   addShape: (type: string, opts: Record<string, unknown>) => void;
@@ -52,6 +59,12 @@ type TableLike = { text: string; options?: Record<string, unknown> };
 async function loadPptx(): Promise<PptFactory> {
   const mod = (await import("pptxgenjs")) as unknown as { default: { new (): PptxLike } };
   return { PptxGenJs: mod.default };
+}
+
+export async function countSlidesInBuffer(buffer: Buffer): Promise<number> {
+  const JSZip = (await import("jszip")).default;
+  const zip = await JSZip.loadAsync(buffer);
+  return Object.keys(zip.files).filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n)).length;
 }
 
 /** §34/§35 — programmatic validation of the generated deck. */
@@ -78,7 +91,12 @@ async function validateGeneratedDeck(buffer: Buffer, expectedKpis: { total: numb
     if (/undefined|NaN/.test(xml)) problems.push(`${f}: contains undefined/NaN`);
   }
 
-  const slide1 = fs.readFileSync(path.join(slideDir, "slide3.xml"), "utf8");
+  const allSlides = slideFiles.map((f) => fs.readFileSync(path.join(slideDir, f), "utf8")).join("\n");
+  const summarySlide = slideFiles.map((f) => path.join(slideDir, f)).find((p) => {
+    const xml = fs.readFileSync(p, "utf8");
+    return xml.includes("Executive Summary") && (xml.includes("Total findings") || xml.includes("Status Distribution"));
+  });
+  const slide1 = summarySlide ? fs.readFileSync(summarySlide, "utf8") : allSlides;
   const has = (v: string) => slide1.includes(`>${v}<`) || slide1.includes(`>${v}<`) || slide1.includes(`>${v}`) && slide1.includes(`<${v}>`);
   if (!slide1.includes(String(expectedKpis.total))) problems.push("KPI total missing on summary slide");
   if (!slide1.includes(String(expectedKpis.pending))) problems.push("KPI pending missing");
@@ -110,21 +128,50 @@ export async function exportPptReport(params: {
   const processing = await prisma.masterValue.findUnique({ where: { domain_value: { domain: "job_status", value: "processing" } } });
   if (!processing) throw NotFoundError("job_status/processing");
 
+  // Uploaded client template: preserve its design and update only values.
+  // If patching fails, fall back to the existing safe generated deck.
+  const storedTemplate = await getStoredTemplate().catch(() => null);
+  let templateBuffer: Buffer | null = null;
+  if (storedTemplate) {
+    try {
+      const engagements = await prisma.engagement.findMany({
+        where: { application: { isActive: true, ...(params.filters.applicationId ? { id: params.filters.applicationId } : {}) } },
+        include: { statusRef: true },
+      });
+      const statusCounts = new Map<string, number>();
+      const engagementStatusByAppId = new Map<number, string>();
+      for (const e of engagements) {
+        statusCounts.set(e.statusRef.label, (statusCounts.get(e.statusRef.label) ?? 0) + 1);
+        engagementStatusByAppId.set(e.applicationId, e.statusRef.label);
+      }
+      templateBuffer = await buildTemplateValueUpdate(report, storedTemplate.buffer, statusCounts, engagementStatusByAppId);
+    } catch {
+      templateBuffer = null;
+    }
+  }
+
   const { PptxGenJs } = await loadPptx();
 
   const pptx = new PptxGenJs();
   pptx.defineLayout({ name: "VAPT169", width: 13.33, height: 7.5 });
   pptx.layout = "VAPT169";
 
-  const slideCount = 5;
+  const pptTemplateDir = path.join(process.cwd(), "prisma", "templates", "ppt");
+  const akasaLogo = path.join(pptTemplateDir, "image3.png");
+  const digialertLogo = path.join(pptTemplateDir, "image1.png");
+  const coverHero = path.join(pptTemplateDir, "image2.jpeg");
+
+  const slideCount = 6;
   let slideIndex = 0;
   const newSlide = () => {
     slideIndex += 1;
     const slide = pptx.addSlide();
     slide.background = { color: A.PAGE };
-    // Ink band + red rule motif (§24 visual family)
-    slide.addShape("rect", { x: 0, y: 0, w: 13.33, h: 1.15, fill: { color: A.INK }, line: { color: A.INK } });
-    slide.addShape("rect", { x: 0, y: 1.15, w: 13.33, h: 0.06, fill: { color: A.RED }, line: { color: A.RED } });
+    // Akasa orange band + violet rule motif (Digialert/Akasa template)
+    slide.addShape("rect", { x: 0, y: 0, w: 13.33, h: 1.15, fill: { color: A.ORANGE }, line: { color: A.ORANGE } });
+    slide.addShape("rect", { x: 0, y: 1.15, w: 13.33, h: 0.06, fill: { color: A.VIOLET }, line: { color: A.VIOLET } });
+    if (fs.existsSync(akasaLogo)) slide.addImage({ path: akasaLogo, x: 10.62, y: 0.24, w: 2.1, h: 0.51 });
+    if (fs.existsSync(digialertLogo)) slide.addImage({ path: digialertLogo, x: 11.39, y: 6.98, w: 1.35, h: 0.33 });
     return slide;
   };
 
@@ -144,9 +191,10 @@ export async function exportPptReport(params: {
 
   // Slide 1 — Cover (§28.1)
   const cover = newSlide();
+  if (fs.existsSync(coverHero)) cover.addImage({ path: coverHero, x: 0.43, y: 1.22, w: 6.93, h: 6.08 });
   addHeader(cover, "TASK MANAGER", "VAPT");
-  cover.addText("Vulnerability Assessment & Penetration Testing", { x: 0.5, y: 2.4, w: 12.3, h: 0.9, fontFace: "Bebas Neue", fontSize: 40, color: A.INK });
-  cover.addText(`Program Status Report & Findings — generated ${new Date(report.generatedAt).toLocaleDateString("en-GB")}`, { x: 0.5, y: 3.4, w: 12.3, h: 0.4, fontFace: "Poppins", fontSize: 14, color: A.MUTED });
+  cover.addText("Vulnerability Assessment & Penetration Testing", { x: 7.55, y: 2.4, w: 5.2, h: 0.9, fontFace: "Bebas Neue", fontSize: 40, color: A.INK });
+  cover.addText(`Program Status Report & Findings — generated ${new Date(report.generatedAt).toLocaleDateString("en-GB")}`, { x: 7.55, y: 3.4, w: 5.2, h: 0.4, fontFace: "Poppins", fontSize: 14, color: A.MUTED });
 
   // Slide 2 — Executive summary KPIs (§28.2/§28.3)
   const summary = newSlide();
@@ -220,10 +268,37 @@ export async function exportPptReport(params: {
     remediation.addTable(nfRows, { x: 0.4, y: 1.5, w: 12.5, colW: [3.6, 1.2, 1.4, 1.4, 1.0, 1.6], border: { pt: 0.5, color: A.STROKE }, rowH: 0.32 });
   }
 
+  // Slide 6 — Scan timeline, remediation status and cumulative findings.
+  const timeline = newSlide();
+  addHeader(timeline, "Scan Timeline & Cumulative Findings", "Scan/report dates oldest to newest · same report snapshot as Dashboard");
+  const insightDate = (value: string | null) => (value ? new Date(value).toLocaleDateString("en-GB") : "—");
+  timeline.addText(
+    `${report.insights.datedApplications} dated applications · earliest ${insightDate(report.insights.earliestScanDate)} · latest ${insightDate(report.insights.latestScanDate)} · average request-to-report ${report.insights.averageRequestedToReportDays === null ? "—" : `${report.insights.averageRequestedToReportDays} days`} · ${report.insights.applicationsWithPendingRemediation} applications with pending remediation`,
+    { x: 0.5, y: 1.42, w: 12.3, h: 0.45, fontFace: "Poppins", fontSize: 11, color: A.MUTED },
+  );
+  const timelineApps = report.applications
+    .filter((a) => a.scanReportDate)
+    .sort((a, b) => new Date(a.scanReportDate!).getTime() - new Date(b.scanReportDate!).getTime());
+  if (report.cumulativeFindings.length === 0) {
+    timeline.addText("No scan/report dates are available for the cumulative view.", { x: 0.5, y: 2.3, w: 12, h: 0.4, fontFace: "Poppins", fontSize: 12, color: A.MUTED });
+  } else {
+    timeline.addChart("line", [
+      { name: "Cumulative findings", labels: report.cumulativeFindings.map((point) => point.label), values: report.cumulativeFindings.map((point) => point.cumulativeFindings) },
+    ], { x: 0.5, y: 2.05, w: 6.0, h: 4.8, lineWidth: 3, showTitle: true, title: "Cumulative findings", titleFontFace: "Bebas Neue", titleFontSize: 16, titleColor: A.INK });
+  }
+  timeline.addChart("bar", [
+    {
+      name: "Findings by application",
+      labels: timelineApps.map((a) => `${a.displayName.slice(0, 22)} · ${insightDate(a.scanReportDate)}`),
+      values: timelineApps.map((a) => a.counts.total),
+    },
+  ], { x: 6.85, y: 2.05, w: 6.0, h: 4.8, barDir: "bar", chartColors: [A.HIGH], showValue: true, dataLabelColor: A.INK, showTitle: true, title: "Scan timeline — findings by application", titleFontFace: "Bebas Neue", titleFontSize: 16, titleColor: A.INK });
+
   void slideIndex;
 
   const written = (await pptx.write({ outputType: "nodebuffer" })) as Buffer;
-  const buffer = Buffer.from(written);
+  const generatedBuffer = Buffer.from(written);
+  const buffer = templateBuffer ?? generatedBuffer;
 
   // §34/§35 validation
   const validation = await validateGeneratedDeck(buffer, {
@@ -231,7 +306,7 @@ export async function exportPptReport(params: {
     pending: report.pendingFindings,
     closed: report.closedFindings,
     car: report.carVerified,
-    slideCount,
+    slideCount: templateBuffer ? await countSlidesInBuffer(buffer) : slideCount,
   });
   if (!validation.ok) {
     await recordAudit({
@@ -257,6 +332,7 @@ export async function exportPptReport(params: {
       status: completed.id,
       params: {
         filters: params.filters,
+        templateSource: templateBuffer ? "uploaded-template" : "builtin",
         reportSnapshot: {
           generatedAt: report.generatedAt,
           total: report.totalFindings,

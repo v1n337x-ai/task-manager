@@ -44,9 +44,7 @@ export function severityFillClass(severityValue: string): string {
 
 export function StatusFillCell({ value }: { value: string }) {
   return (
-    <span className="-mx-3 -my-2 flex min-h-[40px] items-center justify-center px-3 py-2 text-center text-[12px] font-bold leading-tight">
-      <span className={cn("block w-full", statusFillClass(value))}>{value}</span>
-    </span>
+    <span className={cn("fill-cell flex min-h-[40px] w-full items-center justify-center px-3 py-2 text-center text-[12px] font-bold leading-tight", statusFillClass(value))}>{value}</span>
   );
 }
 
@@ -58,8 +56,6 @@ export function SeverityFillCell({
   label: string;
 }) {
   return (
-    <span className="-mx-3 -my-2 flex min-h-[40px] items-center justify-center px-3 py-2 text-center text-[12px] font-bold leading-tight">
-      <span className={cn("block w-full", severityFillClass(severityValue))}>{label}</span>
-    </span>
+    <span className={cn("fill-cell flex min-h-[40px] w-full items-center justify-center px-3 py-2 text-center text-[12px] font-bold leading-tight", severityFillClass(severityValue))}>{label}</span>
   );
 }

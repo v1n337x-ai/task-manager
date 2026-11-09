@@ -25,6 +25,7 @@ export function DataTable<T>({
   emptyTitle,
   emptyHint,
   className,
+  rowClassName,
 }: {
   columns: Column<T>[];
   rows: T[] | null | undefined;
@@ -35,6 +36,7 @@ export function DataTable<T>({
   emptyTitle?: string;
   emptyHint?: string;
   className?: string;
+  rowClassName?: (row: T) => string | undefined;
 }) {
   if (error) return <ErrorState detail={errorDetail ?? error} className={className} />;
   if (loading) return <LoadingState label={`Loading ${caption ?? "data"}…`} className={className} />;
@@ -56,7 +58,7 @@ export function DataTable<T>({
         </THead>
         <TBody>
           {rows.map((row, i) => (
-            <TR key={i}>
+            <TR key={i} className={rowClassName?.(row)}>
               {columns.map((c) => (
                 <TD key={c.key} className={c.className}>
                   {c.render(row)}

@@ -42,8 +42,8 @@ export function ImportFindingsButton({ applicationId }: { applicationId: number 
         setError(data?.error?.message ?? "Import failed.");
         return;
       }
-      const r = data.result as { created: { code: string }[]; skipped: { title: string }[]; warnings: string[] };
-      setMsg(`Imported ${r.created.length} finding(s) · skipped ${r.skipped.length} · warnings ${r.warnings.length}.`);
+      const r = data.result as { created: { code: string }[]; updated: { code: string }[]; skipped: { title: string }[]; warnings: string[] };
+      setMsg(`Imported ${r.created.length} new finding(s) · updated ${r.updated?.length ?? 0} existing · skipped ${r.skipped.length} · warnings ${r.warnings.length}.`);
       if (input) input.value = "";
       router.refresh();
     } finally {

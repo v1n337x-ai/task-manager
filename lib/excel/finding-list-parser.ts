@@ -18,6 +18,7 @@ export interface ParsedFindingsRow {
   title: string;
   severity: ParsedSeverity;
   description: string | null;
+  firstSeenIterationNumber: 1 | 2;
   iteration2Status: "fixed" | "not_fixed" | null;
 }
 
@@ -59,21 +60,54 @@ function cellText(value: ExcelJS.CellValue): string {
   return String(value).trim();
 }
 
-/** Find the header row + column indexes by shape detection (within row 1..10). */
-function detectHeader(ws: ExcelJS.Worksheet): { row: number; noCol: number; nameCol: number; sevCol: number; i2Col: number | null } | null {
-  for (let r = 1; r <= Math.min(ws.rowCount, 10); r++) {
-    const row = ws.getRow(r);
-    let noCol = 0, nameCol = 0, sevCol = 0, i2Col = 0;
-    for (let c = 1; c <= Math.min(ws.columnCount, 30); c++) {
-      const h = cellText(row.getCell(c).value).toLowerCase();
-      if (!noCol && /^(#|s\.?no|no\.?|sl\.?no)$/.test(h)) noCol = c;
-      if (!nameCol && /(vulnerab|finding|name|title|issue)/.test(h)) nameCol = c;
-      if (!sevCol && /severit/.test(h)) sevCol = c;
-      if (!i2Col && /(iteration\s*-?\s*2|iteration\s*2).*(status|verdict)|fixed\/not|status\s*\(?\s*i?2/.test(h)) i2Col = c;
-    }
-    if (noCol && nameCol && sevCol) return { row: r, noCol, nameCol, sevCol, i2Col: i2Col || null };
+interface HeaderGroup {
+  row: number;
+  noCol: number;
+  nameCol: number;
+  sevCol: number;
+  statusCol: number | null;
+}
+
+function groupsInRow(ws: ExcelJS.Worksheet, r: number): HeaderGroup[] {
+  const row = ws.getRow(r);
+  const windows = new Map<string, number>();
+  for (let c = 1; c <= Math.min(ws.columnCount, 60); c++) {
+    const h = cellText(row.getCell(c).value).toLowerCase().replace(/\s+/g, " ");
+    if (/^(#|s\.?no|no\.?|sl\.?no)$/.test(h)) windows.set("no", c);
+    if (/(vulnerab|finding|name|title|issue)/.test(h)) windows.set("name", c);
+    if (/severit/.test(h)) windows.set("sev", c);
+    if (/(status|verdict|iteration\s*-?\s*2|fixed\s*\/\s*not)/.test(h)) windows.set("status", c);
   }
-  return null;
+  const no = windows.get("no");
+  const name = windows.get("name");
+  const sev = windows.get("sev");
+  if (!no || !name || !sev) return [];
+  // Build one group anchored on each "#" found. A stacked second table has
+  // another "#" on a later row; a side-by-side second table has another "#"
+  // on the same row. scan nearby vulnerability/severity/status columns.
+  const groups: HeaderGroup[] = [];
+  for (let c = 1; c <= Math.min(ws.columnCount, 60); c++) {
+    const h = cellText(row.getCell(c).value).toLowerCase().replace(/\s+/g, " ");
+    if (!/^(#|s\.?no|no\.?|sl\.?no)$/.test(h)) continue;
+    // name = first vulnerability/name header to the right within 3 columns
+    let nameC = 0;
+    let sevC = 0;
+    let statusC = 0;
+    for (let d = c + 1; d <= Math.min(c + 5, ws.columnCount); d++) {
+      const dh = cellText(row.getCell(d).value).toLowerCase().replace(/\s+/g, " ");
+      if (!nameC && /(vulnerab|finding|name|title|issue)/.test(dh)) nameC = d;
+      if (!sevC && /severit/.test(dh)) sevC = d;
+    }
+    for (let d = c + 1; d <= Math.min(c + 8, ws.columnCount); d++) {
+      const dh = cellText(row.getCell(d).value).toLowerCase().replace(/\s+/g, " ");
+      if (/(status|verdict|iteration\s*-?\s*2|fixed\s*\/\s*not)/.test(dh)) {
+        statusC = d;
+        break;
+      }
+    }
+    if (nameC && sevC) groups.push({ row: r, noCol: c, nameCol: nameC, sevCol: sevC, statusCol: statusC || null });
+  }
+  return groups;
 }
 
 export async function parseFindingListWorkbook(content: Buffer): Promise<FindingListParse> {
@@ -81,24 +115,18 @@ export async function parseFindingListWorkbook(content: Buffer): Promise<Finding
   // ExcelJS's zip loader rejects Node Buffers — hand it a real typed view.
   await wb.xlsx.load(new Uint8Array(content) as unknown as ExcelJS.Buffer);
 
-  let parsed: FindingListParse | null = null;
-  for (const ws of wb.worksheets) {
-    if (ws.rowCount === 0) continue;
-    const head = detectHeader(ws);
-    if (!head) continue;
+  const normalizeTitle = (t: string) => t.toLowerCase().replace(/\s+/g, " ").trim();
+  const parseRowsFromGroup = (ws: ExcelJS.Worksheet, head: HeaderGroup, start: number, end: number, warnings: string[], firstSeenIterationNumber: 1 | 2 = 1) => {
     const rows: ParsedFindingsRow[] = [];
-    const warnings: string[] = [];
-
-    for (let r = head.row + 1; r <= ws.rowCount; r++) {
+    for (let r = start; r <= end; r++) {
       const row = ws.getRow(r);
       const noRaw = cellText(row.getCell(head.noCol).value);
       const title = cellText(row.getCell(head.nameCol).value);
       const sevRaw = cellText(row.getCell(head.sevCol).value);
-      const i2Raw = head.i2Col ? cellText(row.getCell(head.i2Col).value) : "";
-
-      if (!title && !sevRaw && !noRaw) continue; // blank line
+      const i2Raw = head.statusCol ? cellText(row.getCell(head.statusCol).value) : "";
+      if (!title && !sevRaw && !noRaw) continue;
       if (!title) {
-        if (noRaw && !sevRaw) continue; // stray numbering-only row — silent skip
+        if (noRaw && !sevRaw) continue;
         warnings.push(`Row ${r}: skipped — no vulnerability name.`);
         continue;
       }
@@ -114,11 +142,44 @@ export async function parseFindingListWorkbook(content: Buffer): Promise<Finding
         if (!mapped) warnings.push(`Row ${r}: unknown Iteration-2 status "${i2Raw.slice(0, 24)}" ignored.`);
         else iteration2Status = mapped;
       }
-      rows.push({ no, title: title.slice(0, 300), severity, description: null, iteration2Status });
+      rows.push({ no, title: title.slice(0, 300), severity, description: null, firstSeenIterationNumber, iteration2Status });
+    }
+    return rows;
+  };
+
+  let parsed: FindingListParse | null = null;
+  for (const ws of wb.worksheets) {
+    if (ws.rowCount === 0) continue;
+    const allGroups: HeaderGroup[] = [];
+    for (let r = 1; r <= ws.rowCount; r++) allGroups.push(...groupsInRow(ws, r));
+    const first = allGroups[0];
+    if (!first) continue;
+    const warnings: string[] = [];
+    const second = allGroups.find((g) => g !== first && (g.row > first.row || g.row === first.row));
+    let rows: ParsedFindingsRow[] = [];
+
+    if (!second) {
+      rows = parseRowsFromGroup(ws, first, first.row + 1, ws.rowCount, warnings, 1);
+    } else if (second.row === first.row) {
+      const firstRows = parseRowsFromGroup(ws, first, first.row + 1, ws.rowCount, warnings, 1);
+      const secondRows = parseRowsFromGroup(ws, second, second.row + 1, ws.rowCount, warnings, 2);
+      rows = [...firstRows.map((row, idx) => {
+        const secondRow = secondRows.find((s) => s.no === row.no) ?? secondRows.find((s) => normalizeTitle(s.title) === normalizeTitle(row.title)) ?? secondRows[idx];
+        return { ...row, iteration2Status: row.iteration2Status ?? secondRow?.iteration2Status ?? null };
+      }),
+      ...secondRows.filter((secondRow) => !firstRows.some((row) => row.no === secondRow.no || normalizeTitle(row.title) === normalizeTitle(secondRow.title)))];
+    } else {
+      const firstRows = parseRowsFromGroup(ws, first, first.row + 1, second.row - 1, warnings, 1);
+      const secondRows = parseRowsFromGroup(ws, second, second.row + 1, ws.rowCount, warnings, 2);
+      rows = [...firstRows.map((row) => {
+        const secondRow = secondRows.find((s) => s.no === row.no) ?? secondRows.find((s) => normalizeTitle(s.title) === normalizeTitle(row.title));
+        return { ...row, iteration2Status: secondRow?.iteration2Status ?? null };
+      }),
+      ...secondRows.filter((secondRow) => !firstRows.some((row) => row.no === secondRow.no || normalizeTitle(row.title) === normalizeTitle(secondRow.title)))] ;
     }
 
     parsed = { sheetName: ws.name, rows, warnings };
-    if (rows.length > 0) break; // first sheet that yields usable rows wins
+    if (rows.length > 0) break;
   }
 
   if (!parsed || parsed.rows.length === 0) {

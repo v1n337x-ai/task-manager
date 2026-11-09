@@ -54,6 +54,8 @@ export interface ProviderPortOptions {
   model?: string | null;
   /** fetch implementation override (tests only — never set in app code). */
   fetchImpl?: typeof fetch;
+  /** Learned feedback from past human review (optional). */
+  feedback?: string | null;
 }
 
 export class ProviderUnavailableError extends Error {

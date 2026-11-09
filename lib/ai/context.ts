@@ -15,8 +15,8 @@ export interface ContextBuildResult {
   reductions: string[];
 }
 
-const MAX_MESSAGES = 30;
-const MAX_BODY_CHARS = 4000;
+const MAX_MESSAGES = 12;
+const MAX_BODY_CHARS = 1800;
 
 export function buildAnalysisContext(input: {
   applicationName: string | null;

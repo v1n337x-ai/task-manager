@@ -1,0 +1,480 @@
+{
+  "filename": "Akasa_VAPT_Status_26-27_v7 2.pptx",
+  "sha256": "b9a85b00bbaffd08d060539414235196be02ec77e525b8d33b57a6de16425bcb",
+  "storedBytes": 415558,
+  "slideCount": 20,
+  "slideSize": {
+    "cx": 12192000,
+    "cy": 6858000,
+    "widthInches": 13.333333333333334,
+    "heightInches": 7.5
+  },
+  "themes": [
+    {
+      "name": "theme1.xml",
+      "colors": [
+        "#44546a",
+        "#e7e6e6",
+        "#ff3030",
+        "#e52b2b",
+        "#cc2626",
+        "#b22121",
+        "#991c1c",
+        "#7f1818",
+        "#0563c1",
+        "#954f72",
+        "#000000"
+      ]
+    },
+    {
+      "name": "theme2.xml",
+      "colors": [
+        "#44546a",
+        "#e7e6e6",
+        "#ff3030",
+        "#e52b2b",
+        "#cc2626",
+        "#b22121",
+        "#991c1c",
+        "#7f1818",
+        "#0563c1",
+        "#954f72",
+        "#000000"
+      ]
+    },
+    {
+      "name": "theme3.xml",
+      "colors": [
+        "#44546a",
+        "#e7e6e6",
+        "#4472c4",
+        "#ed7d31",
+        "#a5a5a5",
+        "#ffc000",
+        "#5b9bd5",
+        "#70ad47",
+        "#0563c1",
+        "#954f72",
+        "#000000"
+      ]
+    },
+    {
+      "name": "theme4.xml",
+      "colors": [
+        "#44546a",
+        "#e7e6e6",
+        "#4472c4",
+        "#ed7d31",
+        "#a5a5a5",
+        "#ffc000",
+        "#5b9bd5",
+        "#70ad47",
+        "#0563c1",
+        "#954f72",
+        "#000000"
+      ]
+    }
+  ],
+  "media": [
+    {
+      "name": "image1.png",
+      "ext": "png",
+      "bytes": 14363
+    },
+    {
+      "name": "image2.jpeg",
+      "ext": "jpeg",
+      "bytes": 117797
+    },
+    {
+      "name": "image3.png",
+      "ext": "png",
+      "bytes": 17696
+    },
+    {
+      "name": "image4.jpg",
+      "ext": "jpg",
+      "bytes": 65455
+    }
+  ],
+  "fonts": [
+    "+mj-lt",
+    "+mn-lt",
+    "Calibri Light",
+    "Barlow",
+    "Barlow SemiBold",
+    "Poppins",
+    "Calibri",
+    "Bebas Neue"
+  ],
+  "slides": [
+    {
+      "number": 1,
+      "title": "Vulnerability Assessment &\nPenetration Testing (VAPT)",
+      "role": "cover",
+      "textPreview": [
+        "Vulnerability Assessment &\nPenetration Testing (VAPT)",
+        "Program Status Report & Findings\nfor Akasa Air Limited — FY 2026-27",
+        "Proposed by",
+        "DATE",
+        "Proposed TO",
+        "Sep 2026"
+      ],
+      "hasTable": false,
+      "hasChart": false
+    },
+    {
+      "number": 2,
+      "title": "Table of Contents",
+      "role": "table_of_contents",
+      "textPreview": [
+        "Table of Contents",
+        "Page No.",
+        "EXECUTIVE SUMMARY",
+        "03",
+        "APPLICATION REGISTER",
+        "04",
+        "APPLICATION STATUS DASHBOARD",
+        "05",
+        "SEVERITY OVERVIEW",
+        "06",
+        "FINDINGS BY APPLICATION",
+        "07"
+      ],
+      "hasTable": false,
+      "hasChart": false
+    },
+    {
+      "number": 3,
+      "title": "Executive Summary",
+      "role": "executive_summary",
+      "textPreview": [
+        "Executive Summary",
+        "Vulnerability Assessment & Penetration Testing — Akasa Air FY 2026-27",
+        "34",
+        "Applications Assessed",
+        "235",
+        "Total Findings",
+        "123",
+        "Closed",
+        "112",
+        "Open / Pending",
+        "47.7%",
+        "Closure Rate"
+      ],
+      "hasTable": false,
+      "hasChart": false
+    },
+    {
+      "number": 4,
+      "title": "Application Register",
+      "role": "application_register",
+      "textPreview": [
+        "Application Register",
+        "All 34 assessed applications – status and finding counts. Owners and scope on next slide.",
+        "#",
+        "Application",
+        "Type",
+        "Overall Status",
+        "Total",
+        "Pending",
+        "Closed",
+        "1",
+        "Ecom PROD",
+        "Web"
+      ],
+      "hasTable": true,
+      "hasChart": false
+    },
+    {
+      "number": 5,
+      "title": "Application Owners",
+      "role": "application_owners",
+      "textPreview": [
+        "Application Owners",
+        "Owner and scope per application · open vs closed app count",
+        "#",
+        "Application",
+        "Owner",
+        "Scope",
+        "Status",
+        "1",
+        "Ecom PROD",
+        "K. Fernandes / A. Khanday",
+        "Internal",
+        "On Hold"
+      ],
+      "hasTable": true,
+      "hasChart": false
+    },
+    {
+      "number": 6,
+      "title": "Application Status Dashboard",
+      "role": "application_status",
+      "textPreview": [
+        "Application Status Dashboard",
+        "Where the 34 applications stand today",
+        "12",
+        "Completed — 0 open",
+        "18",
+        "In Progress",
+        "4",
+        "On Hold",
+        "3",
+        "Open — awaiting retest",
+        "Web 23   |   Mobile 5   |   API 3"
+      ],
+      "hasTable": false,
+      "hasChart": true
+    },
+    {
+      "number": 7,
+      "title": "Internal vs External",
+      "role": "internal_vs_external",
+      "textPreview": [
+        "Internal vs External",
+        "In-house estate vs customer-facing estate — findings and the test cases behind them",
+        "INTERNAL — 21 APPLICATIONS",
+        "147 findings  ·  84 open  ·  63 closed",
+        "Assessment: Complete VAPT — Elevate Loyalty Web",
+        "KEY TEST CASES",
+        "9.6",
+        "Hardcoded",
+        "key in client-side code",
+        "Akasa Air Elevate",
+        "9.4",
+        "Unauthenticated FFN enumeration"
+      ],
+      "hasTable": false,
+      "hasChart": false
+    },
+    {
+      "number": 8,
+      "title": "Severity Overview",
+      "role": "severity_overview",
+      "textPreview": [
+        "Severity Overview",
+        "Distribution of 233 findings by severity — open vs closed",
+        "Risk is concentrated at the top of the severity scale: 12 of 44 Critical and 33 of 64 High findings remain open. Resolving the Critical and High",
+        "Test cases",
+        "would reduce open risk from 45 to 67 findings."
+      ],
+      "hasTable": false,
+      "hasChart": true
+    },
+    {
+      "number": 9,
+      "title": "Findings by Application",
+      "role": "findings_by_application",
+      "textPreview": [
+        "Findings by Application",
+        "Open vs closed vulnerability count — complete list, all 34 applications"
+      ],
+      "hasTable": false,
+      "hasChart": true
+    },
+    {
+      "number": 10,
+      "title": "Scan Timeline",
+      "role": "scan_timeline",
+      "textPreview": [
+        "Scan Timeline",
+        "Applications received each month vs the findings they produced (bars = findings· line = apps received)",
+        "Scanning ran January to September 2026, peaking in May and July. Engagements dated after the current month are upcoming and will appear on this timeline once delivered."
+      ],
+      "hasTable": false,
+      "hasChart": true
+    },
+    {
+      "number": 11,
+      "title": "Remediation Status",
+      "role": "remediation_status",
+      "textPreview": [
+        "Remediation Status",
+        "Every application with open findings · all currently Pending",
+        "Application",
+        "Open",
+        "Closed",
+        "Total",
+        "Critical",
+        "High",
+        "Status",
+        "Haptik Chatbot",
+        "0",
+        "18"
+      ],
+      "hasTable": true,
+      "hasChart": false
+    },
+    {
+      "number": 12,
+      "title": "Cumulative Findings",
+      "role": "cumulative_findings",
+      "textPreview": [
+        "Cumulative Findings",
+        "Reported vs closed for scans delivered to date (Jan–Sep 2026)",
+        "Of the programme total (235 reported, 123 closed), 211 reported and 117 closed are visible above; the remainder belongs to engagements dated after the current month and is not yet reflected on this page."
+      ],
+      "hasTable": false,
+      "hasChart": true
+    },
+    {
+      "number": 13,
+      "title": "Future Works",
+      "role": "future_work",
+      "textPreview": [
+        "Future Works",
+        "The remaining work · how we will close it out",
+        "What we do next",
+        "•  Revalidate every pending application the moment fixes land in production so nothing re-tested remains open · while every open finding is Pending, the item is not considered closed.",
+        "•  Then close the two remaining coverage gaps · a security audit of the Jenkins CI/CD pipeline and a cloud security audit · so the delivery pipeline and the hosted estate hold the same standard as the applications we have already tested."
+      ],
+      "hasTable": false,
+      "hasChart": false
+    },
+    {
+      "number": 14,
+      "title": "Security Activity",
+      "role": "security_activity",
+      "textPreview": [
+        "Security Activity",
+        "Monthly Review – October 2026-27",
+        "Akasa Air Limited – FY 2026-27",
+        "Proposed by",
+        "DATE",
+        "Proposed TO",
+        "Oct 2026"
+      ],
+      "hasTable": false,
+      "hasChart": false
+    },
+    {
+      "number": 15,
+      "title": "Table of Contents",
+      "role": "table_of_contents",
+      "textPreview": [
+        "Table of Contents",
+        "Page No.",
+        "Security Activity",
+        "01",
+        "Executive Summary",
+        "03",
+        "Application Register",
+        "04",
+        "Application Owners",
+        "05",
+        "Application Status Dashboard",
+        "06"
+      ],
+      "hasTable": false,
+      "hasChart": false
+    },
+    {
+      "number": 16,
+      "title": "Sophos Policies",
+      "role": "sophos_policies",
+      "textPreview": [
+        "Sophos Policies",
+        "1",
+        "Block Python Application Across the Organization",
+        "Python applications have been blocked",
+        "organi",
+        "s",
+        "ation",
+        "-wide, with approved exceptions retained for developers and designated users in Marketing, RM, Operations Planning, Finance and CX.",
+        "Completed",
+        "2",
+        "ACP – Application Control Policy",
+        "The allow/block application list was reviewed and approved by Jimit. The base Application Control Policy and supporting allow/block policies are enabled; application activity is currently under monitoring."
+      ],
+      "hasTable": false,
+      "hasChart": false
+    },
+    {
+      "number": 17,
+      "title": "Ongoing Process",
+      "role": "ongoing_process",
+      "textPreview": [
+        "Ongoing Process",
+        "1",
+        "AV Compliance",
+        "We have compared the asset inventory against Sophos with ManageEngine reports and share the non-compliant agent status",
+        "report weekly.",
+        "Ongoing",
+        "2",
+        "Server Count",
+        "Ongoing",
+        "3",
+        "Global Execution",
+        "Global exclusions have been backed up; 36 of 44 were identified as safe to remove. Test-team validation and final approval are pending."
+      ],
+      "hasTable": false,
+      "hasChart": false
+    },
+    {
+      "number": 18,
+      "title": "M365",
+      "role": "m365",
+      "textPreview": [
+        "M365",
+        "Security monitoring, investigation and access-control activities",
+        "1",
+        "User at Risk",
+        "Reviewed the activity of users flagged as risky and carried out the required follow-up actions. October review: 40 risky users",
+        "analysed",
+        ".",
+        "On-going",
+        "2",
+        "Email Investigation",
+        "Two phishing emails were investigated. The sender domain and malicious URL were blocked, and delivered messages were soft-deleted from user mailboxes.",
+        "Mitigated"
+      ],
+      "hasTable": false,
+      "hasChart": false
+    },
+    {
+      "number": 19,
+      "title": "Ongoing Process",
+      "role": "ongoing_process",
+      "textPreview": [
+        "Ongoing Process",
+        "Policy governance and endpoint security controls",
+        "1",
+        "DLP",
+        "The policy remains in monitoring mode; CR-764 is awaiting approval.",
+        "Dedicated groups have been created for WhatsApp-only users, Development, Finance, HR, IT and Marketing to support department-specific DLP rules.",
+        "DLP Policy Violators  are identified based on the department and the rule is customised according to it.",
+        "Approval Pending",
+        "2",
+        "Peripheral Control",
+        "Users have been added to exceptions based on the approved peripheral-control requirements.",
+        "Ongoing"
+      ],
+      "hasTable": false,
+      "hasChart": false
+    },
+    {
+      "number": 20,
+      "title": "Future Work",
+      "role": "future_work",
+      "textPreview": [
+        "Future Work",
+        "Upcoming security activities and planned assessments",
+        "1",
+        "Phishing Campaign",
+        "The test phishing email has been sent.",
+        "Final approval from the team is awaited; once approval is received, the campaign is expected to take approximately 6–7 days to complete.",
+        "Awaiting Approval",
+        "2",
+        "Tabletop Exercise",
+        "Status update to be added.",
+        "Update Required",
+        "3"
+      ],
+      "hasTable": false,
+      "hasChart": false
+    }
+  ],
+  "aiAvailable": false,
+  "warnings": []
+}

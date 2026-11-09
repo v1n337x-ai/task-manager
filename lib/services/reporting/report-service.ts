@@ -5,6 +5,7 @@
  * never Excel snapshots, never AI narrative numbers.
  */
 import { prisma } from "@/lib/db";
+import { duplicateMasterPlaceholderIds } from "@/lib/services/finding-placeholder-utils";
 
 export interface SeverityBreakdown {
   critical: number;
@@ -37,7 +38,29 @@ export interface ApplicationReport {
     testCases: number;
   };
   latestIteration: number | null;
+  requestedDate: string | null;
+  scanReportDate: string | null;
+  closureRate: number | null;
+  milestones: { iteration: number; reportDate: string | null; statusLabel: string }[];
   lastActivity: string | null;
+}
+
+export interface CumulativeFindingPoint {
+  month: string;
+  label: string;
+  applications: number;
+  findingsThisMonth: number;
+  cumulativeFindings: number;
+}
+
+export interface DashboardInsights {
+  datedApplications: number;
+  missingDateApplications: number;
+  earliestScanDate: string | null;
+  latestScanDate: string | null;
+  averageRequestedToReportDays: number | null;
+  applicationsWithPendingRemediation: number;
+  oldestPendingApplication: string | null;
 }
 
 export interface DashboardReport {
@@ -50,6 +73,8 @@ export interface DashboardReport {
   severityBreakdown: SeverityBreakdown;
   statusBreakdown: { open: number; fixed: number; notFixed: number; reopened: number; car: number };
   applications: ApplicationReport[];
+  cumulativeFindings: CumulativeFindingPoint[];
+  insights: DashboardInsights;
   iterationBreakdown: { iteration: number; applications: number }[];
   recentActivity: { at: string; action: string; entityType: string; entityId: string; source: string }[];
 }
@@ -82,21 +107,30 @@ export async function generateDashboardReport(filters: ReportFilters = {}): Prom
       applicationTypeRef: true,
       scopeRef: true,
       statusRef: true,
-      engagements: { include: { iterations: { orderBy: { number: "desc" } } } },
+      engagements: {
+        include: {
+          statusRef: true,
+          iterations: { orderBy: { number: "desc" }, include: { statusRef: true } },
+        },
+      },
     },
     orderBy: { name: "asc" },
   });
 
-  const findings = await prisma.finding.findMany({
+  const allFindings = await prisma.finding.findMany({
     where: { application: appWhere, isActive: true },
     select: {
       id: true,
       applicationId: true,
+      title: true,
+      description: true,
       severityRef: { select: { value: true } },
       statusRef: { select: { value: true } },
       iterationStates: { include: { iteration: { select: { number: true } }, statusRef: { select: { value: true } } } },
     },
   });
+  const duplicatePlaceholderIds = duplicateMasterPlaceholderIds(allFindings, (f) => f.applicationId);
+  const findings = allFindings.filter((f) => !duplicatePlaceholderIds.has(f.id));
   const testCases = await prisma.testCase.groupBy({ by: ["applicationId"], where: { application: appWhere }, _count: { _all: true } });
   const tcByApp = new Map(testCases.map((t) => [t.applicationId, t._count._all]));
 
@@ -167,9 +201,66 @@ export async function generateDashboardReport(filters: ReportFilters = {}): Prom
         testCases: tcCount,
       },
       latestIteration: latest?.number ?? 0,
+      requestedDate: engagement?.requestedDate?.toISOString() ?? null,
+      scanReportDate: engagement?.reportDate?.toISOString() ?? null,
+      closureRate: counts.total ? Math.round((counts.fixed / counts.total) * 1000) / 10 : null,
+      milestones: [...(engagement?.iterations ?? [])]
+        .sort((a, b) => a.number - b.number)
+        .filter((iteration) => iteration.number <= 2)
+        .map((iteration) => ({
+          iteration: iteration.number,
+          reportDate: iteration.reportDate?.toISOString() ?? null,
+          statusLabel: iteration.statusRef.label,
+        })),
       lastActivity: (a.updatedAt ?? null)?.toISOString() ?? null,
     };
   });
+
+  const datedApplications = appRows.filter((a) => a.scanReportDate);
+  const chronologicalApplications = [...datedApplications].sort(
+    (a, b) => new Date(a.scanReportDate!).getTime() - new Date(b.scanReportDate!).getTime(),
+  );
+  const durationDays = appRows.flatMap((a) => {
+    if (!a.requestedDate || !a.scanReportDate) return [];
+    const days = Math.floor((new Date(a.scanReportDate).getTime() - new Date(a.requestedDate).getTime()) / 86_400_000);
+    return days >= 0 ? [days] : [];
+  });
+  const pendingApplications = appRows.filter((a) => a.counts.pending > 0);
+  const oldestPendingApplication = [...pendingApplications]
+    .sort((a, b) => {
+      const aTime = a.scanReportDate ? new Date(a.scanReportDate).getTime() : Number.POSITIVE_INFINITY;
+      const bTime = b.scanReportDate ? new Date(b.scanReportDate).getTime() : Number.POSITIVE_INFINITY;
+      return aTime - bTime;
+    })[0]?.displayName ?? null;
+  const insights: DashboardInsights = {
+    datedApplications: datedApplications.length,
+    missingDateApplications: appRows.length - datedApplications.length,
+    earliestScanDate: chronologicalApplications[0]?.scanReportDate ?? null,
+    latestScanDate: chronologicalApplications.at(-1)?.scanReportDate ?? null,
+    averageRequestedToReportDays:
+      durationDays.length ? Math.round((durationDays.reduce((sum, days) => sum + days, 0) / durationDays.length) * 10) / 10 : null,
+    applicationsWithPendingRemediation: pendingApplications.length,
+    oldestPendingApplication,
+  };
+
+  const monthlyScanActivity = new Map<string, { applications: number; findings: number }>();
+  for (const application of chronologicalApplications) {
+    const monthDate = new Date(application.scanReportDate!);
+    const month = `${monthDate.getUTCFullYear()}-${String(monthDate.getUTCMonth() + 1).padStart(2, "0")}`;
+    const current = monthlyScanActivity.get(month) ?? { applications: 0, findings: 0 };
+    current.applications += 1;
+    current.findings += application.counts.total;
+    monthlyScanActivity.set(month, current);
+  }
+  let cumulativeFindingsTotal = 0;
+  const cumulativeFindings: CumulativeFindingPoint[] = [...monthlyScanActivity.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([month, values]) => {
+      cumulativeFindingsTotal += values.findings;
+      const [year, monthNumber] = month.split("-").map(Number);
+      const label = new Date(Date.UTC(year!, monthNumber! - 1, 1)).toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
+      return { month, label, applications: values.applications, findingsThisMonth: values.findings, cumulativeFindings: cumulativeFindingsTotal };
+    });
 
   const iterationSet = new Map<number, number>();
   for (const a of apps) {
@@ -208,6 +299,8 @@ export async function generateDashboardReport(filters: ReportFilters = {}): Prom
     severityBreakdown,
     statusBreakdown,
     applications: appRows,
+    cumulativeFindings,
+    insights,
     iterationBreakdown: [...iterationSet.entries()].sort((a, b) => a[0] - b[0]).map(([iteration, applications]) => ({ iteration, applications })),
     recentActivity: recent.map((r) => ({
       at: r.createdAt.toISOString(),

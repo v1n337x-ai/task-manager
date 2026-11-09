@@ -27,7 +27,7 @@ References: <chainA-0001@digialert.test>
 Message-ID: <chainB-0002@akasa.test>
 Content-Type: text/plain; charset=utf-8
 
-Developer response: findings F-001 and F-002 are fixed.
+Developer response: High severity findings F-001 and F-002 are fixed.
 `;
 
 export const chainC = `From: vineet@digialert.test
@@ -38,7 +38,7 @@ References: <chainA-0001@digialert.test> <chainB-0002@akasa.test>
 Message-ID: <chainC-0003@digialert.test>
 Content-Type: text/plain; charset=utf-8
 
-Retest completed. F-001 Fixed. F-002 Not Fixed.
+Retest completed. High severity F-001 Fixed. F-002 Not Fixed.
 `;
 
 export const multipartWithAttachment = `From: vineet@digialert.test

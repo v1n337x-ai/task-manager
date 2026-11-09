@@ -37,10 +37,21 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     // Original upload filenames — map each stored message back to the .eml the
     // user imported (import_jobs preview holds messageIdSynthetic + filename),
     // so the UI can list the uploaded files in confirmation order (user ask).
-    const importJobs = await prisma.importJob.findMany({
-      where: { type: "eml_batch" },
-      select: { filename: true, preview: true },
-    });
+    // PERF: only fetch the jobs that can match THIS thread's messages. Loading
+    // every eml_batch job (2k rows / ~11 MB of JSON) made each click take ~3s.
+    const messageIds = thread.messages.map((m) => m.messageId);
+    const importJobs =
+      messageIds.length === 0
+        ? []
+        : await prisma.importJob.findMany({
+            where: {
+              type: "eml_batch",
+              OR: messageIds.map((id) => ({
+                preview: { path: ["row", "messageIdSynthetic"], equals: id },
+              })),
+            },
+            select: { filename: true, preview: true },
+          });
     const fileBySyntheticId = new Map<string, string>();
     for (const j of importJobs) {
       const preview = j.preview as { row?: { messageIdSynthetic?: string; filename?: string } } | null;

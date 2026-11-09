@@ -10,11 +10,13 @@ import { NotFoundError } from "@/lib/errors";
 import { recordAudit } from "@/lib/audit";
 import { logger } from "@/lib/logger";
 import { parseFindingListWorkbook } from "@/lib/excel/finding-list-parser";
-import { createFinding, setFindingIterationState } from "@/lib/services/finding-service";
+import { createFinding, setFindingIterationState, buildFindingMatchKey } from "@/lib/services/finding-service";
+import { MASTER_PLACEHOLDER_MARKER } from "@/lib/services/finding-placeholder-utils";
 import { createIteration } from "@/lib/services/engagement-service";
 
 export interface FindingImportResult {
   created: { id: number; code: string; title: string; severity: string }[];
+  updated: { id: number; code: string; title: string; severity: string }[];
   skipped: { no: number; title: string; reason: string }[];
   warnings: string[];
   totalRows: number;
@@ -66,23 +68,116 @@ export async function importFindingList(params: {
   const { i1, i2 } = await ensureIterations(params.applicationId, params.actorUserId);
 
   const created: FindingImportResult["created"] = [];
+  const updated: FindingImportResult["updated"] = [];
   const skipped: FindingImportResult["skipped"] = [];
+  const placeholders = await prisma.finding.findMany({
+    where: { applicationId: params.applicationId, description: { contains: MASTER_PLACEHOLDER_MARKER } },
+    include: { severityRef: { select: { value: true } }, iterationStates: { include: { statusRef: { select: { value: true } }, iteration: { select: { number: true } } } } },
+    orderBy: { id: "asc" },
+  });
+  const usedPlaceholderIds = new Set<number>();
 
   for (const row of parsed.rows) {
     try {
+      const matchKey = buildFindingMatchKey({ title: row.title });
+      const existingFinding = await prisma.finding.findUnique({
+        where: { applicationId_matchKey: { applicationId: params.applicationId, matchKey } },
+      });
+
+      // Replace synthetic master-import placeholders with the named finding.
+      // These placeholder rows were deliberately created to hold aggregate
+      // counts only; detail reports provide the real names and must supersede them.
+      if (!existingFinding) {
+        const placeholder = placeholders.find((p) => {
+          if (usedPlaceholderIds.has(p.id)) return false;
+          return p.severityRef?.value === row.severity;
+        });
+        if (placeholder) {
+          usedPlaceholderIds.add(placeholder.id);
+          const severityRow = await prisma.masterValue.findUnique({
+            where: { domain_value: { domain: "severity", value: row.severity } },
+          });
+          const updates: Record<string, unknown> = { title: row.title.trim(), matchKey, firstSeenIterationNumber: row.firstSeenIterationNumber };
+          if (severityRow && placeholder.severity !== severityRow.id) updates.severity = severityRow.id;
+          await prisma.finding.update({ where: { id: placeholder.id }, data: updates });
+          if (row.iteration2Status && i2) {
+            await setFindingIterationState(
+              { findingId: placeholder.id, iterationId: i2, severityValue: row.severity, statusValue: row.iteration2Status },
+              params.actorUserId,
+              { source: "EXCEL_IMPORT" },
+            );
+          }
+          if (row.firstSeenIterationNumber === 2 && i2) {
+            await setFindingIterationState(
+              { findingId: placeholder.id, iterationId: i2, severityValue: row.severity, statusValue: row.iteration2Status ?? "open" },
+              params.actorUserId,
+              { source: "EXCEL_IMPORT" },
+            );
+          }
+          updated.push({ id: placeholder.id, code: placeholder.code, title: row.title, severity: row.severity });
+          continue;
+        }
+      }
+
+      if (existingFinding) {
+        // Keep the original tracking record, but feed the latest workbook values
+        // into each named iteration state. I1 is only touched for sightings that
+        // belong to I1; I2 findings are appended to the existing record.
+        const severityRow = await prisma.masterValue.findUnique({
+          where: { domain_value: { domain: "severity", value: row.severity } },
+        });
+        const updates: Record<string, unknown> = {};
+        if (severityRow && existingFinding.severity !== severityRow.id) updates.severity = severityRow.id;
+        if (existingFinding.title.trim() !== row.title.trim()) updates.title = row.title.trim();
+        if (!existingFinding.firstSeenIterationNumber) updates.firstSeenIterationNumber = row.firstSeenIterationNumber;
+        if (Object.keys(updates).length) await prisma.finding.update({ where: { id: existingFinding.id }, data: updates });
+
+        if (row.firstSeenIterationNumber === 1) {
+          await setFindingIterationState(
+            { findingId: existingFinding.id, iterationId: i1, severityValue: row.severity, statusValue: "open" },
+            params.actorUserId,
+            { source: "EXCEL_IMPORT" },
+          );
+        }
+        if (row.iteration2Status && i2) {
+          await setFindingIterationState(
+            { findingId: existingFinding.id, iterationId: i2, severityValue: row.severity, statusValue: row.iteration2Status },
+            params.actorUserId,
+            { source: "EXCEL_IMPORT" },
+          );
+        }
+        if (row.firstSeenIterationNumber === 2 && !row.iteration2Status && i2) {
+          await setFindingIterationState(
+            { findingId: existingFinding.id, iterationId: i2, severityValue: row.severity, statusValue: "open" },
+            params.actorUserId,
+            { source: "EXCEL_IMPORT" },
+          );
+        }
+        updated.push({ id: existingFinding.id, code: existingFinding.code, title: row.title, severity: row.severity });
+        continue;
+      }
+
       const finding = await createFinding(
-        { applicationId: params.applicationId, title: row.title, severityValue: row.severity, description: row.description ?? undefined, firstSeenIterationNumber: 1 },
+        {
+          applicationId: params.applicationId,
+          title: row.title,
+          severityValue: row.severity,
+          description: row.description ?? undefined,
+          firstSeenIterationNumber: row.firstSeenIterationNumber,
+        },
         params.actorUserId,
         {},
       );
-      await setFindingIterationState(
-        { findingId: finding.id, iterationId: i1, severityValue: row.severity, statusValue: "open" },
-        params.actorUserId,
-        { source: "EXCEL_IMPORT" },
-      );
-      if (row.iteration2Status && i2) {
+      if (row.firstSeenIterationNumber === 1) {
         await setFindingIterationState(
-          { findingId: finding.id, iterationId: i2, severityValue: row.severity, statusValue: row.iteration2Status },
+          { findingId: finding.id, iterationId: i1, severityValue: row.severity, statusValue: "open" },
+          params.actorUserId,
+          { source: "EXCEL_IMPORT" },
+        );
+      }
+      if (row.firstSeenIterationNumber === 2 && i2) {
+        await setFindingIterationState(
+          { findingId: finding.id, iterationId: i2, severityValue: row.severity, statusValue: row.iteration2Status ?? "open" },
           params.actorUserId,
           { source: "EXCEL_IMPORT" },
         );
@@ -106,6 +201,7 @@ export async function importFindingList(params: {
       sheet: parsed.sheetName,
       totalRows: parsed.rows.length,
       created: created.length,
+      updated: updated.length,
       skipped: skipped.length,
       warnings: parsed.warnings.length,
     }),
@@ -114,7 +210,7 @@ export async function importFindingList(params: {
     ip: params.ctx.ip,
     userAgent: params.ctx.userAgent,
   });
-  logger.info("app_findings.import", { applicationId: params.applicationId, created: created.length, skipped: skipped.length, actorUserId: params.actorUserId });
+  logger.info("app_findings.import", { applicationId: params.applicationId, created: created.length, updated: updated.length, skipped: skipped.length, actorUserId: params.actorUserId });
 
-  return { created, skipped, warnings: parsed.warnings, totalRows: parsed.rows.length };
+  return { created, updated, skipped, warnings: parsed.warnings, totalRows: parsed.rows.length };
 }

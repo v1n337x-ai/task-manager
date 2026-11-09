@@ -50,7 +50,7 @@ describe.skipIf(!dbAvailable)("AI thread analysis (mock provider)", () => {
     expect(run.status).toBe("needs_review");
     expect(run.provider).toBe("mock");
     expect(run.schemaVersion).toBe("AI_EXTRACTION_V1");
-    expect(run.promptVersion).toBe("VAPT_EMAIL_ANALYSIS_V1");
+    expect(run.promptVersion).toBe("VAPT_EMAIL_ANALYSIS_V2");
     // mock found F-002/003 status statements from the fixture chain:
     expect(run.structured!.findings.length).toBeGreaterThanOrEqual(1);
     const fixedSignal = run.structured!.findings.find((f) => f.statusSignal === "fixed");
@@ -64,7 +64,7 @@ describe.skipIf(!dbAvailable)("AI thread analysis (mock provider)", () => {
     const row = await testDb.aiExtraction.findUniqueOrThrow({ where: { id: run.extractionId } });
     expect(row.inputContextHash).toBeTruthy();
     expect(row.outputHash).toBeTruthy();
-    expect(row.promptVersion).toBe("VAPT_EMAIL_ANALYSIS_V1");
+    expect(row.promptVersion).toBe("VAPT_EMAIL_ANALYSIS_V2");
     expect(row.durationMs).toBeGreaterThanOrEqual(0);
   });
 
@@ -88,7 +88,7 @@ describe.skipIf(!dbAvailable)("AI thread analysis (mock provider)", () => {
 
     const { recordApprovalDecision } = await import("@/lib/services/ai-foundation-service");
     // approve one finding item:
-    await recordApprovalDecision({ extractionId, decision: "approve", itemKey: "findingStatus:0" }, userId, {});
+    await recordApprovalDecision({ extractionId, decision: "approve", itemKey: "findingStatus:1" }, userId, {});
     // correct a participant role (AI said X → human says pentester):
     await recordApprovalDecision(
       { extractionId, decision: "correct", itemKey: "participantRole:vineet@digialert.test", correctedValue: "pentester", note: "evidence: authored retest report" },
@@ -96,13 +96,13 @@ describe.skipIf(!dbAvailable)("AI thread analysis (mock provider)", () => {
       {},
     );
     // reject another item:
-    await recordApprovalDecision({ extractionId, decision: "reject", itemKey: "findingStatus:1" }, userId, {});
+    await recordApprovalDecision({ extractionId, decision: "reject", itemKey: "findingStatus:0" }, userId, {});
 
     const after = JSON.stringify(await testDb.aiExtraction.findUniqueOrThrow({ where: { id: extractionId }, select: { structuredOutput: true } }));
     expect(before).toBe(after); // AI output IMMUTABLE
 
     const decisions = await testDb.aiApprovalDecision.findMany({ where: { extractionId }, include: { decidedBy: true } });
-    expect(decisions.map((d) => d.itemKey)).toContain("findingStatus:0");
+    expect(decisions.map((d) => d.itemKey)).toContain("findingStatus:1");
     expect(decisions.map((d) => d.itemKey)).toContain("participantRole:vineet@digialert.test");
     const correction = decisions.find((d) => d.decision === "correct");
     expect(correction!.correctedValue).toBe("pentester");
@@ -125,10 +125,13 @@ describe.skipIf(!dbAvailable)("AI thread analysis (mock provider)", () => {
 
   it("12. repeated identical context does NOT overwrite the first run (§49 idempotency of history)", async () => {
     const runs = await testDb.aiExtraction.findMany({ where: { threadId }, orderBy: { createdAt: "asc" } });
-    const hash1 = runs[0]!.inputContextHash;
-    const hash2 = runs[runs.length - 1]!.inputContextHash;
-    expect(hash1).toBe(hash2); // deterministic context
-    expect(runs[0]!.id).not.toBe(runs[runs.length - 1]!.id); // separate runs, both kept
+    const previous = runs[runs.length - 1]!;
+    const rl = await import("@/lib/auth/rate-limit");
+    rl.resetRateLimiter();
+    const { analyzeThread } = await import("@/lib/ai/analysis-service");
+    const repeated = await analyzeThread({ threadId, userId, ctx: {}, providerOverrideSlug: "mock" });
+    expect(repeated.inputContextHash).toBe(previous.inputContextHash); // tracker state unchanged since previous run
+    expect(repeated.extractionId).not.toBe(previous.id); // separate runs, both kept
   });
 
   it("13-15. OpenCode (enabled, unconfigured) fails HONESTLY without server/credential (§6/§50)", async () => {

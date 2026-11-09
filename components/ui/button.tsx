@@ -12,9 +12,9 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: "bg-slate text-white hover:bg-slate/90",
-        accent: "bg-accent text-white hover:bg-accent/90",
-        outline: "border border-stroke bg-card text-ink-2 hover:bg-xlsx-data rounded-none",
+        primary: "bg-slate text-white shadow-sm hover:bg-slate/90 hover:shadow",
+        accent: "bg-accent text-white shadow-sm hover:bg-accent/90 hover:shadow",
+        outline: "border border-stroke bg-card text-ink-2 shadow-sm hover:bg-xlsx-data rounded-none",
         ghost: "text-ink-2 hover:bg-band",
         link: "text-progress underline-offset-4 hover:underline",
       },

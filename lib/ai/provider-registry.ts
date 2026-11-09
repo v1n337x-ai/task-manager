@@ -163,7 +163,7 @@ function opencodePort(options: ProviderPortOptions): AiProviderPort {
         baseUrl: serverUrl,
         credential,
         model: modelRef,
-        prompt: buildExtractionPrompt(context),
+        prompt: buildExtractionPrompt(context, options.feedback),
         fetchImpl: options.fetchImpl,
       });
       if ("text" in result) {

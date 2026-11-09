@@ -37,7 +37,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       throw ValidationError("Item CORRECT decisions require correctedValue.");
     }
 
-    await recordApprovalDecision(
+    const result = await recordApprovalDecision(
       {
         extractionId,
         decision: input.data.decision,
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         userAgent: request.headers.get("user-agent") ?? undefined,
       },
     );
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, result });
   } catch (error) {
     return toErrorResponse(error);
   }

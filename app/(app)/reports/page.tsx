@@ -107,7 +107,7 @@ export default async function ReportsPage({
                     { key: "iter", header: "Iteration", className: "text-center whitespace-nowrap", render: (it) => <strong>{`I${it.iterationNumber}`}</strong> },
                     { key: "name", header: "Iteration name", className: "min-w-[150px]", render: (it) => it.name },
                     { key: "type", header: "Type", className: "whitespace-nowrap", render: (it) => it.typeLabel },
-                    { key: "status", header: "Status", className: "whitespace-nowrap", render: (it) => <StatusFillCell value={it.statusLabel} /> },
+                    { key: "status", header: "Status", className: "filled-cell text-center whitespace-nowrap", render: (it) => <StatusFillCell value={it.statusLabel} /> },
                     { key: "dates", header: "Date", className: "whitespace-nowrap", render: (it) => <span className="text-muted text-[12px]">{fmtDate(it.reportDate ?? it.startDate)}</span> },
                     { key: "crit", header: "Crit", className: "text-center", render: (it) => it.counts.critical },
                     { key: "high", header: "High", className: "text-center", render: (it) => it.counts.high },

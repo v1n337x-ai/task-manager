@@ -45,3 +45,6 @@ coverage/
 .p3cookies.txt
 .export.xlsx
 _payload*
+.*cookies*.txt
+_*
+tsconfig.tsbuildinfo

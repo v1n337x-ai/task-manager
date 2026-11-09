@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { SeverityFillCell } from "@/components/status-fill";
 import { AiReview } from "./ai-review-panel";
 import { PstImportButton } from "./pst-import-button";
 
@@ -49,29 +50,56 @@ export function EmailPanel({
   const [phase, setPhase] = React.useState<"idle" | "uploading" | "previewed">("idle");
   const [force, setForce] = React.useState(false);
   const [last, setLast] = React.useState<string | null>(null);
+  const [progress, setProgress] = React.useState<string | null>(null);
   const [activeThread, setActiveThread] = React.useState<ThreadSummary | null>(threads[0] ?? null);
   const [threadDetail, setThreadDetail] = React.useState<ThreadDetail | null>(null);
   const [detailLoading, setDetailLoading] = React.useState(false);
   const [pstOpen, setPstOpen] = React.useState(false);
+  const threadLoadToken = React.useRef(0);
 
   async function upload() {
     if (files.length === 0) return;
     setBusy(true);
     setLast(null);
+    setResults(null);
+    const collected: UploadPreviewItem[] = [];
     try {
-      const fd = new FormData();
-      fd.set("applicationId", String(applicationId));
-      for (const f of files) fd.append("files", f);
-      const res = await fetch("/api/emails/upload", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok) {
-        setLast(data.error?.message ?? "Upload failed.");
-        setResults(null);
-        return;
+      // One request per file. A single multipart batch of 25 .eml files can
+      // exceed the request-body cap and fail as a whole; per-file requests
+      // isolate failures and let the user see progress.
+      for (let i = 0; i < files.length; i += 1) {
+        setProgress(`Parsing ${i + 1} of ${files.length}…`);
+        const fd = new FormData();
+        fd.set("applicationId", String(applicationId));
+        fd.append("files", files[i]);
+        try {
+          const res = await fetch("/api/emails/upload", {
+            method: "POST",
+            body: fd,
+            headers: csrf() ? { "x-csrf-token": csrf()! } : {},
+          });
+          const data = (await res.json().catch(() => null)) as
+            | { error?: { message?: string }; results?: UploadPreviewItem[] }
+            | null;
+          if (!res.ok || !data?.results) {
+            collected.push({
+              ok: false,
+              filename: files[i].name,
+              error: data?.error?.message ?? `Upload failed (HTTP ${res.status}).`,
+            });
+            continue;
+          }
+          collected.push(...data.results);
+        } catch (error) {
+          collected.push({ ok: false, filename: files[i].name, error: (error as Error).message || "Upload failed." });
+        }
       }
-      setResults(data.results as UploadPreviewItem[]);
-      setPhase("previewed");
+      const ready = collected.filter((r) => r.ok).length;
+      setResults(collected);
+      if (ready > 0) setPhase("previewed");
+      setLast(`Parsed ${ready} of ${files.length} file(s). Review the previews, then confirm.`);
     } finally {
+      setProgress(null);
       setBusy(false);
     }
   }
@@ -102,16 +130,33 @@ export function EmailPanel({
   }
 
   async function openThread(thread: ThreadSummary) {
+    const requestToken = ++threadLoadToken.current;
     setActiveThread(thread);
+    setThreadDetail(null);
     setDetailLoading(true);
     try {
       const res = await fetch(`/api/emails/threads/${thread.id}`);
+      if (threadLoadToken.current !== requestToken) return;
       const data = await res.json();
+      if (threadLoadToken.current !== requestToken) return;
       setThreadDetail(res.ok ? (data as ThreadDetail) : null);
+    } catch (error) {
+      if (threadLoadToken.current !== requestToken) return;
+      setThreadDetail(null);
+      setLast(`Could not load the conversation (${(error as Error).message}). Check the server and retry.`);
     } finally {
-      setDetailLoading(false);
+      if (threadLoadToken.current === requestToken) setDetailLoading(false);
     }
   }
+
+  // Open the newest thread automatically so the enlarged conversation view is
+  // visible immediately instead of showing only the thread list.
+  React.useEffect(() => {
+    const firstThread = threads[0];
+    if (firstThread) void openThread(firstThread);
+    // openThread is intentionally excluded: running it on every render would refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threads[0]?.id]);
 
   return (
     <div className="space-y-5">
@@ -159,7 +204,8 @@ export function EmailPanel({
         </div>
         <div className="mt-3 flex items-center gap-2">
           <Button variant="accent" onClick={upload} disabled={busy || files.length === 0}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <AtSign className="h-4 w-4" aria-hidden />} Parse
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <AtSign className="h-4 w-4" aria-hidden />}
+            {busy ? (progress ?? "Parsing…") : "Parse"}
           </Button>
           {phase === "previewed" ? (
             <Button variant="primary" onClick={confirm} disabled={busy}>
@@ -205,39 +251,60 @@ export function EmailPanel({
         ) : null}
       </section>
 
-      <section aria-label="Conversation threads" className="grid gap-5 lg:grid-cols-[minmax(240px,340px)_1fr]">
-        <div className="panel px-3 py-3">
-          <h3 className="px-2 text-[13px] font-semibold uppercase tracking-wide text-ink">Threads</h3>
-          {threads.length === 0 ? (
-            <p className="px-2 py-4 text-[13px] text-muted">No threads linked to this application yet.</p>
-          ) : (
-            <ul>
+      <section aria-label="Conversation threads" className="min-w-0">
+        <div className="mb-5 rounded-2xl border border-stroke-soft bg-card shadow-[0_14px_36px_rgb(243_112_33/8%)]">
+          <div className="flex flex-wrap items-center gap-3 border-b border-stroke-soft px-5 py-4">
+            <h3 className="text-[12px] font-bold uppercase tracking-[0.08em] text-ink">Conversation</h3>
+            <Badge variant="muted">{threads.length} thread{threads.length === 1 ? "" : "s"}</Badge>
+            <label className="sr-only" htmlFor="conversation-thread-select">Select conversation thread</label>
+            <select
+              id="conversation-thread-select"
+              value={activeThread?.id ?? ""}
+              onChange={(event) => {
+                const next = threads.find((t) => t.id === Number(event.target.value));
+                if (next) void openThread(next);
+              }}
+              className="min-w-0 flex-1 rounded-xl border border-stroke-soft bg-white px-3 py-2 text-[13px] font-medium text-ink shadow-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 sm:min-w-[320px]"
+              disabled={threads.length === 0}
+            >
               {threads.map((t) => (
-                <li key={t.id}>
-                  <button
-                    type="button"
-                    onClick={() => openThread(t)}
-                    className={cn(
-                      "w-full rounded-md px-2 py-2 text-left text-[13px] transition",
-                      activeThread?.id === t.id ? "bg-band font-semibold text-ink" : "text-ink-2 hover:bg-band",
-                    )}
-                  >
-                    <span className="block truncate">{t.subject}</span>
-                    <span className="block text-[11px] text-muted">
-                      {t.messageCount} message(s) · last {t.lastSentAt ? new Date(t.lastSentAt).toLocaleDateString("en-GB") : "—"}
-                    </span>
-                  </button>
-                </li>
+                <option key={t.id} value={t.id}>
+                  {t.subject} · {t.messageCount} message(s)
+                </option>
               ))}
-            </ul>
-          )}
+            </select>
+            <span className="text-[12px] text-muted">
+              {activeThread?.lastSentAt ? `Last ${new Date(activeThread.lastSentAt).toLocaleDateString("en-GB")}` : ""}
+            </span>
+          </div>
+
+          {threads.length > 1 ? (
+            <div className="flex gap-2 overflow-x-auto px-4 py-3" aria-label="Available threads">
+              {threads.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => void openThread(t)}
+                  aria-current={activeThread?.id === t.id ? "true" : undefined}
+                  className={cn(
+                    "shrink-0 rounded-full border px-3.5 py-2 text-[12px] font-semibold transition",
+                    activeThread?.id === t.id
+                      ? "border-accent bg-gradient-to-r from-accent-soft to-[#f6edff] text-ink shadow-sm"
+                      : "border-stroke-soft bg-white text-ink-2 hover:border-accent/40 hover:bg-accent-soft",
+                  )}
+                >
+                  {t.subject}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
 
-        <div className="panel px-5 py-4">
+        <div className="min-w-0 overflow-hidden rounded-2xl border border-stroke-soft bg-card shadow-[0_14px_36px_rgb(243_112_33/8%)]">
           {detailLoading ? (
-            <p className="text-[13px] text-muted">Loading conversation…</p>
+            <p className="px-6 py-16 text-center text-[13px] text-muted">Loading conversation…</p>
           ) : !threadDetail ? (
-            <p className="text-[13px] text-muted">Select a thread to read the reconstructed conversation.</p>
+            <p className="px-6 py-16 text-center text-[13px] text-muted">Select a thread to read the reconstructed conversation.</p>
           ) : (
             <ChatThread
               subject={threadDetail.thread.subject}
@@ -324,11 +391,238 @@ function initials(name: string): string {
  * as tidy paragraphs/bullets. The original bytes are untouched — this only
  * changes the RENDER.
  */
-const HEADER_LINE = /^(from|sent|to|cc|bcc|subject|date|importance|attachments)\s*:\s*(.*)$/i;
+const HEADER_LINE = /^\s*>?\s*(from|sent|to|cc|bcc|subject|date|importance|attachments)\s*:\s*(.*)$/i;
+const ADDRESS_LABEL = /^(from|to|cc|bcc)$/i;
 
-type NeatBlock = { type: "envelope"; pairs: [string, string][] } | { type: "text"; text: string };
+/**
+ * Outlook writes addresses as `Name <addr@x.com <mailto:addr@x.com> >`. The
+ * stored bytes must stay untouched, but the reader should only ever see
+ * `Name` plus the plain address — so strip the duplicate mailto wrapper and
+ * any stray outer brackets before rendering.
+ */
+function cleanMailto(value: string): string {
+  return value
+    .replace(/<\s*mailto:[^>]*>/gi, " ")
+    .replace(/[<>]/g, " ")
+    .replace(/\(\s+/g, "(")
+    .replace(/\s+\)/g, ")")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
-function parseNeatBlocks(body: string): NeatBlock[] {
+/**
+ * Body copy also carries Outlook's mention syntax (`@Name <mailto:addr>`).
+ * The address is already visible in the bubble's From/To header, so drop the
+ * wrapper and leave a clean `@Name`.
+ */
+function cleanBodyText(line: string): string {
+  return line
+    .replace(/<\s*mailto:[^>]*>/gi, "")
+    // Drop Outlook's safelinks tracking wrapper; the readable URL usually
+    // precedes it, and the encoded %7C payload is pure noise.
+    .replace(/\s*<https?:\/\/[^>\s]*safelinks\.protection\.outlook\.com[^>]*>/gi, "")
+    .replace(/([A-Za-z])\((Consultant)\)/gi, "$1 ($2)")
+    .replace(/[ \t]+([.,;:!?])/g, "$1")
+    .trimEnd();
+}
+
+/** "Khalkho(Consultant)" → "Khalkho (Consultant)". */
+function tidyName(name: string): string {
+  return cleanMailto(name)
+    .replace(/\s*\(\s*/g, " (")
+    .replace(/\s*\)/g, ")")
+    .trim();
+}
+
+interface Recipient {
+  name: string;
+  email: string;
+}
+
+/**
+ * Split a To/Cc/Bcc/From header into readable recipients. Handles `;` and
+ * comma separators (only outside angle brackets), drops the mailto duplicate,
+ * and de-duplicates by address.
+ */
+function parseRecipients(value: string): Recipient[] {
+  const raw = value.replace(/<\s*mailto:[^>]*>/gi, " ");
+  const parts: string[] = [];
+  let depth = 0;
+  let buf = "";
+
+  for (const ch of raw) {
+    if (ch === "<") depth += 1;
+    else if (ch === ">") depth = Math.max(0, depth - 1);
+    if ((ch === ";" || ch === ",") && depth === 0) {
+      parts.push(buf);
+      buf = "";
+    } else {
+      buf += ch;
+    }
+  }
+  parts.push(buf);
+
+  const seen = new Set<string>();
+  const out: Recipient[] = [];
+  for (const part of parts) {
+    const text = part.replace(/\s+/g, " ").trim();
+    if (!text) continue;
+    const email = (text.match(/[^\s<>;,:"]+@[^\s<>;,:"]+/)?.[0] ?? "").replace(/[.,;:]+$/, "");
+    const withoutEmail = email ? text.replace(email, " ") : text;
+    const name = tidyName(withoutEmail.replace(/<[^>]*>/g, " "));
+    const key = (email || name).toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ name: name || email, email });
+  }
+  return out;
+}
+
+type NeatBlock = { type: "envelope"; pairs: [string, string][] } | { type: "text"; text: string } | { type: "summaryTable"; rows: SummaryTableRow[]; statusLabels: string[] };
+
+interface SummaryTableRow {
+  no: number;
+  title: string;
+  severity: string;
+  statuses: string[];
+}
+
+const SUMMARY_TABLE_HEADER = /^\s*(?:#|s(?:r)?\.?\s*no\.?|sno|no\.?)\s*(?:[|\t;]\s*|\s+)(?:name\s+of\s+(?:the\s+)?vulnerab\w*|vulnerability(?:\s+name)?|finding|issue|title|test\s+case|name)\s*(?:[|\t;]\s*|\s+)(?:severity|risk|impact)\s*(?:[|\t;]\s*|\s+)(?:(?:uat|prod)\s+)?(?:status|current\s+status|state|verdict|result)(?:\s*(?:[|\t;]\s*|\s+)(?:(?:uat|prod)\s+)?(?:status|current\s+status|state|verdict|result))?\s*$/i;
+const SUMMARY_TABLE_ROW_START = /^\s*\|?\s*(\d{1,3})(?:[\s.).|]+)\s*\S/;
+const SUMMARY_TABLE_END = /^\s*(from|sent|subject|regards|best\s+regards|thanks|regards,|thanks,)\s*:/i;
+
+const SUMMARY_SEVERITIES = ["critical", "high", "medium", "low", "info"];
+
+export function parseSummaryTableRow(raw: string, statusLabels: string[] = ["Status"]): SummaryTableRow | null {
+  const normalizedRaw = raw.replace(/\|/g, " ").replace(/\s+/g, " ").trim();
+  const match = normalizedRaw.match(/^(\d{1,3})(?:\s+|[.)]\s*)(.+)$/s);
+  if (!match) return null;
+  const no = Number(match[1]);
+  let rest = match[2].replace(/\s+/g, " ").trim();
+
+  const statuses: string[] = [];
+  while (statuses.length < statusLabels.length) {
+    const statusMatch = rest.match(/\s*(Not Fixed \/ New Finding|Not Fixed|New Finding|Accepted Risk|Not Retested|Out of Scope|Not Applicable|Not Mitigated|Reopened|Remediated|Mitigated|Pending|Open|Fixed|Closed|CAR|Removed)\s*$/i);
+    if (!statusMatch) break;
+    statuses.unshift(statusMatch[1]);
+    rest = rest.slice(0, -statusMatch[0].length).trim();
+  }
+  while (statuses.length < statusLabels.length) statuses.push("—");
+
+  let severity = "unknown";
+  for (const candidate of SUMMARY_SEVERITIES) {
+    const severityMatch = rest.match(new RegExp(`\\s*${candidate}\\s*$`, "i"));
+    if (severityMatch) {
+      severity = candidate;
+      rest = rest.slice(0, -severityMatch[0].length).trim();
+      break;
+    }
+  }
+
+  const title = rest.replace(/^\s*[-–—]\s*/, "").trim();
+  if (!title) return null;
+  return { no, title, severity, statuses };
+}
+
+function summaryTableStatusLabels(line: string): string[] {
+  const severityMatch = line.toLowerCase().match(/\b(?:severity|risk|impact)\b/);
+  if (!severityMatch?.index) return [];
+  const rest = line.slice(severityMatch.index + severityMatch[0].length).replace(/^[|\t;:\-\s]*/, "");
+  const labels: string[] = [];
+  for (const labelMatch of rest.matchAll(/(uat\s+status|prod\s+status|status|current\s+status|state|verdict|result)/gi)) {
+    labels.push(labelMatch[0].replace(/\s+/g, " ").trim());
+  }
+  return labels;
+}
+
+function summaryTableStatusLabelsAt(lines: string[], index: number): { start: number; labels: string[] } | null {
+  const labels: string[] = [];
+  let cursor = index + 3;
+  while (cursor < lines.length) {
+    const line = lines[cursor]?.trim() ?? "";
+    if (!/^(?:uat\s+status|prod\s+status|status|current\s+status|state|verdict|result)$/i.test(line)) break;
+    labels.push(line.replace(/\s+/g, " ").trim());
+    cursor += 1;
+  }
+  if (labels.length === 0) return null;
+  return { start: cursor, labels };
+}
+
+function parseVerticalSummaryTable(lines: string[], start: number, statusLabels: string[]): { rows: SummaryTableRow[]; nextIndex: number } {
+  const rows: SummaryTableRow[] = [];
+  let i = start;
+
+  while (i < lines.length) {
+    while (i < lines.length && lines[i]!.trim() === "") i += 1;
+    const numberMatch = lines[i]?.match(/^\s*\|?\s*(\d{1,3})\s*\|?\s*$/);
+    if (!numberMatch) break;
+    const no = Number(numberMatch[1]);
+    i += 1;
+
+    const titleLines: string[] = [];
+    while (i < lines.length) {
+      const candidate = lines[i]!.trim();
+      if (SUMMARY_SEVERITIES.includes(candidate.toLowerCase())) break;
+      if (/^\|?\s*\d{1,3}\s*\|?\s*$/.test(candidate)) break;
+      if (candidate) titleLines.push(candidate);
+      i += 1;
+    }
+    const severity = lines[i]?.trim().toLowerCase() ?? "unknown";
+    i += 1;
+    const statuses: string[] = [];
+    for (let statusIndex = 0; statusIndex < statusLabels.length; statusIndex += 1) {
+      const statusCandidate = lines[i]?.trim() ?? "";
+      if (/^(not fixed \/ new finding|not fixed|new finding|accepted risk|not retested|out of scope|not applicable|not mitigated|reopened|remediated|mitigated|pending|open|fixed|closed|car|removed)$/i.test(statusCandidate)) {
+        statuses.push(statusCandidate);
+        i += 1;
+      } else statuses.push("—");
+    }
+    const title = titleLines.join(" ").trim();
+    if (title) rows.push({ no, title, severity, statuses });
+  }
+  return { rows, nextIndex: i };
+}
+
+export function parseSummaryTable(lines: string[], start: number, statusLabels: string[] = ["Status"]): { rows: SummaryTableRow[]; nextIndex: number } {
+  const rows: SummaryTableRow[] = [];
+  let current: string | null = null;
+  let i = start;
+
+  const flush = () => {
+    if (!current) return;
+    const row = parseSummaryTableRow(current, statusLabels);
+    if (row) rows.push(row);
+    current = null;
+  };
+
+  while (i < lines.length) {
+    const line = lines[i] ?? "";
+    if (line.trim() === "") {
+      let next = i + 1;
+      while (next < lines.length && lines[next]!.trim() === "") next += 1;
+      if (next < lines.length && SUMMARY_TABLE_ROW_START.test(lines[next]!)) {
+        i = next;
+        continue;
+      }
+      break;
+    }
+    if (SUMMARY_TABLE_END.test(line)) break;
+
+    if (SUMMARY_TABLE_ROW_START.test(line)) {
+      flush();
+      current = line.trim();
+    } else if (current) {
+      current += ` ${line.trim()}`;
+    } else {
+      break;
+    }
+    i += 1;
+  }
+  flush();
+  return { rows, nextIndex: Math.max(i, start + 1) };
+}
+
+export function parseNeatBlocks(body: string): NeatBlock[] {
   const lines = body.replace(/\r\n/g, "\n").split("\n");
   const blocks: NeatBlock[] = [];
   let textBuf: string[] = [];
@@ -342,8 +636,28 @@ function parseNeatBlocks(body: string): NeatBlock[] {
     }
   };
 
-  for (const raw of lines) {
-    const line = raw.replace(/\s+$/, "");
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+    const line = lines[lineIndex]!.replace(/\s+$/, "");
+    if (SUMMARY_TABLE_HEADER.test(line)) {
+      pushText();
+      const statusLabels = summaryTableStatusLabels(line);
+      const table = parseSummaryTable(lines, lineIndex + 1, statusLabels.length ? statusLabels : ["Status"]);
+      if (table.rows.length > 0) {
+        blocks.push({ type: "summaryTable", rows: table.rows, statusLabels: statusLabels.length ? statusLabels : ["Status"] });
+        lineIndex = table.nextIndex - 1;
+        continue;
+      }
+    }
+    const verticalHeader = summaryTableStatusLabelsAt(lines, lineIndex);
+    if (verticalHeader) {
+      pushText();
+      const table = parseVerticalSummaryTable(lines, verticalHeader.start, verticalHeader.labels);
+      if (table.rows.length > 0) {
+        blocks.push({ type: "summaryTable", rows: table.rows, statusLabels: verticalHeader.labels });
+        lineIndex = table.nextIndex - 1;
+        continue;
+      }
+    }
     const m = line.match(HEADER_LINE);
     if (m) {
       pushText();
@@ -363,16 +677,16 @@ function parseNeatBlocks(body: string): NeatBlock[] {
       continue;
     }
     if (envelope) {
-      // Continuation of the last header (Outlook wraps long values) or blank end.
-      if (line.trim() === "") {
-        if (envelope.length > 0) envelope = null;
+      // A blank line or the start of quoted body text ends the header block.
+      if (line.trim() === "" || /^\s*>/.test(line)) {
+        envelope = null;
+        if (line.trim() === "") continue;
+      } else {
+        // Values wrap; keep absorbing until a blank line.
+        const last = envelope[envelope.length - 1];
+        if (last) last[1] = `${last[1]} ${line.trim()}`.trim();
         continue;
       }
-      
-      // Values wrap; keep absorbing until a blank line.
-      const last = envelope[envelope.length - 1];
-      if (last) last[1] = `${last[1]} ${line.trim()}`.trim();
-      continue;
     }
     textBuf.push(line.replace(/^\s*>\s?/, ""));
   }
@@ -380,70 +694,412 @@ function parseNeatBlocks(body: string): NeatBlock[] {
   return blocks;
 }
 
-function NeatTextBody({ body }: { body: string }) {
-  const blocks = parseNeatBlocks(body);
+/**
+ * Compact recipient line: names only by default, emails behind an explicit
+ * expander. A 15-person To line stays two lines instead of thirty.
+ */
+function RecipientList({ recipients, showEmails = false }: { recipients: Recipient[]; showEmails?: boolean }) {
+  const [expanded, setExpanded] = React.useState(false);
+  const limit = 4;
+  const hasMore = recipients.length > limit;
+  const shown = hasMore && !expanded ? recipients.slice(0, limit) : recipients;
+
   return (
-    <div className="mt-1.5 space-y-2 text-[13px] leading-relaxed text-ink-2">
-      {blocks.map((b, i) => {
-        if (b.type === "envelope") {
-          return (
-            <div key={`env${i}`} className="border-l-2 border-xlsx-band bg-tint-b/70 px-3 py-2">
-              <dl className="space-y-0.5">
-                {b.pairs.map(([label, value], j) => (
-                  <div key={j} className="flex gap-2">
-                    <dt className="w-16 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-muted">{label}</dt>
-                    <dd className="min-w-0 break-words text-[12px] text-ink-2">{value || "—"}</dd>
-                  </div>
+    <span>
+      {shown.map((r, k) => (
+        <React.Fragment key={k}>
+          {k > 0 ? <span className="text-muted">; </span> : null}
+          <span className="whitespace-nowrap" title={r.email || undefined}>
+            {r.name}
+          </span>
+          {(expanded || showEmails) && r.email && r.email.toLowerCase() !== r.name.toLowerCase() ? (
+            <span className="text-[11px] text-muted"> {r.email}</span>
+          ) : null}
+        </React.Fragment>
+      ))}
+      {hasMore ? (
+        <>
+          {" "}
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="text-[11px] font-medium text-ink-2 underline decoration-dotted underline-offset-2"
+          >
+            {expanded ? "show less" : `+${recipients.length - limit} more`}
+          </button>
+        </>
+      ) : null}
+    </span>
+  );
+}
+
+function renderNeatBlocks(blocks: NeatBlock[], offset = 0) {
+  return blocks.map((b, i) => {
+    const key = offset + i;
+    if (b.type === "summaryTable") {
+      return (
+        <div key={`summary${key}`} className="overflow-hidden rounded-2xl border border-stroke-soft bg-card shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="vapt-summary-table">
+              <thead>
+                <tr>
+                  <th scope="col">#</th>
+                  <th scope="col">Name of the vulnerability</th>
+                  <th scope="col">Severity</th>
+                  {b.statusLabels.map((label) => <th key={label} scope="col">{label}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {b.rows.map((row) => (
+                  <tr key={row.no}>
+                    <td><span className="inline-flex min-h-6 min-w-6 items-center justify-center rounded-full bg-accent-soft px-1.5 text-[12px] font-bold text-accent-deep">{row.no}</span></td>
+                    <td className="font-semibold text-ink">{row.title}</td>
+                    <td className="filled-cell"><SeverityFillCell severityValue={row.severity} label={row.severity.charAt(0).toUpperCase() + row.severity.slice(1)} /></td>
+                    {row.statuses.map((status, index) => (
+                      <td key={index} className="filled-cell">
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${status.toLowerCase() === "fixed" ? "bg-[#dcf3e1] text-green-800" : status === "—" ? "bg-band text-muted" : "bg-[#ffe4e4] text-[#b42318]"}`}>{status}</span>
+                      </td>
+                    ))}
+                  </tr>
                 ))}
-              </dl>
-            </div>
-          );
-        }
-        return (
-          <div key={`t${i}`}>
-            {b.text.split(/\n/).map((line, j) => {
-              if (line.trim() === "") return <div key={j} className="h-2" />;
-              const bullet = /^[-–•]\s+/.exec(line);
-              const numbered = /^\d+[.)]\s+/.exec(line);
-              if (bullet || numbered) {
-                return (
-                  <p key={j} className="whitespace-pre-wrap pl-4">
-                    {line}
-                  </p>
-                );
-              }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+    if (b.type === "envelope") {
+      return (
+        <div key={`env${key}`} className="border-l-2 border-xlsx-band bg-tint-b/70 px-3 py-2">
+          <dl className="space-y-0.5">
+            {b.pairs.map(([label, value], j) => {
+              // Anchor the "Sent:"/"Date:" row on the date it carries, so a
+              // rail date that exists only inside a quoted chain can land on
+              // the exact reply header.
+              const dateValue = /^(sent|date)$/i.test(label) ? parseQuotedDate(value) : null;
+              const recipients = ADDRESS_LABEL.test(label) ? parseRecipients(value) : [];
               return (
-                <p key={j} className="whitespace-pre-wrap">
-                  {line}
-                </p>
+                <div
+                  key={j}
+                  data-anchor={dateValue ? `qd-${dateValue.toDateString()}` : undefined}
+                  className="flex gap-2"
+                >
+                  <dt className="w-[4.5rem] shrink-0 pt-[1px] text-[10px] font-semibold uppercase tracking-wide text-muted">{label}</dt>
+                  <dd className="min-w-0 flex-1 break-words text-[12px] leading-snug text-ink-2">
+                    {ADDRESS_LABEL.test(label) ? (
+                      recipients.length ? (
+                        <RecipientList recipients={recipients} showEmails={label.toLowerCase() === "from"} />
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )
+                    ) : (
+                      <span className="whitespace-pre-wrap">{cleanMailto(value) || "—"}</span>
+                    )}
+                  </dd>
+                </div>
               );
             })}
-          </div>
-        );
-      })}
+          </dl>
+        </div>
+      );
+    }
+    return (
+      <div key={`t${key}`}>
+        {b.text.split(/\n/).map((line, j) => {
+          if (line.trim() === "") return <div key={j} className="h-2" />;
+          const cleaned = cleanBodyText(line);
+          // Outlook writes horizontal rules as a run of underscores/dashes.
+          if (/^[-_]{5,}$/.test(cleaned.trim())) return <hr key={j} className="my-2 border-0 border-t border-stroke" />;
+          const bullet = /^[-–•]\s+/.exec(cleaned);
+          const numbered = /^\d+[.)]\s+/.exec(cleaned);
+          if (bullet || numbered) {
+            return (
+              <p key={j} className="whitespace-pre-wrap pl-4">
+                {cleaned}
+              </p>
+            );
+          }
+          return (
+            <p key={j} className="whitespace-pre-wrap">
+              {cleaned}
+            </p>
+          );
+        })}
+      </div>
+    );
+  });
+}
+
+const toggleClass =
+  "mt-1 inline-flex items-center gap-1 border border-stroke bg-tint-b px-2 py-1 text-[11px] font-medium text-ink-2 transition hover:bg-xlsx-data";
+
+function NeatTextBody({ body, messageId }: { body: string; messageId?: number }) {
+  const [showQuoted, setShowQuoted] = React.useState(false);
+  const [showAll, setShowAll] = React.useState(false);
+  const blocks = React.useMemo(() => parseNeatBlocks(body), [body]);
+
+  // A rail date that exists only inside quoted mail can't scroll anywhere new
+  // (all such dates share the containing bubble), so it asks that bubble to
+  // open its folded chain instead. Event-based so the reader's toggle state
+  // stays local to this component.
+  React.useEffect(() => {
+    if (messageId === undefined) return;
+    const onExpand = (event: Event) => {
+      const detail = (event as CustomEvent<{ messageId?: number }>).detail;
+      if (detail?.messageId === messageId) setShowQuoted(true);
+    };
+    window.addEventListener("tm:expand-quote", onExpand as EventListener);
+    return () => window.removeEventListener("tm:expand-quote", onExpand as EventListener);
+  }, [messageId]);
+
+  // Outlook reply chains end up as one giant raw body. Everything from the
+  // first forwarded-header block onward is earlier mail — fold it away so the
+  // reader sees the actual new message first (and can expand on demand).
+  const firstEnvelope = blocks.findIndex((b) => b.type === "envelope");
+  const splitAt = firstEnvelope > 0 ? firstEnvelope : -1;
+  const head = splitAt > 0 ? blocks.slice(0, splitAt) : blocks;
+  const quoted = splitAt > 0 ? blocks.slice(splitAt) : [];
+  const blockChars = (b: NeatBlock) =>
+    b.type === "text"
+      ? b.text.length
+      : b.type === "envelope"
+        ? b.pairs.reduce((s, [, v]) => s + v.length, 0)
+        : b.rows.reduce((s, row) => s + row.title.length + row.severity.length + row.statuses.join(" ").length + String(row.no).length, 0);
+  const quotedChars = quoted.reduce((n, b) => n + blockChars(b), 0);
+  const headChars = head.reduce((n, b) => n + blockChars(b), 0);
+  const longHead = headChars > 2_500;
+
+  return (
+    <div className="mt-2 min-w-0 space-y-2 break-words text-[14px] leading-7 text-ink-2 [overflow-wrap:anywhere]">
+      <div className={cn(longHead && !showAll && "max-h-72 overflow-hidden")}>{renderNeatBlocks(head)}</div>
+
+      {quoted.length > 0 && quotedChars > 200 ? (
+        <>
+          <button type="button" onClick={() => setShowQuoted((v) => !v)} className={toggleClass}>
+            {showQuoted
+              ? "Hide earlier mail in this thread"
+              : `Show earlier mail in this thread (${quotedChars.toLocaleString("en-GB")} characters)`}
+          </button>
+          {showQuoted ? (
+            <div className="space-y-2 border-l-2 border-stroke pl-3 opacity-90">{renderNeatBlocks(quoted, splitAt)}</div>
+          ) : null}
+        </>
+      ) : null}
+
+      {longHead ? (
+        <button type="button" onClick={() => setShowAll((v) => !v)} className={toggleClass}>
+          {showAll ? "Show less" : "Show full message"}
+        </button>
+      ) : null}
     </div>
   );
 }
 
+/**
+ * MessageBody — one readable renderer for both HTML and text mail. Long
+ * Outlook chains are clamped; "Show full email" expands them in place.
+ */
+function MessageBody({ message }: { message: ChatMessage }) {
+  const [expanded, setExpanded] = React.useState(false);
+
+  // Rail dates that live inside an HTML body ask the bubble to open so the
+  // click always has a visible effect (text bodies fold via NeatTextBody).
+  React.useEffect(() => {
+    const onExpand = (event: Event) => {
+      const detail = (event as CustomEvent<{ messageId?: number }>).detail;
+      if (detail?.messageId === message.id) setExpanded(true);
+    };
+    window.addEventListener("tm:expand-quote", onExpand as EventListener);
+    return () => window.removeEventListener("tm:expand-quote", onExpand as EventListener);
+  }, [message.id]);
+
+  if (message.bodyHtmlSanitized) {
+    const plain = message.bodyHtmlSanitized.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    const long = plain.length > 1_500;
+    return (
+      <div className="mt-2 min-w-0">
+        <div
+          className={cn(
+            "message-html prose prose-sm max-w-none break-words text-[13px] leading-relaxed text-ink-2 [overflow-wrap:anywhere] [&_img]:max-w-full [&_pre]:whitespace-pre-wrap [&_table]:min-w-full",
+            !expanded && long && "max-h-[420px] overflow-hidden",
+          )}
+          dangerouslySetInnerHTML={{ __html: message.bodyHtmlSanitized }}
+        />
+        {long ? (
+          <button type="button" onClick={() => setExpanded((v) => !v)} className={toggleClass}>
+            {expanded ? "Show less" : "Show full email"}
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (message.bodyText) return <NeatTextBody body={message.bodyText} messageId={message.id} />;
+  return <p className="mt-1 text-[12px] italic text-muted">empty body</p>;
+}
+
 const timeOf = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "");
+
+const QUOTED_DATE_LINE = /^(?:Sent|Date):\s*(.+)$/gim;
+const MONTHS: Record<string, number> = {
+  jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2, apr: 3, april: 3, may: 4, jun: 5, june: 5,
+  jul: 6, july: 6, aug: 7, august: 7, sep: 8, sept: 8, september: 8, oct: 9, october: 9, nov: 10, november: 10, dec: 11, december: 11,
+};
+
+/** Tolerant parser for Outlook date headers ("01 September 2026 10:21",
+ *  "Tuesday, September 1, 2026 12:45 PM", ISO, …). Returns null if unreadable. */
+function parseQuotedDate(raw: string): Date | null {
+  const cleaned = raw.trim().replace(/\s+/g, " ");
+  if (!cleaned) return null;
+  const direct = new Date(cleaned);
+  if (!Number.isNaN(direct.getTime())) return direct;
+  const m = /(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/.exec(cleaned);
+  if (!m) return null;
+  const month = MONTHS[(m[2] ?? "").toLowerCase()];
+  if (month === undefined) return null;
+  const d = new Date(Number(m[3]), month, Number(m[1]), Number(m[4] ?? 0), Number(m[5] ?? 0));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+interface DayEntry {
+  key: string;
+  label: string;
+  count: number;
+  anchor: string;
+  quotedAnchor?: string;
+}
+
+interface MessageGroupData {
+  key: string;
+  dayKey: string;
+  dayLabel: string;
+  sender: ChatMessage["from"];
+  role: string;
+  messages: ChatMessage[];
+}
+
+function MessageGroupCard({ group, showDay }: { group: MessageGroupData; showDay: boolean }) {
+  const meta = roleMeta(group.role);
+  return (
+    <>
+      {showDay ? (
+        <div id={`day-${group.dayKey}`} data-anchor={`day-${group.dayKey}`} className="flex justify-center" style={{ contentVisibility: "auto" }}>
+          <span className="rounded-full border border-stroke-soft bg-card/90 px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-muted shadow-sm">
+            {group.dayLabel}
+          </span>
+        </div>
+      ) : null}
+      <section
+        className="overflow-hidden rounded-[20px] border border-stroke-soft bg-card shadow-sm"
+        style={{ contentVisibility: "auto", containIntrinsicSize: "auto 220px" }}
+      >
+        <header className="flex items-center gap-3 border-b border-stroke-soft bg-gradient-to-r from-accent-soft/70 via-card to-[#f6edff]/70 px-4 py-3 sm:px-5">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white ring-2 ring-white shadow-sm" style={{ background: meta.dot }} aria-hidden>
+            {initials(group.sender.displayName)}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="truncate text-[14px] font-bold text-ink">{tidyName(group.sender.displayName)}</span>
+              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide ${meta.badge}`}>{meta.label}</span>
+              {group.sender.roleSource === "RULE" ? <span className="text-[10px] text-muted">auto-detected</span> : null}
+              {group.sender.roleSource === "HUMAN" ? <span className="text-[10px] text-muted">human-set</span> : null}
+            </div>
+            <p className="truncate text-[11px] text-muted">{group.sender.email}</p>
+          </div>
+          <div className="shrink-0 text-right">
+            <p className="text-[12px] font-semibold text-ink-2">{group.dayLabel}</p>
+            <p className="text-[11px] text-muted">{group.messages.length} message{group.messages.length === 1 ? "" : "s"}</p>
+          </div>
+        </header>
+        <div className="divide-y divide-stroke-soft">
+          {group.messages.map((message) => (
+            <article key={message.id} id={`msg-${message.id}`} data-anchor={`msg-${message.id}`} className="px-4 py-4 sm:px-6">
+              <MessageBody message={message} />
+              {message.attachments.length > 0 ? (
+                <ul className="mt-3 flex flex-wrap gap-2">
+                  {message.attachments.map((attachment) => (
+                    <li key={attachment.id} className="flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-1 text-[11px] text-ink-2 shadow-sm">
+                      <Paperclip className="h-3 w-3" aria-hidden /> {attachment.filename} ({Math.max(1, Math.round((attachment.sizeBytes ?? 0) / 1024))} KB)
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <footer className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[10px] text-muted">
+                <span>To: {message.recipients.filter((r) => r.kind === "TO").map((r) => r.email).join(", ") || "—"}</span>
+                <time dateTime={message.sentAt ?? undefined} title={`${message.from.email} · id ${message.messageId}`}>
+                  {timeOf(message.sentAt)}{message.sentAt ? ` · ${new Date(message.sentAt).toLocaleDateString("en-GB")}` : ""}
+                </time>
+              </footer>
+            </article>
+          ))}
+        </div>
+      </section>
+    </>
+  );
+}
 
 function ChatThread({ subject, appDisplayName, messages }: { subject: string; appDisplayName: string | null; messages: ChatMessage[] }) {
   const scrollRef = React.useRef<HTMLDivElement | null>(null);
-
-  // Jump rail data: per-day anchors (with message counts).
+  // Jump rail data: per-day anchors. Includes dates of actual messages PLUS
+  // the dates inside quoted reply headers — a single archived .eml often
+  // contains a whole chain, and those dates must be jumpable too.
   const days = React.useMemo(() => {
-    const map = new Map<string, { label: string; count: number }>();
+    const map = new Map<string, DayEntry>();
+    const labelOf = (d: Date) => d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+
     for (const m of messages) {
-      const key = m.sentAt ? new Date(m.sentAt).toDateString() : "undated";
-      const label = m.sentAt ? new Date(m.sentAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) : "undated";
+      if (!m.sentAt) continue;
+      const d = new Date(m.sentAt);
+      if (Number.isNaN(d.getTime())) continue;
+      const key = d.toDateString();
       const prev = map.get(key);
-      map.set(key, { label: prev?.label ?? label, count: (prev?.count ?? 0) + 1 });
+      map.set(key, { key, label: labelOf(d), count: (prev?.count ?? 0) + 1, anchor: prev?.anchor ?? `msg-${m.id}` });
     }
-    return [...map.entries()].map(([key, v]) => ({ key, ...v }));
+
+    for (const m of messages) {
+      const body = m.bodyText ?? "";
+      if (!body) continue;
+      for (const match of body.matchAll(QUOTED_DATE_LINE)) {
+        const d = parseQuotedDate(match[1] ?? "");
+        if (!d) continue;
+        const key = d.toDateString();
+        if (!map.has(key)) {
+          map.set(key, { key, label: labelOf(d), count: 0, anchor: `msg-${m.id}`, quotedAnchor: `qd-${key}` });
+        }
+      }
+    }
+
+    return [...map.values()].sort((a, b) => new Date(a.key).getTime() - new Date(b.key).getTime());
   }, [messages]);
 
-  // Two-sided split computed from the resolved roles — confirms that EVERY
-  // message is assigned to the pentester/defense side or the developer side.
+  // Group all messages by calendar date and sender. Each sender/date
+  // combination gets one consistent card, even when another participant
+  // replied between that sender's messages; this prevents different people
+  // or dates from being mixed into the same conversation box.
+  const groupedMessages = React.useMemo<MessageGroupData[]>(() => {
+    const groups: MessageGroupData[] = [];
+    const groupByKey = new Map<string, MessageGroupData>();
+    for (const message of messages) {
+      const date = message.sentAt ? new Date(message.sentAt) : null;
+      const dayKey = date && !Number.isNaN(date.getTime()) ? date.toDateString() : "undated";
+      const dayLabel = date && !Number.isNaN(date.getTime())
+        ? date.toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "short", year: "numeric" })
+        : "Undated";
+      const senderKey = message.from.email.toLowerCase();
+      const key = `${dayKey}|${senderKey}`;
+      let group = groupByKey.get(key);
+      if (!group) {
+        group = { key, dayKey, dayLabel, sender: message.from, role: message.from.effectiveRole, messages: [] };
+        groupByKey.set(key, group);
+        groups.push(group);
+      }
+      group.messages.push(message);
+    }
+    return groups;
+  }, [messages]);
+
+  // Role counts are used only as a thread overview; the conversation itself
+  // is grouped by date and sender rather than rendered as two chat sides.
   const sideCounts = React.useMemo(() => {
     let left = 0;
     let right = 0;
@@ -454,113 +1110,61 @@ function ChatThread({ subject, appDisplayName, messages }: { subject: string; ap
     return { left, right };
   }, [messages]);
 
-  function jumpTo(id: string) {
+  // Scroll the chat canvas itself — never the page. Rect maths (not offsetTop)
+  // because offsetTop is relative to a page-level offsetParent, which sent the
+  // old formula to the top of the thread. Two passes absorb height estimates
+  // from `content-visibility` before the target settles.
+  function jumpTo(id: string, fallbackId?: string) {
     const container = scrollRef.current;
     if (!container) return;
-    const el = container.querySelector(`[data-anchor="${id}"]`);
-    if (el) container.scrollTo({ top: (el as HTMLElement).offsetTop - container.offsetTop - 8, behavior: "auto" });
+    const align = () => {
+      const el = (container.querySelector(`[data-anchor="${id}"]`) ??
+        (fallbackId ? container.querySelector(`[data-anchor="${fallbackId}"]`) : null)) as HTMLElement | null;
+      if (!el) return;
+      const top =
+        el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop - 8;
+      container.scrollTop = Math.max(0, top);
+    };
+    align();
+    requestAnimationFrame(() => {
+      align();
+      requestAnimationFrame(align);
+    });
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-w-0 flex-col">
       {/* Header with the side-split confirmation */}
-      <div className="border-b border-stroke pb-3">
-        <h3 className="font-display truncate text-2xl text-ink">{subject}</h3>
-        <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted" data-testid="side-split">
-          <span>
-            {appDisplayName ?? "Unassigned"} · {messages.length} messages
+      <div className="border-b border-stroke-soft px-5 pb-4 pt-2 sm:px-7">
+        <h3 className="font-display truncate text-[26px] font-bold leading-tight text-ink">{subject}</h3>
+        <p className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-muted" data-testid="side-split">
+          <span className="rounded-full bg-accent-soft px-2.5 py-1 font-semibold text-accent-deep">
+            {appDisplayName ?? "Unassigned"} · {messages.length} messages · grouped by date and sender
           </span>
-          <span>
-            <span className="font-semibold text-sev-critical">pentester/defense {sideCounts.left}</span>
+          <span className="rounded-full bg-[#f6edff] px-2.5 py-1">
+            <span className="font-semibold text-sev-critical">pentester/defense: {sideCounts.left}</span>
             <span className="mx-1 text-muted">·</span>
-            <span className="font-semibold text-sev-info">developer {sideCounts.right}</span>
-            <span> every message is on a side</span>
+            <span className="font-semibold text-sev-info">developer: {sideCounts.right}</span>
+            <span className="ml-1">messages</span>
           </span>
         </p>
       </div>
 
-      {/* Chat area — bubbles scroll inside a fixed-height canvas; contained
-          scrolling keeps the page from jumping (the delayed-scroll fix). */}
-      <div className="mt-3 flex min-h-[420px] flex-1 gap-3" style={{ maxHeight: 640 }}>
-        {/* Chat canvas — bubbles scroll inside; contained scrolling keeps the
-            page from jumping (the delayed-scroll fix). */}
-        <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto overscroll-contain bg-tint-b p-4" style={{ scrollBehavior: "auto" }}>
-        {messages.map((m, i) => {
-          const meta = roleMeta(m.from.effectiveRole);
-          const side = meta.side;
-          const isRight = side === "right";
-          const dayKey = m.sentAt ? new Date(m.sentAt).toDateString() : "";
-          const prevSent = i > 0 ? messages[i - 1]!.sentAt : null;
-          const prevDay = prevSent ? new Date(prevSent).toDateString() : "";
-          return (
-            <React.Fragment key={m.id}>
-              {dayKey && dayKey !== prevDay ? (
-                <div id={`day-${dayKey}`} data-anchor={`day-${dayKey}`} className="flex justify-center" style={{ contentVisibility: "auto" }}>
-                  <span className="rounded-none bg-card px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted shadow-sm">
-                    {m.sentAt ? new Date(m.sentAt).toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "short" }) : "undated message"}
-                  </span>
-                </div>
-              ) : null}
-              <div id={`msg-${m.id}`} data-anchor={`msg-${m.id}`} className={`flex gap-2 ${isRight ? "flex-row-reverse" : ""}`} style={{ contentVisibility: "auto", containIntrinsicSize: "auto 220px" }}>
-                {/* Avatar */}
-                <span
-                  className={`mt-1 hidden h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white sm:flex`}
-                  style={{ background: meta.dot }}
-                  aria-hidden
-                >
-                  {initials(m.from.displayName)}
-                </span>
-
-                {/* Bubble */}
-                <div className={`flex max-w-[78%] flex-col ${isRight ? "items-end" : "items-start"}`}>
-                  <div
-                    className={`w-full rounded-none border px-3.5 py-2.5 shadow-sm ${
-                      isRight ? "border-[#171717] bg-xlsx-peach" : "border-[#171717] bg-card"
-                    }`}
-                  >
-                    <p className="flex flex-wrap items-center gap-2 text-[12px]">
-                      <span className={`font-semibold ${isRight ? "text-ink" : "text-ink-2"}`}>{m.from.displayName}</span>
-                      <span className={`inline-flex items-center rounded-none px-1.5 py-0.5 text-[9px] font-bold tracking-wide ${meta.badge}`}>
-                        {meta.label}
-                      </span>
-                      {m.from.roleSource === "RULE" ? <span className="text-[9px] text-muted">auto-detected</span> : null}
-                      {m.from.roleSource === "HUMAN" ? <span className="text-[9px] text-muted">human-set</span> : null}
-                    </p>
-                    {m.bodyHtmlSanitized ? (
-                      <div
-                        className="prose prose-sm mt-2 max-w-none overflow-hidden text-[13px]"
-                        dangerouslySetInnerHTML={{ __html: m.bodyHtmlSanitized }}
-                      />
-                    ) : m.bodyText ? (
-                      <NeatTextBody body={m.bodyText} />
-                    ) : (
-                      <p className="mt-1 text-[12px] italic text-muted">empty body</p>
-                    )}
-                    {m.attachments.length > 0 ? (
-                      <ul className="mt-2 flex flex-wrap gap-2">
-                        {m.attachments.map((a) => (
-                          <li key={a.id} className="flex items-center gap-1 rounded-none bg-tint-b px-2 py-0.5 text-[11px] text-ink-2">
-                            <Paperclip className="h-3 w-3" aria-hidden /> {a.filename} ({Math.max(1, Math.round((a.sizeBytes ?? 0) / 1024))} KB)
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                    <p className="mt-1.5 text-right text-[10px] text-muted" title={`${m.from.email} · id ${m.messageId}`}>
-                      {timeOf(m.sentAt)}
-                      {m.sentAt ? ` · ${new Date(m.sentAt).toLocaleDateString("en-GB")}` : ""}
-                    </p>
-                  </div>
-                  {/* Recipients faint line under the bubble (first message of a run only) */}
-                  {i === 0 || messages[i - 1]!.from.email !== m.from.email ? (
-                    <p className="mt-0.5 overflow-hidden text-ellipsis text-[10px] text-muted">
-                      to: {m.recipients.filter((r) => r.kind === "TO").map((r) => r.email).join(", ") || "—"}
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-            </React.Fragment>
-          );
-        })}
+      {/* Chat area — fixed-height canvas; the bubble list scrolls inside it.
+          NOTE: no flex-1 here on purpose — in an auto-height column a
+          flex-basis of 0 makes the row grow with the content and the height
+          clamp is ignored (that is what made "jump to date" a no-op). */}
+      <div className="flex min-h-[560px] min-w-0 flex-col gap-4 overflow-hidden px-5 py-5 sm:px-7" style={{ height: "clamp(560px, 74vh, 820px)" }}>
+        <div className="flex min-h-0 flex-1 gap-4 overflow-hidden">
+        {/* Chat canvas — bubbles scroll inside this box. */}
+        <div ref={scrollRef} className="h-full min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden overscroll-contain rounded-2xl bg-[linear-gradient(180deg,#fffaf6_0%,#ffffff_100%)] p-5 sm:p-7" style={{ scrollBehavior: "auto" }}>
+        {groupedMessages.map((group, groupIndex) => (
+          <MessageGroupCard
+            key={group.key}
+            group={group}
+            showDay={group.dayKey !== groupedMessages[groupIndex - 1]?.dayKey}
+          />
+        ))}
         </div>
 
         {/* Jump rail — click a date or a message to jump; the human-machine
@@ -573,10 +1177,26 @@ function ChatThread({ subject, appDisplayName, messages }: { subject: string; ap
               <button
                 key={d.key}
                 type="button"
-                onClick={() => jumpTo(`day-${d.key}`)}
+                onClick={() => {
+                  // Quoted-only dates all live in the same bubble; open its
+                  // folded chain so the click has a visible effect.
+                  if (d.count === 0) {
+                    const messageId = Number(d.anchor.replace("msg-", ""));
+                    if (Number.isFinite(messageId)) {
+                      window.dispatchEvent(new CustomEvent("tm:expand-quote", { detail: { messageId } }));
+                    }
+                  }
+                  jumpTo(d.quotedAnchor ?? d.anchor, d.quotedAnchor ? d.anchor : undefined);
+                }}
+                title={
+                  d.count > 0
+                    ? `Jump to ${d.label} (${d.count} message${d.count === 1 ? "" : "s"})`
+                    : `Jump to mail dated ${d.label} (quoted inside this thread)`
+                }
                 className="flex items-center gap-1 border border-stroke bg-card px-2 py-1 text-[11px] font-medium text-ink-2 transition hover:bg-xlsx-data"
               >
-                {d.label} <span className="text-[10px] text-muted">{d.count}</span>
+                {d.label}
+                {d.count > 0 ? <span className="text-[10px] text-muted">{d.count}</span> : null}
               </button>
             ))}
           </div>
@@ -606,11 +1226,11 @@ function ChatThread({ subject, appDisplayName, messages }: { subject: string; ap
                     type="button"
                     onClick={() => jumpTo(`msg-${m.id}`)}
                     className="w-full truncate border border-stroke bg-card px-2 py-1 text-left text-[11px] text-ink-2 transition hover:bg-xlsx-data"
-                    title={`${m.from.displayName} — ${m.sentAt ? new Date(m.sentAt).toLocaleString("en-GB") : "no date"}`}
+                    title={`${tidyName(m.from.displayName)} — ${m.sentAt ? new Date(m.sentAt).toLocaleString("en-GB") : "no date"}`}
                   >
                     <span className="font-semibold">{i + 1}.</span>{" "}
                     <span className={roleMeta(m.from.effectiveRole).side === "right" ? "text-sev-info" : "text-sev-critical"}>
-                      {m.from.displayName}
+                      {tidyName(m.from.displayName)}
                     </span>
                     {" — "}
                     {timeOf(m.sentAt)}
@@ -620,6 +1240,7 @@ function ChatThread({ subject, appDisplayName, messages }: { subject: string; ap
             </ul>
           </div>
         </aside>
+        </div>
       </div>
 
       {/* Composer is intentionally absent: no mailbox/SMTP integration by design —

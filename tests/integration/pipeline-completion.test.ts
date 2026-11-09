@@ -179,4 +179,22 @@ describe.skipIf(!dbAvailable)("AI approval applies the candidate to the tracker 
     const titles = (await testDb.finding.findMany({ where: { applicationId: appId } })).map((f) => f.title);
     expect(titles).not.toContain("Should NOT appear");
   });
+
+  it("aggregate remediation summaries cannot be applied as findings", async () => {
+    const threadRef3 = await testDb.emailThread.create({ data: { subject: "Probe thread 3", subjectHash: "probe-thread-3", participantKey: "p3" } });
+    const pending = (await testDb.masterValue.findUniqueOrThrow({ where: { domain_value: { domain: "extraction_status", value: "pending" } } })).id;
+    const structured3 = {
+      schemaVersion: "AI_EXTRACTION_V1",
+      threadSummary: "aggregate remediation follow-up",
+      participants: [{ email: "t@digialert.test", proposedRole: "pentester", roleBasis: "EXPLICIT", confidence: "HIGH", evidence: [{ messageIndex: 0, excerpt: "update", confidence: "HIGH" }] }],
+      findings: [{ identifierExplicit: null, identifierMark: "IDENTIFIER_NOT_EXPLICIT", title: "Reported VAPT findings for Chatbot-Service pending remediation", titleMark: "AI_PROPOSED", severity: "unknown", severityMark: "INFERRED", description: null, recommendation: null, relatedTestCaseRefs: [], iterationSignal: 2, iterationSignalExplicit: true, statusSignal: "not_fixed", evidence: [{ messageIndex: 0, excerpt: "update", confidence: "HIGH" }] }],
+      testCases: [],
+      iterationSignals: [],
+      evidence: [{ messageIndex: 0, excerpt: "update", confidence: "HIGH" }],
+    };
+    const e3 = await testDb.aiExtraction.create({ data: { threadId: threadRef3.id, applicationId: appId, providerSlug: "mock", schemaVersion: "AI_EXTRACTION_V1", promptVersion: "VAPT_EMAIL_ANALYSIS_V1", inputContextHash: "z", extractionType: "thread_vapt_analysis", status: pending, structuredOutput: structured3 } });
+    const apply = await import("@/lib/services/finding-apply-service");
+    await expect(apply.applyApprovedFinding({ extractionId: e3.id, itemKey: "findingStatus:0" }, userId)).rejects.toThrow(/generic remediation\/status summary/);
+    expect(await testDb.finding.count({ where: { applicationId: appId } })).toBe(1);
+  });
 });

@@ -245,6 +245,8 @@ model Engagement {
   reportDate       DateTime?
   sortOrder        Int? // tracker S.no equivalent (display only â€” never a key, per DL-03)
   notes            String?
+  followUpDate     DateTime? // Excel "Follow-up" (column S=19) — next-chase date
+  followUpResponse String? // Excel "Follow-up Response" (column T=20)
   isActive         Boolean   @default(true)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt

@@ -59,7 +59,10 @@ export function PstImportButton({ applicationId }: { applicationId: number }) {
         return;
       }
       setJobId(data.result.jobId);
-      const parsed = await fetch(`/api/emails/pst/${data.result.jobId}/parse`, { method: "POST" });
+      const parsed = await fetch(`/api/emails/pst/${data.result.jobId}/parse`, {
+        method: "POST",
+        headers: { ...(csrf() ? { "x-csrf-token": csrf()! } : {}) },
+      });
       const pData = await parsed.json().catch(() => null);
       if (!parsed.ok) {
         setError(pData?.error?.message ?? "Parsing failed.");

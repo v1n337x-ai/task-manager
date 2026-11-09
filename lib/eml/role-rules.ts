@@ -13,11 +13,14 @@ export interface RoleInference {
 }
 
 const PENTESTER_DOMAINS = ["digialert"];
-const VENDOR_HINTS = ["pentest", "vapt", "penetration", "security", "retest", "re-test"];
+const VENDOR_HINTS = ["pentest", "vapt", "penetration", "security", "retest", "re-test", "infosec", "ciso"];
 const OWNER_HINTS = ["owner", "product", "manager"];
-const DEV_HINTS = ["developer", "dev team", "engineering", "fix"];
-const DEV_BODY = /\b(has been|have been|is now|are now)? ?(fixed|resolved|remediated|patched|deployed)\b/i;
-const PENTEST_BODY = /\b(retest(ed|ing)?|penetration test|still vulnerable|still reproducible|not fixed|risk rating|vulnerability)\b/i;
+const DEV_HINTS = ["developer", "dev team", "engineering"];
+const SECURITY_HINTS = ["security", "infosec", "ciso", "appsec"];
+// Remediation language must be an actual fix statement, not a bare status
+// word ("fixed" in an "Open/Closed status" table is reporting, not fixing).
+const DEV_BODY = /\b(?:has been|have been|was|were|is now|are now|we(?:'ve| have)?|they(?:'ve| have)?)\s+(?:been\s+)?(?:fixed|resolved|remediated|patched|deployed)\b|\b(?:fixed|resolved|remediated|patched|deployed)\s+(?:to|in|on)\s+(?:uat|prod|production|staging)\b/i;
+const PENTEST_BODY = /\b(retest(ed|ing)?|penetration test|still vulnerable|still reproducible|not fixed|risk rating|open and closed status)\b/i;
 
 export function inferParticipantRoleFromEml(params: {
   email: string;
@@ -37,22 +40,31 @@ export function inferParticipantRoleFromEml(params: {
     return { role: "pentester", confidence: bodyBacks ? 90 : 78, basis: bodyBacks ? "digialert vendor domain + retest language in body" : "digialert vendor domain" };
   }
 
-  // 2)body-strong signals (independent of domain).
+  // 2) body-strong signals (independent of domain).
   const isPentestBody = PENTEST_BODY.test(body);
-  const isDevBody = DEV_BODY.test(body);
+  const isDevBody = DEV_BODY.test(body) && !/not\s+(?:fixed|resolved)/i.test(body);
+  const isSecurityTitle = /ciso|chief information security|information security officer/i.test(body);
   if (isPentestBody && !isDevBody) {
-    return { role: "pentester", confidence: 76, basis: "retest/penetration language in the message body" };
+    // Vendor (digialert) senders are the pentest vendor; Akasa-side senders
+    // reporting VAPT status are the security team, not the vendor.
+    const role = domain.includes("akasa") ? "security_team" : "pentester";
+    return { role, confidence: 76, basis: "retest/penetration language in the message body" };
   }
   if (isDevBody && !isPentestBody) {
     return { role: "developer", confidence: 72, basis: "fix/remediation language in the message body" };
   }
 
-  // 3) Airline-side roles from name hints.
-  if (DEV_HINTS.some((h) => name.includes(h) || email.includes(h)) && domain.includes("akasa")) {
-    return { role: "developer", confidence: 68, basis: "developer wording on an Akasa address" };
-  }
-  if (OWNER_HINTS.some((h) => name.includes(h)) && domain.includes("akasa")) {
-    return { role: "application_owner", confidence: 64, basis: "owner wording on an Akasa address" };
+  // 3) Airline-side roles from name/email hints.
+  if (domain.includes("akasa")) {
+    if (SECURITY_HINTS.some((h) => name.includes(h) || email.includes(h)) || isSecurityTitle) {
+      return { role: "security_team", confidence: 70, basis: "security wording on an Akasa address" };
+    }
+    if (DEV_HINTS.some((h) => name.includes(h) || email.includes(h))) {
+      return { role: "developer", confidence: 68, basis: "developer wording on an Akasa address" };
+    }
+    if (OWNER_HINTS.some((h) => name.includes(h))) {
+      return { role: "application_owner", confidence: 64, basis: "owner wording on an Akasa address" };
+    }
   }
   if (VENDOR_HINTS.some((h) => name.includes(h)) || VENDOR_HINTS.some((h) => email.includes(h))) {
     return { role: "pentester", confidence: 60, basis: "vendor/test-team wording in the display name or address" };

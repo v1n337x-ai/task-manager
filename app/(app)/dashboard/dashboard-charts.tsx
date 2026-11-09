@@ -3,6 +3,9 @@
 import {
   BarChart,
   Bar,
+  ComposedChart,
+  Area,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -126,7 +129,102 @@ export function StatusBars({ data }: { data: ChartDatum[] }) {
   );
 }
 
-/* ---------------- Top applications bar (PPT slide register) ---------------- */
+
+/* ------------- Scan timeline + cumulative findings (management) ------------- */
+
+export interface CumulativeFindingDatum {
+  label: string;
+  findingsThisMonth: number;
+  cumulativeFindings: number;
+  applications: number;
+}
+
+export function CumulativeFindingsChart({ data }: { data: CumulativeFindingDatum[] }) {
+  return (
+    <section className="panel flex flex-col px-5 py-4" data-testid="cumulative-findings">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">Cumulative findings</h2>
+        {data.length ? <span className="text-[12px] text-muted">{data.at(-1)!.cumulativeFindings} total · latest {data.at(-1)!.label}</span> : null}
+      </div>
+      {data.length === 0 ? (
+        <p className="mt-10 text-center text-[13px] text-muted">No scan/report dates available.</p>
+      ) : (
+        <div className="mt-3 h-[320px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={data} margin={{ top: 24, right: 16, left: -8, bottom: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
+              <XAxis dataKey="label" interval={0} tick={{ fill: AXIS, fontSize: 11 }} axisLine={{ stroke: GRID }} tickLine={false} />
+              <YAxis allowDecimals={false} tick={{ fill: AXIS, fontSize: 11 }} axisLine={false} tickLine={false} />
+              <Tooltip
+                contentStyle={tooltipStyle}
+                itemStyle={{ color: INK, fontWeight: 500 }}
+                formatter={(value, name) => [
+                  `${value as number} finding(s)`,
+                  name === "cumulativeFindings" ? "Cumulative findings" : "New this month",
+                ]}
+                labelFormatter={(label) => {
+                  const row = data.find((item) => item.label === String(label));
+                  return row ? `${row.label} · ${row.applications} scans` : String(label);
+                }}
+              />
+              <Bar dataKey="findingsThisMonth" name="New this month" fill="#9B7BB522" stroke="#9B7BB5" strokeWidth={1.5} radius={[6, 6, 0, 0]} maxBarSize={42} isAnimationActive={false} />
+              <Area dataKey="cumulativeFindings" name="Cumulative findings" type="monotone" stroke="#F37021" fill="#F3702122" strokeWidth={3} dot={{ fill: "#F37021", strokeWidth: 2, r: 3 }} isAnimationActive={false} />
+              <Line dataKey="cumulativeFindings" stroke="#F37021" strokeWidth={3} dot={false} isAnimationActive={false} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </section>
+  );
+}
+
+export interface ScanTimelineDatum {
+  name: string;
+  value: number;
+  date: string;
+  status: string;
+}
+
+export function ScanTimeline({ data }: { data: ScanTimelineDatum[] }) {
+  return (
+    <section className="panel flex flex-col px-5 py-4" data-testid="scan-timeline">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">Scan timeline</h2>
+        {data.length ? <span className="text-[12px] text-muted">Oldest → newest scan/report date</span> : null}
+      </div>
+      {data.length === 0 ? (
+        <p className="mt-10 text-center text-[13px] text-muted">No scan/report dates available.</p>
+      ) : (
+        <div className="mt-3 h-[380px] overflow-y-auto pr-1">
+          <ResponsiveContainer width="100%" height={Math.max(300, data.length * 38)} debounce={0}>
+            <BarChart data={data} layout="vertical" margin={{ top: 4, right: 28, left: 8, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} horizontal={false} />
+              <XAxis type="number" allowDecimals={false} tick={{ fill: AXIS, fontSize: 11 }} axisLine={{ stroke: GRID }} tickLine={false} />
+              <YAxis
+                type="category"
+                dataKey="name"
+                width={176}
+                tickFormatter={(v: string) => truncate(String(v), 24)}
+                tick={{ fill: INK, fontSize: 12 }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip
+                contentStyle={tooltipStyle}
+                formatter={(value, _name, payload) => {
+                  const row = (payload as unknown as Array<{ payload?: ScanTimelineDatum }> | undefined)?.[0]?.payload as ScanTimelineDatum | undefined;
+                  return [`${value as number} finding(s) · ${row?.date ?? ""} · ${row?.status ?? ""}`, "Total findings"];
+                }}
+                cursor={{ fill: "#FBF8FD" }}
+              />
+              <Bar dataKey="value" fill="#F37021" radius={[0, 5, 5, 0]} maxBarSize={22} isAnimationActive={false} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </section>
+  );
+}
 
 export function ApplicationBars({ data, title = "Findings by application" }: { data: ChartDatum[]; title?: string }) {
   return (

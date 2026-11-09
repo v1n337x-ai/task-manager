@@ -5,6 +5,7 @@
  */
 import { prisma } from "@/lib/db";
 import { NotFoundError } from "@/lib/errors";
+import { duplicateMasterPlaceholderIds } from "@/lib/services/finding-placeholder-utils";
 
 export interface TrackerIterationInfo {
   number: number;
@@ -72,6 +73,7 @@ export async function listTrackerApps(filters: {
   severity?: string;
   fixedState?: "fixed" | "not_fixed" | "new" | "pending";
   iterationNumber?: number;
+  sort?: "name" | "scanDate" | "total" | "critical" | "high";
 }): Promise<TrackerAppRow[]> {
   const apps = await prisma.application.findMany({
     where: {
@@ -109,6 +111,8 @@ export async function listTrackerApps(filters: {
       id: true,
       applicationId: true,
       isActive: true,
+      title: true,
+      description: true,
       severityRef: { select: { value: true } },
       statusRef: { select: { value: true } },
       iterationStates: {
@@ -116,6 +120,7 @@ export async function listTrackerApps(filters: {
       },
     },
   });
+  const duplicatePlaceholderIds = duplicateMasterPlaceholderIds(findings, (f) => f.applicationId);
   const testCases = await prisma.testCase.groupBy({ by: ["applicationId"], _count: { _all: true } });
   const tcCountByApp = new Map(testCases.map((t) => [t.applicationId, t._count._all]));
 
@@ -124,7 +129,7 @@ export async function listTrackerApps(filters: {
     const engagement = app.engagements[0];
     const iterations = engagement?.iterations ?? [];
     const latest = iterations[0];
-    const appFindings = findings.filter((f) => f.applicationId === app.id);
+    const appFindings = findings.filter((f) => f.applicationId === app.id && !duplicatePlaceholderIds.has(f.id));
     const relevant = appFindings.filter((f) => f.isActive);
 
     const row: TrackerAppRow = {
@@ -216,6 +221,33 @@ export async function listTrackerApps(filters: {
     if (filters.iterationNumber && row.latestIteration?.number !== filters.iterationNumber) continue;
 
     result.push(row);
+  }
+  // S.No is always chronological by scan/report date (oldest first), while
+  // user-selected table ordering below can still rearrange the display.
+  result.sort((a, b) => {
+    const ta = a.reportDate ? new Date(a.reportDate).getTime() : Number.POSITIVE_INFINITY;
+    const tb = b.reportDate ? new Date(b.reportDate).getTime() : Number.POSITIVE_INFINITY;
+    if (ta !== tb) return ta - tb;
+    return a.displayName.localeCompare(b.displayName);
+  });
+  result.forEach((row, index) => {
+    row.sNo = index + 1;
+  });
+
+  // Optional sort (S.No stays fixed — it lives on the row, not the index).
+  const sort = filters.sort;
+  if (sort && sort !== "name") {
+    result.sort((a, b) => {
+      if (sort === "scanDate") {
+        const ta = a.reportDate ? new Date(a.reportDate).getTime() : 0;
+        const tb = b.reportDate ? new Date(b.reportDate).getTime() : 0;
+        return tb - ta; // newest first
+      }
+      if (sort === "total") return b.counts.total - a.counts.total;
+      if (sort === "critical") return b.counts.critical - a.counts.critical;
+      if (sort === "high") return b.counts.high - a.counts.high;
+      return 0;
+    });
   }
   return result;
 }
@@ -382,7 +414,7 @@ export async function getApplicationTracker(applicationId: number): Promise<Appl
   const engagement = app.engagements[0] ?? null;
 
   const findings = await prisma.finding.findMany({
-    where: { applicationId },
+    where: { applicationId, isActive: true },
     include: {
       severityRef: true,
       statusRef: true,
@@ -411,7 +443,9 @@ export async function getApplicationTracker(applicationId: number): Promise<Appl
     importSnapshot: (it.importSnapshot ?? null) as Record<string, unknown> | null,
   }));
 
+  const duplicatePlaceholderIds = duplicateMasterPlaceholderIds(findings);
   const trackerFindings: TrackerFinding[] = findings
+    .filter((f) => !duplicatePlaceholderIds.has(f.id))
     .filter((f) => f.iterationStates.length > 0 || f.isActive)
     .map((f) => ({
       id: f.id,

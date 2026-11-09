@@ -19,8 +19,8 @@ export function PageHeader({
     <div className={cn("brand-band", className)}>
       <div className="mx-auto flex max-w-7xl flex-wrap items-end justify-between gap-3 px-6 py-4">
         <div className="min-w-0">
-          <h1 className="font-display text-3xl leading-none tracking-wide">{title}</h1>
-          {subtitle ? <p className="mt-1.5 text-[13px] text-muted-2">{subtitle}</p> : null}
+          <h1 className="font-display text-3xl leading-none tracking-wide text-white drop-shadow-[0_1px_1px_rgb(120_45_0/18%)]">{title}</h1>
+          {subtitle ? <p className="mt-1.5 text-[13px] text-white/85">{subtitle}</p> : null}
         </div>
         {actions ? <div className="ml-auto flex flex-wrap items-center justify-end gap-2 pb-0.5">{actions}</div> : null}
       </div>

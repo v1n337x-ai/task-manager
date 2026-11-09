@@ -20,21 +20,21 @@
   --color-muted: #7a7a7a;
   --color-muted-2: #5f5f5f;
 
-  /* Surfaces: white paper + workbook tints */
+  /* Surfaces: white paper + Akasa light-orange tints (no steel/blue) */
   --color-page: #ffffff;
-  --color-page-soft: #ffffff;
+  --color-page-soft: #fff9f5;
   --color-card: #ffffff;
-  --color-band: #eff1f2;
-  --color-stroke: #b7b7b7;
-  --color-stroke-soft: #d9d9d9;
-  --color-tint-a: #e6ecee;
-  --color-tint-b: #ecf2f3;
+  --color-band: #fff0e6;
+  --color-stroke: #d9a06b;
+  --color-stroke-soft: #f0d4b8;
+  --color-tint-a: #fff0e6;
+  --color-tint-b: #fff5ee;
 
-  /* Actions: workbook slate (theme dk2) for primary; red for CTAs */
-  --color-accent: #c1272d;
-  --color-accent-deep: #8e1c21;
-  --color-accent-soft: #e6ecee;
-  --color-slate: #44546a;
+  /* Actions: Akasa Air brand — light orange primary, light purple secondary; no other colors */
+  --color-accent: #ff8c42;
+  --color-accent-deep: #f37021;
+  --color-accent-soft: #fff0e6;
+  --color-slate: #9b7bb5;
 
   /* Severity — the workbook's OWN fills */
   --color-danger: #c1272d;
@@ -51,17 +51,17 @@
   --color-sev-low-text: #ffffff;
   --color-sev-info-text: #ffffff;
 
-  /* Workbook chrome */
-  --color-xlsx-band: #bcd4d8;
-  --color-xlsx-data: #ecf2f3;
+  /* Akasa chrome (no steel/blue) */
+  --color-xlsx-band: #fff0e6;
+  --color-xlsx-data: #fff5ee;
   --color-xlsx-peach: #fce4d6;
-  --color-xlsx-green: #e2efda;
+  --color-xlsx-green: #f0e6ff;
 
   --radius-card: 0px;
   --radius-panel: 0px;
 
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 6%);
-  --shadow-card: 0 1px 3px rgb(0 0 0 / 8%);
+  --shadow-sm: 0 1px 3px rgb(0 0 0 / 8%);
+  --shadow-card: 0 2px 8px rgb(0 0 0 / 10%);
 }
 
 html,
@@ -92,49 +92,55 @@ body {
 /* Slim scrollbars */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #b7b7b7 transparent;
+  scrollbar-color: #d9a06b transparent;
 }
 *::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 *::-webkit-scrollbar-thumb {
-  background: #b7b7b7;
+  background: #d9a06b;
   border-radius: 0;
   border: 3px solid transparent;
   background-clip: content-box;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: #7a7a7a;
+  background: #f37021;
   background-clip: content-box;
   border: 3px solid transparent;
 }
 
-/* Topbar / page header: the workbook band — steel with black text + black rule. */
+/* Topbar / page header: Akasa Air brand band — light orange with white text. */
 .brand-band {
-  background: var(--color-xlsx-band);
-  color: var(--color-ink-2);
-  border-bottom: 2px solid #171717;
+  background: linear-gradient(118deg, var(--color-accent) 0%, #ff9a57 62%, #ffb27c 100%);
+  color: #ffffff;
+  border-bottom: 2px solid var(--color-accent-deep);
+  box-shadow: 0 2px 10px rgb(243 112 33 / 16%);
 }
+/* Text inside the band inherits white; buttons keep their own explicit colors. */
 
-/* Sidebar rail: plain white with black hairline. */
+/* Sidebar rail: plain white with a warm hairline and a soft cast shadow. */
 .side-rail {
   background: var(--color-card);
   border-right: 1px solid var(--color-stroke-soft);
+  box-shadow: 1px 0 12px rgb(243 112 33 / 6%);
 }
 
 /* KPI/stat cards: white, black hairline, square. */
 .kpi-card {
   background: var(--color-card);
-  border: 1px solid var(--color-stroke);
+  border: 1px solid var(--color-stroke-soft);
   border-radius: 0;
-  box-shadow: none;
+  box-shadow: var(--shadow-sm);
   position: relative;
   overflow: hidden;
-  transition: background 0.12s ease;
+  transition: background 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease;
 }
 .kpi-card:hover {
   background: var(--color-xlsx-data);
+  border-color: var(--color-stroke);
+  box-shadow: var(--shadow-card);
+  transform: translateY(-1px);
 }
 .kpi-card::before {
   content: "";
@@ -144,23 +150,22 @@ body {
   background: var(--kpi-accent, var(--color-sev-critical));
 }
 
-/* Panels: white + thin black hairline, square. */
+/* Panels: white + thin hairline, square, soft lift. */
 .panel {
   background: var(--color-card);
-  border: 1px solid var(--color-stroke);
+  border: 1px solid var(--color-stroke-soft);
   border-radius: 0;
-  box-shadow: none;
+  box-shadow: var(--shadow-sm);
 }
 
-/* Tables: THE workbook grid — steel header band, black text, thin black
-   gridlines, white rows (no zebra), hover = data tint. Sticky header. */
+/* Tables: soft modern cards with rounded corners and quiet separators. */
 .tm-table {
   background: var(--color-card);
-  border: 1px solid #171717;
-  border-radius: 0;
+  border: 1px solid var(--color-stroke-soft);
+  border-radius: 16px;
   overflow: hidden;
   width: 100%;
-  box-shadow: none;
+  box-shadow: 0 10px 28px rgb(23 23 23 / 0.06);
 }
 .tm-table .overflow-x-auto {
   border-radius: inherit;
@@ -171,50 +176,297 @@ body {
   min-width: 100%;
 }
 .tm-table thead th {
-  background: var(--color-xlsx-band);
-  color: #171717;
+  background: linear-gradient(180deg, var(--color-xlsx-band) 0%, var(--color-tint-b) 100%);
+  color: var(--color-ink-2);
   font-weight: 700;
   text-align: left;
   white-space: nowrap;
-  border-bottom: 2px solid #171717;
-  border-right: 1px solid #171717;
+  border-bottom: 1px solid var(--color-stroke-soft);
+  border-right: 1px solid rgb(23 23 23 / 0.06);
   font-size: 12px;
+  letter-spacing: 0.03em;
 }
 .tm-table thead th:first-child {
-  border-top-left-radius: 0;
+  border-top-left-radius: 16px;
   border-left: none;
 }
 .tm-table thead th:last-child {
-  border-top-right-radius: 0;
+  border-top-right-radius: 16px;
   border-right: none;
 }
+.tm-table tbody tr {
+  transition: background 0.12s ease;
+}
 .tm-table tbody td {
-  border-bottom: 1px solid #171717;
+  border-bottom: 1px solid rgb(23 23 23 / 0.07);
 }
 .tm-table tbody tr td:first-child {
-  border-left: 1px solid #171717;
+  border-left: 1px solid rgb(23 23 23 / 0.05);
 }
 .tm-table tbody tr td:last-child {
-  border-right: 1px solid #171717;
+  border-right: 1px solid rgb(23 23 23 / 0.05);
 }
 .tm-table tbody tr:hover {
   background: var(--color-xlsx-data);
 }
+.tm-table tbody tr.new-i2-row {
+  background: #e8f5e9;
+}
+.tm-table tbody tr.new-i2-row:hover {
+  background: #d9edde;
+}
 .tm-table td {
   overflow-wrap: anywhere;
 }
+/* Full-cell status/severity fills: remove the host cell's padding entirely so
+   the colored span extends edge-to-edge and vertically to the row height. */
+.tm-table tbody td.filled-cell {
+  padding: 0;
+  height: 1px;
+  vertical-align: middle;
+}
+.tm-table tbody td.filled-cell > span.fill-cell {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0.75rem;
+  box-sizing: border-box;
+  text-align: center;
+}
 
-/* Inputs: black focus like a filled cell selection. */
+/* Modern findings table — soft Akasa card, generous spacing, no harsh grid. */
+.modern-table .tm-table {
+  background: var(--color-card);
+  border: 1px solid var(--color-stroke-soft);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 14px 36px rgb(243 112 33 / 8%);
+}
+.modern-table .tm-table .overflow-x-auto {
+  border-radius: inherit;
+}
+.modern-table .tm-table thead th {
+  background: linear-gradient(90deg, var(--color-accent-soft) 0%, #f6edff 100%);
+  color: var(--color-ink-2);
+  border: 0;
+  border-bottom: 1px solid var(--color-stroke-soft);
+  padding: 0.875rem 1rem;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.modern-table .tm-table tbody td {
+  border: 0;
+  border-bottom: 1px solid #f4e7da;
+  padding: 0.875rem 1rem;
+  vertical-align: middle;
+}
+.modern-table .tm-table tbody tr {
+  transition: background 160ms ease, box-shadow 160ms ease;
+}
+.modern-table .tm-table tbody tr:nth-child(even) {
+  background: #fffaf6;
+}
+.modern-table .tm-table tbody tr:hover {
+  background: var(--color-accent-soft);
+}
+.modern-table .tm-table tbody tr.new-i2-row {
+  background: #eaf6ec;
+}
+.modern-table .tm-table tbody tr.new-i2-row:hover {
+  background: #dcf0e1;
+}
+.modern-table .tm-table tbody td.filled-cell {
+  padding: 0;
+}
+.modern-table .tm-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.modern-table .tm-table tbody tr td:nth-child(2) {
+  overflow-wrap: break-word;
+}
+.vapt-summary-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+.vapt-summary-table thead th {
+  background: linear-gradient(90deg, var(--color-accent-soft) 0%, #f6edff 100%);
+  color: var(--color-ink-2);
+  border-bottom: 1px solid var(--color-stroke-soft);
+  padding: 0.875rem 1rem;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.vapt-summary-table tbody td {
+  border-bottom: 1px solid #f4e7da;
+  padding: 0.75rem 1rem;
+  vertical-align: middle;
+}
+.vapt-summary-table tbody tr:nth-child(even) {
+  background: #fffaf6;
+}
+.vapt-summary-table tbody tr:hover {
+  background: var(--color-accent-soft);
+}
+.vapt-summary-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.vapt-summary-table tbody td:first-child {
+  width: 3rem;
+  text-align: center;
+}
+.vapt-summary-table tbody td:nth-child(2) {
+  min-width: 280px;
+  overflow-wrap: break-word;
+}
+.vapt-summary-table tbody td:nth-child(3),
+.vapt-summary-table tbody td:nth-child(4) {
+  width: 9.5rem;
+  padding: 0;
+  height: 1px;
+  vertical-align: middle;
+}
+.vapt-summary-table tbody td:nth-child(4) {
+  text-align: center;
+}
+.vapt-summary-table tbody td:nth-child(4) > span {
+  margin: 0.625rem 0.75rem;
+}
+.vapt-summary-table tbody td:nth-child(5) > span {
+  margin: 0.625rem 0.75rem;
+}
+.message-html table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 1rem 0;
+  overflow: hidden;
+  border: 1px solid var(--color-stroke-soft);
+  border-radius: 16px;
+  font-size: 13px;
+}
+.message-html thead th,
+.message-html tbody th {
+  background: linear-gradient(90deg, var(--color-accent-soft) 0%, #f6edff 100%);
+  color: var(--color-ink-2);
+  border-bottom: 1px solid var(--color-stroke-soft);
+  padding: 0.875rem 1rem;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: left;
+  white-space: nowrap;
+}
+.message-html tbody td {
+  border-bottom: 1px solid #f4e7da;
+  padding: 0.75rem 1rem;
+  vertical-align: middle;
+}
+.message-html tbody tr:nth-child(even) {
+  background: #fffaf6;
+}
+.message-html tbody tr:hover {
+  background: var(--color-accent-soft);
+}
+.message-html tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.tracker-table-shell {
+  overflow: hidden;
+  border: 1px solid var(--color-stroke-soft);
+  border-radius: 14px;
+  background: var(--color-card);
+  box-shadow: 0 10px 28px rgb(243 112 33 / 8%);
+}
+.tracker-table-shell .tm-table {
+  border: 1px solid var(--color-stroke-soft);
+  border-radius: 0 0 14px 14px;
+  box-shadow: none;
+}
+.tracker-table-shell .tm-table thead th {
+  background: linear-gradient(180deg, var(--color-accent-deep) 0%, var(--color-accent) 100%);
+  color: #ffffff;
+  border-bottom: 3px solid var(--color-slate);
+  border-right: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.tracker-table-shell .tm-table thead th:first-child {
+  border-top-left-radius: 0;
+}
+.tracker-table-shell .tm-table thead th:last-child {
+  border-top-right-radius: 0;
+}
+.tracker-table-shell .tm-table tbody tr:nth-child(even) {
+  background: var(--color-tint-b);
+}
+.tracker-table-shell .tm-table tbody tr:nth-child(odd) {
+  background: #ffffff;
+}
+.tracker-table-shell .tm-table tbody tr:hover {
+  background: var(--color-accent-soft);
+}
+.tracker-table-shell .tm-table tbody tr.new-i2-row,
+.tracker-table-shell .tm-table tbody tr:nth-child(even).new-i2-row,
+.tracker-table-shell .tm-table tbody tr:nth-child(odd).new-i2-row {
+  background: #e8f5e9;
+}
+.tracker-table-shell .tm-table tbody tr.new-i2-row:hover {
+  background: #d9edde;
+}
+.tracker-table-shell .tm-table tbody td {
+  border-bottom: 1px solid rgba(243, 112, 33, 0.12);
+  padding-top: 0.625rem;
+  padding-bottom: 0.625rem;
+}
+.tracker-table-shell .tm-table tbody tr td:first-child,
+.tracker-table-shell .tm-table tbody tr td:last-child {
+  border-left: none;
+  border-right: none;
+}
+.tracker-table-shell .tm-table tbody td:first-child {
+  font-weight: 600;
+}
+.tracker-table-shell .tm-table tbody td.overall-status-cell {
+  padding: 0;
+}
+.tracker-table-shell .tm-table tbody td.overall-status-cell > span {
+  margin: 0;
+  min-height: 100%;
+}
+.tracker-table-shell .tm-table .overflow-x-auto {
+  border-radius: 0 0 14px 14px;
+}
+
+/* Inputs: warm brand focus ring like a filled cell selection. */
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid var(--color-sev-info);
+  outline: 2px solid var(--color-accent-deep);
   outline-offset: 1px;
-  border-color: var(--color-sev-info);
+  border-color: var(--color-accent-deep);
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-sev-info);
+  outline: 2px solid var(--color-accent-deep);
   outline-offset: 2px;
 }
 

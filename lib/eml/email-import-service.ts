@@ -298,15 +298,32 @@ export async function confirmEmlUpload(params: {
     const threadResult = await resolveThreadRowTx(row, (job.options as { declaredApplicationId?: number } | null)?.declaredApplicationId ?? null, tx);
     let threadId: number;
     if (threadResult.threadId === null) {
-      const created = await tx.emailThread.create({
-        data: {
-          applicationId: threadResult.applicationId ?? null,
-          subject: row.subjectOriginal ?? row.subjectNormalized,
-          subjectHash: row.subjectNormalized,
-          participantKey: participantKeyOf(row),
-        },
-      });
-      threadId = created.id;
+      const declared = (job.options as { declaredApplicationId?: number } | null)?.declaredApplicationId ?? threadResult.applicationId ?? null;
+      if (declared !== null) {
+        // Upsert by the (subjectHash, applicationId) unique key so concurrent
+        // confirms can't trip a unique-constraint violation (race-safe).
+        const upserted = await tx.emailThread.upsert({
+          where: { subjectHash_applicationId: { subjectHash: row.subjectNormalized, applicationId: declared } },
+          create: {
+            applicationId: declared,
+            subject: row.subjectOriginal ?? row.subjectNormalized,
+            subjectHash: row.subjectNormalized,
+            participantKey: participantKeyOf(row),
+          },
+          update: {},
+        });
+        threadId = upserted.id;
+      } else {
+        const created = await tx.emailThread.create({
+          data: {
+            applicationId: null,
+            subject: row.subjectOriginal ?? row.subjectNormalized,
+            subjectHash: row.subjectNormalized,
+            participantKey: participantKeyOf(row),
+          },
+        });
+        threadId = created.id;
+      }
     } else {
       threadId = threadResult.threadId;
       const declared = (job.options as { declaredApplicationId?: number } | null)?.declaredApplicationId ?? null;
@@ -457,7 +474,13 @@ async function ensureParticipantTx(tx: Prisma.TransactionClient, p: ParticipantL
 
   // User-requested AUTO role detection from the .eml itself — deterministic
   // rule classifier (vendor domain / body language). No evidence stays UNKNOWN.
-  const inference = p?.email ? (await import("./role-rules")).inferParticipantRoleFromEml({ email: p.email, name: p.name, bodyHint }) : null;
+  // Strip quoted reply chains (Outlook's "____" separator and everything after)
+  // so role inference keys off the participant's OWN words, not the thread
+  // history they happened to forward.
+  const cleanBodyHint = bodyHint
+    ? bodyHint.split(/_{5,}/)[0].slice(0, 2000).trim() || null
+    : null;
+  const inference = p?.email ? (await import("./role-rules")).inferParticipantRoleFromEml({ email: p.email, name: p.name, bodyHint: cleanBodyHint }) : null;
   const resolved = inference
     ? await tx.masterValue.findUnique({ where: { domain_value: { domain: "participant_role", value: inference.role } } })
     : null;

@@ -3,9 +3,8 @@ import Link from "next/link";
 import { PageHeader, PageBody } from "@/components/page-header";
 import { KpiCard } from "@/components/kpi-card";
 import { DbUnavailableState, EmptyState } from "@/components/states";
-import { DataTable } from "@/components/data-table";
 import { generateDashboardReport } from "@/lib/services/reporting/report-service";
-import { SeverityDoughnut, StatusBars, ApplicationBars } from "./dashboard-charts";
+import { SeverityDoughnut, StatusBars, ApplicationBars, CumulativeFindingsChart, ScanTimeline } from "./dashboard-charts";
 import { ExportPptButton } from "./export-ppt-button";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -71,6 +70,41 @@ export default async function DashboardPage({
               <KpiCard label="CAR verified" number={report.carVerified} accent="medium" />
             </section>
 
+            <section aria-label="Management insights" className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <KpiCard
+                label="Dated applications"
+                number={report.insights.datedApplications}
+                accent="accent"
+                supporting={
+                  report.insights.missingDateApplications
+                    ? `${report.insights.missingDateApplications} missing scan/report date`
+                    : "All applications have scan/report dates"
+                }
+              />
+              <KpiCard
+                label="Request → report"
+                number={report.insights.averageRequestedToReportDays === null ? "—" : `${report.insights.averageRequestedToReportDays} days`}
+                accent="progress"
+                supporting={
+                  report.insights.earliestScanDate && report.insights.latestScanDate
+                    ? `Earliest ${new Date(report.insights.earliestScanDate).toLocaleDateString("en-GB")} · latest ${new Date(report.insights.latestScanDate).toLocaleDateString("en-GB")}`
+                    : "No paired request/report dates"
+                }
+              />
+              <KpiCard
+                label="Open remediation"
+                number={report.insights.applicationsWithPendingRemediation}
+                accent="critical"
+                supporting={report.insights.oldestPendingApplication ? `Oldest open: ${report.insights.oldestPendingApplication}` : "No applications have pending findings"}
+              />
+              <KpiCard
+                label="Cumulative findings"
+                number={report.cumulativeFindings.at(-1)?.cumulativeFindings ?? report.totalFindings}
+                accent="medium"
+                supporting={report.cumulativeFindings.at(-1) ? `Through ${report.cumulativeFindings.at(-1)!.label}` : "No dated scans"}
+              />
+            </section>
+
             {/* Slide-3 layout: doughnut + status side by side; the top-applications
                 panel spans the full width and scrolls internally (never stretches
                 or overlaps as more data lands). */}
@@ -95,6 +129,21 @@ export default async function DashboardPage({
               />
             </section>
 
+            <section aria-label="Scan timeline and cumulative findings" className="mt-6 grid gap-6 xl:grid-cols-2">
+              <ScanTimeline
+                data={report.applications
+                  .filter((a) => a.scanReportDate)
+                  .sort((a, b) => new Date(a.scanReportDate!).getTime() - new Date(b.scanReportDate!).getTime())
+                  .map((a) => ({
+                    name: a.displayName,
+                    value: a.counts.total,
+                    date: new Date(a.scanReportDate!).toLocaleDateString("en-GB"),
+                    status: a.statusLabel,
+                  }))}
+              />
+              <CumulativeFindingsChart data={report.cumulativeFindings} />
+            </section>
+
             <div className="mt-6">
               <ApplicationBars
                 title="Applications by findings"
@@ -112,37 +161,6 @@ export default async function DashboardPage({
                 hint="Import the PT Tracker workbook or add findings manually; the dashboard updates live."
               />
             ) : null}
-
-            <section aria-label="Application register" className="mt-6">
-              <DataTable
-                caption="Application-level findings"
-                rows={report.applications}
-                columns={[
-                  {
-                    key: "app",
-                    header: "Application",
-                    render: (a) => (
-                      <Link href={`/pt-tracker/${a.id}`} className="font-medium text-progress underline-offset-4 hover:underline">
-                        {a.displayName}
-                      </Link>
-                    ),
-                  },
-                  { key: "type", header: "Type", render: (a) => a.typeName },
-                  { key: "total", header: "Total", render: (a) => <strong>{a.counts.total}</strong> },
-                  { key: "crit", header: "Crit", render: (a) => a.counts.critical },
-                  { key: "high", header: "High", render: (a) => a.counts.high },
-                  { key: "med", header: "Med", render: (a) => a.counts.medium },
-                  { key: "low", header: "Low", render: (a) => a.counts.low },
-                  { key: "pend", header: "Pending", render: (a) => a.counts.pending },
-                  { key: "fixed", header: "Fixed", render: (a) => a.counts.fixed },
-                  { key: "nf", header: "Not Fixed", render: (a) => a.counts.notFixed },
-                  { key: "ro", header: "Reopened", render: (a) => a.counts.reopened },
-                  { key: "car", header: "CAR", render: (a) => a.counts.car },
-                  { key: "iter", header: "Iteration", render: (a) => (a.latestIteration ? `I${a.latestIteration}` : "—") },
-                ]}
-                emptyTitle="No applications in scope"
-              />
-            </section>
           </>
         )}
       </PageBody>

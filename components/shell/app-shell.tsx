@@ -66,13 +66,13 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
                     onClick={() => setMobileOpen(false)}
                     aria-current={isActive(item.href) ? "page" : undefined}
                     className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition",
+                      "group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition",
                       isActive(item.href)
-                        ? "bg-accent-soft font-semibold text-accent-deep"
-                        : "text-ink-2 hover:bg-band",
+                        ? "bg-accent-soft font-semibold text-accent-deep shadow-[inset_3px_0_0_var(--color-accent)]"
+                        : "text-ink-2 hover:bg-tint-b hover:text-ink",
                     )}
                   >
-                    <item.icon className={cn("h-4 w-4", isActive(item.href) ? "text-accent" : "text-muted")} aria-hidden />
+                    <item.icon className={cn("h-4 w-4 transition", isActive(item.href) ? "text-accent" : "text-muted group-hover:text-accent-deep")} aria-hidden />
                     {item.label}
                     {isActive(item.href) ? <span className="ml-auto h-1.5 w-1.5 rounded-full bg-accent" aria-hidden /> : null}
                   </Link>
@@ -83,7 +83,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
         ))}
       </nav>
       <div className="px-3 pb-4">
-        <p className="flex items-center justify-between rounded-lg bg-tint-b px-3 py-2 text-[11px] text-muted">
+        <p className="flex items-center justify-between rounded-lg border border-slate/20 bg-xlsx-green px-3 py-2 text-[11px] text-muted-2">
           <span>Akasa Air · It&apos;s Your Sky</span>
           <span className="h-2 w-2 rounded-full bg-good/80" aria-hidden />
         </p>
@@ -100,7 +100,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                className="rounded-md p-2 text-ink-2 hover:bg-tint-b lg:hidden"
+                className="rounded-md p-2 text-white transition hover:bg-white/15 lg:hidden"
                 onClick={() => setMobileOpen((v) => !v)}
                 aria-expanded={mobileOpen}
                 aria-label={mobileOpen ? "Close navigation" : "Open navigation"}
@@ -110,13 +110,13 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
               <BrandMenu />
             </div>
             <div className="flex items-center gap-4">
-              <span className="hidden text-[13px] text-ink-2 sm:inline" data-testid="user-chip">
+              <span className="hidden text-[13px] text-white/85 sm:inline" data-testid="user-chip">
                 {user.displayName} · {user.email}
               </span>
               <button
                 type="button"
                 onClick={logout}
-                className="flex items-center gap-2 rounded-lg border border-white/15 px-3 py-1.5 text-[12px] text-ink-2 transition hover:bg-tint-b"
+                className="flex items-center gap-2 rounded-lg border border-white/35 px-3 py-1.5 text-[12px] text-white transition hover:bg-white/15"
               >
                 <LogOut className="h-3.5 w-3.5" aria-hidden />
                 Sign out
@@ -153,10 +153,10 @@ function BrandMenu() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="flex items-center gap-2 rounded-none px-2 py-1.5 text-left transition hover:bg-tint-b focus:outline-none"
+          className="flex items-center gap-2 rounded-none px-2 py-1.5 text-left transition hover:bg-white/15 focus:outline-none"
           aria-haspopup="menu"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-none bg-slate text-white" aria-hidden>
+          <span className="flex h-8 w-8 items-center justify-center rounded-none bg-slate text-white shadow-sm" aria-hidden>
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden>
               {/* Akasa "rising A" motif — wing shaping inside the A */}
               <path d="M12 3.5 21 21h-4.6l-1.9-4h-5l-1.9 4H3L12 3.5Z" fill="#fff" />
@@ -164,8 +164,8 @@ function BrandMenu() {
             </svg>
           </span>
           <span>
-            <span className="block font-display text-[18px] leading-4 tracking-wide text-ink">TASK MANAGER</span>
-            <span className="block text-[10px] font-semibold uppercase tracking-[0.28em] text-accent">VAPT</span>
+            <span className="block font-display text-[18px] leading-4 tracking-wide text-white">TASK MANAGER</span>
+            <span className="block text-[10px] font-semibold uppercase tracking-[0.28em] text-white/80">VAPT</span>
           </span>
         </button>
       </DropdownMenuTrigger>

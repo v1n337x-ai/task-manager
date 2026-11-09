@@ -105,6 +105,16 @@ export async function addEvidence(input: AddEvidenceInput, actorUserId: number |
   return row;
 }
 
+export interface ApprovalApplyFailure {
+  itemKey: string;
+  reason: string;
+}
+
+export interface ApprovalDecisionResult {
+  applied: { itemKey: string; findingId: number; code: string; created: boolean; iterationLabel: string }[];
+  failed: ApprovalApplyFailure[];
+}
+
 /**
  * Human decision on an AI proposal (§39): approve | reject | correct.
  * Applying an approved proposal is a separate, auditable service action —
@@ -121,9 +131,11 @@ export async function recordApprovalDecision(
   },
   actorUserId: number,
   ctx: { ip?: string; userAgent?: string },
-) {
+): Promise<ApprovalDecisionResult> {
   const extraction = await prisma.aiExtraction.findUnique({ where: { id: input.extractionId } });
   if (!extraction) throw NotFoundError("AI extraction");
+  const applied: ApprovalDecisionResult["applied"] = [];
+  const failed: ApprovalApplyFailure[] = [];
 
   const itemKey = input.itemKey ?? "__run__";
   const dup = await prisma.aiApprovalDecision.findUnique({
@@ -170,6 +182,57 @@ export async function recordApprovalDecision(
     await prisma.aiExtraction.update({ where: { id: extraction.id }, data: { status: statusId } });
   }
 
+  // Whole-run APPROVE also applies every finding candidate to the PT Tracker,
+  // so the tracker cells reflect the analysis without requiring per-item
+  // clicks. Human approval is still the gate (this only runs on an explicit
+  // approve decision). Already-applied items are skipped (duplicate decisions).
+  if (!input.itemKey && input.decision === "approve") {
+    const structured = (extraction.structuredOutput ?? null) as { findings?: unknown[] } | null;
+    const count = Array.isArray(structured?.findings) ? structured!.findings!.length : 0;
+    for (let i = 0; i < count; i += 1) {
+      const itemKey = `findingStatus:${i}`;
+      const dup = await prisma.aiApprovalDecision.findUnique({
+        where: { extractionId_itemKey: { extractionId: extraction.id, itemKey } },
+      });
+      if (dup) continue;
+      try {
+        await prisma.aiApprovalDecision.create({
+          data: {
+            extractionId: extraction.id,
+            decision: "approve",
+            decidedByUserId: actorUserId,
+            itemKey,
+          },
+        });
+        const { applyApprovedFinding } = await import("@/lib/services/finding-apply-service");
+        const result = await applyApprovedFinding({ extractionId: extraction.id, itemKey }, actorUserId);
+        applied.push({ itemKey, findingId: result.findingId, code: result.code, created: result.created, iterationLabel: result.iterationLabel });
+        await recordAudit({
+          action: "ai_approval.finding_applied",
+          entityType: "Finding",
+          entityId: result.findingId,
+          newValue: JSON.stringify({ extractionId: extraction.id, itemKey, code: result.code, created: result.created, iterationState: result.iterationLabel, via: "whole_run" }),
+          source: "HUMAN",
+          actorUserId,
+          ip: ctx.ip,
+          userAgent: ctx.userAgent,
+        });
+      } catch (error) {
+        failed.push({ itemKey, reason: String((error as Error).message ?? error).slice(0, 240) });
+        await recordAudit({
+          action: "ai_approval.finding_apply_failed",
+          entityType: "AiExtraction",
+          entityId: extraction.id,
+          newValue: JSON.stringify({ itemKey, reason: String((error as Error).message ?? error).slice(0, 240) }),
+          source: "SYSTEM",
+          actorUserId,
+          ip: ctx.ip,
+          userAgent: ctx.userAgent,
+        });
+      }
+    }
+  }
+
   // User-requested pipeline completion (Phase 9.1): approving a
   // `findingStatus:<idx>` item CREATES/UPDATES the tracker finding with the
   // AI-proposed values — the human approval is the gate; the AI did not write
@@ -178,6 +241,7 @@ export async function recordApprovalDecision(
     try {
       const { applyApprovedFinding } = await import("@/lib/services/finding-apply-service");
       const result = await applyApprovedFinding({ extractionId: extraction.id, itemKey: input.itemKey! }, actorUserId);
+      applied.push({ itemKey: input.itemKey, findingId: result.findingId, code: result.code, created: result.created, iterationLabel: result.iterationLabel });
       await recordAudit({
         action: "ai_approval.finding_applied",
         entityType: "Finding",
@@ -189,6 +253,7 @@ export async function recordApprovalDecision(
         userAgent: ctx.userAgent,
       });
     } catch (error) {
+      failed.push({ itemKey: input.itemKey, reason: String((error as Error).message ?? error).slice(0, 240) });
       // The approval decision stands; only the tracker write reports honestly.
       await recordAudit({
         action: "ai_approval.finding_apply_failed",
@@ -202,6 +267,8 @@ export async function recordApprovalDecision(
       });
     }
   }
+
+  return { applied, failed };
 }
 
 export async function listExtractions(statusValue?: string) {

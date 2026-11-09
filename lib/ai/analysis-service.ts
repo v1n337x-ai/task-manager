@@ -47,15 +47,75 @@ async function loadThreadContext(threadId: number): Promise<{
   });
   if (!thread) throw NotFoundError("Email thread");
 
-  const messagesDb = thread.messages.map((m, index) => ({ id: m.id, index }));
+  // buildAnalysisContext keeps the newest 12 messages and reindexes them
+  // 0..11. The evidence linker and approval validator must use that same
+  // selected window; otherwise messageIndex can point at the wrong email.
+  const messagesDb = [...thread.messages].slice(-12).map((m, index) => ({ id: m.id, index }));
+
+  // Supply the model with the application's live finding/test-case identity
+  // list so explicit F-/TC- codes can resolve to their real names instead of
+  // being paraphrased into new, unsupported titles.
+  let iterations: { number: number; name: string; type: string; status: string }[] = [];
+  let existingFindings: { code: string; title: string; severity: string; status: string; testCase: string | null }[] = [];
+  let existingTestCases: { code: string; title: string; state: string }[] = [];
+  if (thread.applicationId) {
+    const engagement = await prisma.engagement.findFirst({
+      where: { applicationId: thread.applicationId },
+      orderBy: { id: "asc" },
+      include: {
+        iterations: {
+          orderBy: { number: "asc" },
+          include: { iterationTypeRef: true, statusRef: true },
+        },
+      },
+    });
+    iterations = engagement?.iterations.map((iteration) => ({
+      number: iteration.number,
+      name: iteration.name,
+      type: iteration.iterationTypeRef.label,
+      status: iteration.statusRef.value,
+    })) ?? [];
+
+    const findings = await prisma.finding.findMany({
+      where: { applicationId: thread.applicationId, isActive: true },
+      orderBy: { id: "asc" },
+      take: 120,
+      select: {
+        code: true,
+        title: true,
+        severityRef: { select: { value: true } },
+        statusRef: { select: { value: true } },
+        testCase: { select: { code: true } },
+      },
+    });
+    existingFindings = findings.map((finding) => ({
+      code: finding.code,
+      title: finding.title,
+      severity: finding.severityRef.value,
+      status: finding.statusRef.value,
+      testCase: finding.testCase?.code ?? null,
+    }));
+
+    const testCases = await prisma.testCase.findMany({
+      where: { applicationId: thread.applicationId, isActive: true },
+      orderBy: { id: "asc" },
+      take: 120,
+      select: { code: true, title: true, statusRef: { select: { value: true } } },
+    });
+    existingTestCases = testCases.map((testCase) => ({
+      code: testCase.code,
+      title: testCase.title,
+      state: testCase.statusRef.value,
+    }));
+  }
 
   const built = buildAnalysisContext({
     applicationName: thread.application?.displayName ?? null,
     applicationUrl: thread.application?.webUrl ?? null,
     applicationAliases: thread.application?.aliases.map((a) => a.alias) ?? [],
-    iterations: [],
-    existingFindings: [],
-    existingTestCases: [],
+    iterations,
+    existingFindings,
+    existingTestCases,
     subject: thread.subject,
     messages: thread.messages.map((m) => ({
       from: m.fromContact?.emailAddress ?? "(unknown sender)",
@@ -98,7 +158,26 @@ export async function analyzeThread(params: {
   try {
     // Real ports receive their credential ONLY through this in-memory options
     // object — plaintext never touches the database, logs, or audit trail.
-    const portOptions = slug === "opencode" && configured?.encryptedApiKey ? { credential: decryptSecret(configured.encryptedApiKey) } : {};
+    // Learned feedback from past human review (rejections/corrections) —
+    // keeps the AI from repeating mistakes the team already flagged.
+    let feedback: string | null = null;
+    try {
+      const recent = await prisma.aiApprovalDecision.findMany({
+        where: { decision: { in: ["reject", "correct"] }, note: { not: null } },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: { note: true, itemKey: true },
+      });
+      const lines = recent
+        .map((d) => (d.note && d.note.trim().length > 0 ? `- ${d.itemKey ?? "run"}: ${d.note.trim()}` : null))
+        .filter((x): x is string => !!x);
+      if (lines.length > 0) feedback = lines.join("\\n");
+    } catch {
+      // Feedback is best-effort; never block analysis.
+    }
+    const portOptions = slug === "opencode" && configured?.encryptedApiKey
+      ? { credential: decryptSecret(configured.encryptedApiKey), feedback }
+      : { feedback };
     port = resolveProviderPort(slug, isProduction(), portOptions);
   } catch {
     throw new AppError("VALIDATION_ERROR", 422, `Unknown AI provider "${slug}".`);

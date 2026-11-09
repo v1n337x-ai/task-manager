@@ -59,7 +59,11 @@ export function ImportExcelDialog() {
       const fd = new FormData();
       fd.set("file", file);
       fd.set("createMissingApplications", String(createMissing));
-      const res = await fetch("/api/imports/excel", { method: "POST", body: fd });
+      const res = await fetch("/api/imports/excel", {
+        method: "POST",
+        body: fd,
+        headers: csrf() ? { "x-csrf-token": csrf()! } : {},
+      });
       const data = await res.json();
       if (!res.ok) {
         setNotice(data.error?.message ?? "Validation failed.");

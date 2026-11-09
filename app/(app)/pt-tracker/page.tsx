@@ -6,6 +6,7 @@ import { DataTable } from "@/components/data-table";
 import { FilterBar, FilterChip } from "@/components/filter-bar";
 import { DbUnavailableState } from "@/components/states";
 import { ImportExcelDialog, ExportExcelButton, RefreshButton } from "./excel-actions";
+import { ExportFindingsWorkbookButton } from "./findings-export-button";
 import { DetailsFloater, IterationsFloater, SevStat } from "./floaters";
 import { StatusFillCell } from "@/components/status-fill";
 import { listTrackerApps, summarize } from "@/lib/services/tracker-service";
@@ -44,11 +45,13 @@ export default async function PtTrackerPage({
   const iterationParam = pick("iteration");
   const iterationNumber = iterationParam ? Number(iterationParam) : undefined;
   const q = pick("q");
+  const sortRaw = pick("sort");
+  const sort = ["name", "scanDate", "total", "critical", "high"].includes(sortRaw ?? "") ? (sortRaw as "name" | "scanDate" | "total" | "critical" | "high") : undefined;
 
   let rows = null as Awaited<ReturnType<typeof listTrackerApps>> | null;
   let dbError: string | null = null;
   try {
-    rows = await listTrackerApps({ q, type, status, scope, severity, fixedState, iterationNumber: Number.isInteger(iterationNumber) ? iterationNumber : undefined });
+    rows = await listTrackerApps({ q, type, status, scope, severity, fixedState, iterationNumber: Number.isInteger(iterationNumber) ? iterationNumber : undefined, sort });
   } catch (error) {
     dbError = String(error);
   }
@@ -64,6 +67,7 @@ export default async function PtTrackerPage({
           <div className="flex items-center gap-2">
             <ImportExcelDialog />
             <ExportExcelButton />
+            <ExportFindingsWorkbookButton />
             <Link
               href="/master-data"
               className="inline-flex h-9 items-center justify-center rounded-lg bg-card px-4 text-[13px] font-semibold text-ink-2 shadow-sm transition hover:bg-band"
@@ -112,19 +116,37 @@ export default async function PtTrackerPage({
           {(["critical", "high", "medium", "low"] as const).map((s) => (
             <FilterChip
               key={s}
-              href={trackerUrl({ type, status, scope, fixedState: fixedStateRaw, iteration: iterationParam, severity: severity === s ? undefined : s })}
+              href={trackerUrl({ type, status, scope, fixedState: fixedStateRaw, iteration: iterationParam, severity: severity === s ? undefined : s, sort })}
               active={severity === s}
             >
               {s[0]!.toUpperCase() + s.slice(1)}
             </FilterChip>
           ))}
+            <span className="text-[12px] text-muted">Sort:</span>
+            {(["name", "scanDate", "total", "critical", "high"] as const).map((s) => (
+              <FilterChip
+                key={s}
+                href={trackerUrl({ type, status, scope, fixedState: fixedStateRaw, iteration: iterationParam, severity, sort: sort === s ? undefined : s })}
+                active={sort === s}
+              >
+                {s === "name" ? "Name" : s === "scanDate" ? "Scan date" : s === "total" ? "Total" : s === "critical" ? "Critical" : "High"}
+              </FilterChip>
+            ))}
         </FilterBar>
 
         {dbError ? (
           <DbUnavailableState className="mt-5" />
         ) : (
+          <div className="tracker-table-shell mt-4">
+            <div className="flex flex-wrap items-end justify-between gap-3 border-b border-stroke-soft bg-card px-5 py-4">
+              <div>
+                <h2 className="font-display text-xl leading-none tracking-wide text-ink">Application Register</h2>
+                <p className="mt-1 text-[12px] text-muted">{rows?.length ?? 0} applications · live counts from findings</p>
+              </div>
+              <span className="rounded-full bg-accent-soft px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-accent-deep">Live data</span>
+            </div>
           <DataTable
-            className="mt-4"
+            className="mt-0"
             caption="Application tracker — PT Tracker v1.0 columns (minimized via floaters)"
             rows={rows}
             columns={[
@@ -164,7 +186,7 @@ export default async function PtTrackerPage({
               {
                 key: "overall",
                 header: "Overall Status",
-                className: "whitespace-nowrap",
+                className: "overall-status-cell filled-cell text-center whitespace-nowrap",
                 render: (r) => <StatusFillCell value={r.overallStatusLabel} />,
               },
               { key: "vulncount", header: "Total Vuln Count", className: "text-center whitespace-nowrap", render: (r) => <strong>{r.counts.total}</strong> },
@@ -214,6 +236,7 @@ export default async function PtTrackerPage({
             emptyTitle="No applications match"
             emptyHint="Adjust filters or import the PT Tracker workbook (fixed 39-column Excel contract)."
           />
+          </div>
         )}
       </PageBody>
     </>

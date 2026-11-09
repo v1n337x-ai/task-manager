@@ -202,69 +202,73 @@ function FindingsTab({
   detail: ApplicationTrackerDetail;
   iterations: IterationLite[];
 }) {
-  const allIterationsUsed = new Set<number>();
-  detail.findings.forEach((f) => f.iterationStates.forEach((s) => allIterationsUsed.add(s.iterationNumber)));
-  // Contract: exactly I1 + I2 (user-directed cap) — iteration numbers above 2
-  // stay in the database (append-only) but are never displayed.
-  const usedIterations = [...allIterationsUsed].sort((a, b) => a - b).filter((n) => n <= 2);
+  // Uniform contract: only the Iteration 2 column is shown in this table.
+  // States beyond I2 remain in the database but are never displayed.
+  const visibleIterations = [2];
+
+  // A finding is new in I2 only when it was not repeated in Iteration 1
+  // and first appeared in Iteration 2.
+  const isNewInIteration2 = (f: TrackerFinding) =>
+    f.firstSeenIterationNumber === 2 &&
+    f.iterationStates.some((s) => s.iterationNumber === 2) &&
+    !f.iterationStates.some((s) => s.iterationNumber === 1);
 
   // Excel-style layout (vapt.xlsx): # | Name of the vulnerability | Severity
-  // | Iteration 1 | Iteration 2 | + explicit I2 status column. Compact widths.
+  // | Iteration 2. The Iteration 2 column already shows the current Fixed /
+  // Not Fixed / Open verdict, so no duplicate status column.
   const numbered = detail.findings.map((f, i) => ({ f, no: i + 1 }));
   return (
     <DataTable
+      className="modern-table"
       caption="Findings summary — vapt.xlsx layout"
       rows={numbered}
+      rowClassName={(r: { f: TrackerFinding }) => (isNewInIteration2(r.f) ? "new-i2-row" : undefined)}
       columns={[
-        { key: "no", header: "#", className: "w-10 text-center text-muted", render: (r: { no: number }) => String(r.no) },
+        { key: "no", header: "#", className: "w-12 text-center align-middle text-muted", render: (r: { no: number }) => <span className="inline-flex min-h-6 min-w-6 items-center justify-center rounded-full bg-accent-soft px-1.5 text-[12px] font-bold text-accent-deep">{r.no}</span> },
         {
           key: "name",
           header: "Name of the vulnerability",
-          className: "max-w-[340px]",
-          render: (r: { f: TrackerFinding }) => (
-            <span className="block" title={r.f.description ?? undefined}>
-              <span className="block truncate font-medium text-ink">{r.f.title}</span>
-              <span className="text-[10px] text-muted">{r.f.code}</span>
-            </span>
-          ),
+          className: "min-w-[300px] max-w-[420px] align-middle",
+          render: (r: { f: TrackerFinding }) => {
+            const newInI2 = isNewInIteration2(r.f);
+            return (
+              <span className="block" title={r.f.description ?? undefined}>
+                <span className={newInI2 ? "block text-[14px] font-semibold leading-snug text-green-700" : "block text-[14px] font-semibold leading-snug text-ink"}>
+                  {r.f.title}
+                </span>
+                {newInI2 ? (
+                  <span className="mt-1.5 inline-flex items-center rounded-full bg-[#dff2e3] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-green-700">
+                    New in I2
+                  </span>
+                ) : null}
+              </span>
+            );
+          },
         },
-        { key: "severity", header: "Severity", className: "whitespace-nowrap", render: (r: { f: TrackerFinding }) => <SeverityFillCell severityValue={r.f.severityValue} label={r.f.severityValue.charAt(0).toUpperCase() + r.f.severityValue.slice(1)} /> },
-        ...usedIterations.map((num) => ({
+        { key: "severity", header: "Severity", className: "filled-cell w-36 text-center align-middle whitespace-nowrap", render: (r: { f: TrackerFinding }) => <SeverityFillCell severityValue={r.f.severityValue} label={r.f.severityValue.charAt(0).toUpperCase() + r.f.severityValue.slice(1)} /> },
+        ...visibleIterations.map((num) => ({
           key: `i${num}`,
           header: `Iteration ${num}`,
-          className: "whitespace-nowrap",
+          className: "filled-cell w-40 text-center align-middle whitespace-nowrap",
           render: (r: { f: TrackerFinding }) => {
             const state = r.f.iterationStates.find((s) => s.iterationNumber === num);
-            if (!state) return <span className="text-muted">—</span>;
+            if (!state) return <StatusFillCell value="—" />;
             const isNew = state.statusValue === "new" && r.f.iterationStates.length === 1;
             return <StatusFillCell value={isNew ? `New in I${num}` : state.statusLabel} />;
           },
         })),
         {
-          key: "i2status",
-          header: "Iteration 2 Status",
-          className: "whitespace-nowrap",
-          render: (r: { f: TrackerFinding }) => {
-            // Explicit fixed / not fixed verdict for I2 (user-requested column).
-            const i2 = r.f.iterationStates.find((s) => s.iterationNumber === 2);
-            if (!i2) return <span className="text-muted">—</span>;
-            const isFixed = ["fixed", "not_fixed"].includes(i2.statusValue) ? i2.statusValue === "fixed" : null;
-            if (isFixed === null) return <StatusFillCell value={i2.statusLabel} />;
-            return <StatusFillCell value={isFixed ? "Fixed" : "Not Fixed"} />;
-          },
-        },
-        {
           key: "actions",
           header: "",
-          className: "w-10",
+          className: "w-16 text-center align-middle",
           render: (r: { f: TrackerFinding }) =>
             iterations.length ? (
-              <FindingStateDialog finding={{ id: r.f.id, code: r.f.code, title: r.f.title, severityValue: r.f.severityValue }} iterations={iterations.filter((i) => i.number <= 2)} />
+              <FindingStateDialog finding={{ id: r.f.id, title: r.f.title, severityValue: r.f.severityValue }} iterations={iterations.filter((i) => i.number <= 2)} />
             ) : null,
         },
       ]}
       emptyTitle="No findings yet"
-      emptyHint="Use “Add Finding”. Iteration 1 and Iteration 2 appear as separate columns (the contract's two iterations)."
+      emptyHint="Use “Add Finding”. Iteration 2 appears as a column."
     />
   );
 }
@@ -290,7 +294,7 @@ function IterationsTab({
         { key: "n", header: "#", render: (i) => <strong>I{i.number}</strong> },
         { key: "name", header: "Name", render: (i) => i.name },
         { key: "type", header: "Type", render: (i) => i.typeLabel },
-        { key: "status", header: "Status", className: "whitespace-nowrap", render: (i) => <StatusFillCell value={i.statusLabel} /> },
+        { key: "status", header: "Status", className: "filled-cell text-center whitespace-nowrap", render: (i) => <StatusFillCell value={i.statusLabel} /> },
         { key: "start", header: "Start", render: (i) => (i.startDate ? new Date(i.startDate).toLocaleDateString("en-GB") : "—") },
         { key: "report", header: "Report", render: (i) => (i.reportDate ? new Date(i.reportDate).toLocaleDateString("en-GB") : "—") },
         // Imported-snapshot column removed (user direction 2026-11): the raw

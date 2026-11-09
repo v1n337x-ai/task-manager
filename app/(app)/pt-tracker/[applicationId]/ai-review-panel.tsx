@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2, Sparkles, ChevronsUpDown, Gavel } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { validateFindingCandidate } from "@/lib/ai/finding-quality";
 
 interface StructuredExtraction {
   schemaVersion: string;
@@ -40,6 +41,20 @@ interface ReviewExtraction {
   evidence: EvidenceRow[];
 }
 
+interface ItemDecisionData {
+  itemKey: string;
+  decision: string;
+  correctedValue: unknown;
+  note?: string | null;
+  decidedAt?: string | null;
+}
+
+interface RunDecisionData {
+  decision: string;
+  decidedAt: string;
+  decidedByUserId: number;
+}
+
 /**
  * AI Review (Phase 5 §40-§44, §67-§76): side-by-side extraction + evidence.
  * Item-level approve/reject/correct — the AI payload is never mutated.
@@ -52,13 +67,42 @@ export function AiReview({ threadId, threadSubject }: { threadId: number; thread
   const [busyItem, setBusyItem] = React.useState<string | null>(null);
   const [lastMsg, setLastMsg] = React.useState<string | null>(null);
   const [openEvidence, setOpenEvidence] = React.useState<string | null>(null);
+  const [itemDecisions, setItemDecisions] = React.useState<ItemDecisionData[]>([]);
+  const [runDecision, setRunDecision] = React.useState<RunDecisionData | null>(null);
 
-  const [correctionValue, setCorrectionValue] = React.useState("");
 
+
+  const extractionRef = React.useRef<ReviewExtraction | null>(null);
+  React.useEffect(() => { extractionRef.current = extraction; }, [extraction]);
+  React.useEffect(() => {
+    setRuns([]);
+    setExtraction(null);
+    setItemDecisions([]);
+    setRunDecision(null);
+    setLastMsg(null);
+    setOpenEvidence(null);
+  }, [threadId]);
   const refreshRuns = React.useCallback(async () => {
     const res = await fetch(`/api/ai/threads/${threadId}/extractions`);
     const data = await res.json();
-    if (res.ok) setRuns(data.runs);
+    if (res.ok) {
+      setRuns(data.runs);
+      const current = extractionRef.current;
+      const needsBetter = !current || current.threadId !== threadId || !current.structured || !!current.errorMessage;
+      if (data.runs?.length && needsBetter) {
+        const latest = data.runs.find((r: { statusValue: string }) => r.statusValue !== "failed") ?? data.runs[0];
+        if (latest && latest.id !== current?.id) {
+          setLoading(true);
+          try {
+            const r = await fetch(`/api/ai/extractions/${latest.id}`);
+            const d = await r.json();
+            if (r.ok) setExtraction({ ...(d.extraction ?? {}), evidence: d.evidence ?? [] });
+          } finally {
+            setLoading(false);
+          }
+        }
+      }
+    }
   }, [threadId]);
 
   const loadExtraction = React.useCallback(async (id: number) => {
@@ -66,7 +110,13 @@ export function AiReview({ threadId, threadSubject }: { threadId: number; thread
     try {
       const res = await fetch(`/api/ai/extractions/${id}`);
       const data = await res.json();
-      if (res.ok) setExtraction(data);
+      if (res.ok) {
+        // API returns { extraction, evidence, itemDecisions, runDecision };
+        // flatten so the panel can read fields directly.
+        setExtraction({ ...(data.extraction ?? {}), evidence: data.evidence ?? [] });
+        setItemDecisions(data.itemDecisions ?? []);
+        setRunDecision(data.runDecision ?? null);
+      }
     } finally {
       setLoading(false);
     }
@@ -134,7 +184,9 @@ export function AiReview({ threadId, threadSubject }: { threadId: number; thread
         body: JSON.stringify({ extractionId: extraction.id, decision, itemKey: itemKey ?? undefined, correctedValue }),
       });
       const data = await res.json();
-      setLastMsg(res.ok ? `Decision recorded (${decision}${itemKey ? `, ${itemKey}` : ", whole run"}). The AI payload is preserved unchanged.` : (data.error?.message ?? "Decision failed."));
+      const blockedItems = (data.result?.failed as Array<{ itemKey: string; reason: string }> | undefined) ?? [];
+      const blockedSuffix = blockedItems.length ? ` ${blockedItems.length} candidate(s) were blocked by the quality gate: ${blockedItems.map((item) => `${item.itemKey} — ${item.reason}`).join("; ")}` : "";
+      setLastMsg(res.ok ? `Decision recorded (${decision}${itemKey ? `, ${itemKey}` : ", whole run"}). The AI payload is preserved unchanged.${blockedSuffix}` : (data.error?.message ?? "Decision failed."));
       await loadExtraction(extraction.id);
       await refreshRuns();
     } finally {
@@ -159,10 +211,9 @@ export function AiReview({ threadId, threadSubject }: { threadId: number; thread
           ) : null}
         </div>
       </div>
-      <p className="mt-1 text-[13px] text-muted">
-        Explicitly user-triggered · structured AI_EXTRACTION_V1 · every claim needs evidence · nothing mutates VAPT state until human approval (and Phase 6 wiring).
+      <p className="mt-1 text-[13px] leading-relaxed text-muted">
+        AI creates evidence-backed candidates only. It never writes a finding by itself. Review each item, then approve what is correct; approved findings are written to the tracker, rejected candidates are not. Raw AI output is never changed.
       </p>
-      <p className="mt-2 text-[12px] text-muted-2">Current OpenCode mode: deterministic analysis unavailable until the provider contract is supplied — runs in this workspace use the deterministic mock provider.</p>
 
       {lastMsg ? <p role="status" className="mt-3 rounded-md border border-stroke bg-band px-3 py-2 text-[13px] text-ink-2">{lastMsg}</p> : null}
 
@@ -185,9 +236,9 @@ export function AiReview({ threadId, threadSubject }: { threadId: number; thread
       ) : !extraction ? (
         <p className="mt-4 text-[13px] text-muted">No extraction selected — run &quot;Analyze Thread&quot; first.</p>
       ) : extraction.errorMessage ? (
-        <p role="alert" className="mt-4 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-[13px] text-danger">{extraction.errorMessage}</p>
+        <div role="alert" className="mt-4 space-y-2 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-[13px] text-danger"><p>{extraction.errorMessage}</p><p className="text-[12px] text-danger/80">This run did not produce reviewable output. Click &quot;Re-analyze&quot; above to retry — the previous run is preserved.</p></div>
       ) : !extraction.structured ? (
-        <p className="mt-4 text-[13px] text-muted">Extraction stored without structured output.</p>
+        <p className="mt-4 text-[13px] text-muted">This run has no reviewable output yet. Click &quot;Re-analyze&quot; to generate one.</p>
       ) : (
         <div className="mt-4 space-y-5">
           <div>
@@ -200,14 +251,20 @@ export function AiReview({ threadId, threadSubject }: { threadId: number; thread
               hash={extraction.inputContextHash}
               confidence={extraction.confidence}
             />
-            <div className="mt-2 flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => decide("approve", null)} disabled={busy !== false}>
-                <Gavel className="h-3.5 w-3.5" aria-hidden /> Approve summary
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => decide("approve", null)} disabled={busyItem !== null || !!runDecision}>
+                <Gavel className="h-3.5 w-3.5" aria-hidden /> Approve all candidates in this run
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => decide("reject", null)} disabled={busy !== false}>
-                Reject summary
+              <Button size="sm" variant="ghost" onClick={() => decide("reject", null)} disabled={busyItem !== null || !!runDecision}>
+                Reject all
               </Button>
+              {runDecision ? (
+                <span className="rounded-full bg-accent-soft px-2.5 py-1 text-[11px] font-semibold text-accent-deep">
+                  Already reviewed: {runDecision.decision}
+                </span>
+              ) : null}
             </div>
+            <p className="mt-1 text-[12px] text-muted">Whole-run approval applies every valid finding candidate from this AI run.</p>
           </div>
 
           <ReviewBlock
@@ -223,29 +280,32 @@ export function AiReview({ threadId, threadSubject }: { threadId: number; thread
             onApprove={(key) => decide("approve", key)}
             onReject={(key) => decide("reject", key)}
             onCorrect={(key, value) => decide("correct", key, value)}
-            correctionValue={correctionValue}
-            setCorrectionValue={setCorrectionValue}
             openEvidence={openEvidence}
             setOpenEvidence={setOpenEvidence}
+            decisionsByKey={new Map(itemDecisions.map((d) => [d.itemKey, d]))}
+            footer="Approving a role records the review decision only; it does not change VAPT data."
           />
 
           <ReviewBlock
             title="Finding candidates"
-            items={extraction.structured.findings.map((f, i) => ({
+            items={extraction.structured.findings.map((f, i) => {
+              const qualityReasons = validateFindingCandidate(f);
+              return {
               key: `findingStatus:${i}`,
               main: `${f.identifierMark === "IDENTIFIER_EXPLICIT" ? `${f.identifierExplicit} (explicit ID)` : f.identifierMark === "AI_PROPOSED" ? `${f.title} (AI proposed)` : f.title}`,
-              sub: `severity ${f.severity} (${f.severityMark}) · status ${f.statusSignal ?? "—"} · evidence ${f.evidence.length}`,
+              sub: `severity ${f.severity} (${f.severityMark}) · status ${f.statusSignal ?? "—"} · evidence ${f.evidence.length}${qualityReasons.length ? ` · blocked: ${qualityReasons.join(" ")}` : ""}`,
               evidence: f.evidence.map((e) => ({ messageIndex: e.messageIndex, excerpt: e.excerpt })),
               correctPlaceholder: "Corrected status (fixed / not_fixed / open / …)",
-            }))}
+              };
+            })}
             busyItem={busyItem}
             onApprove={(key) => decide("approve", key)}
             onReject={(key) => decide("reject", key)}
             onCorrect={(key, value) => decide("correct", key, value)}
-            correctionValue={correctionValue}
-            setCorrectionValue={setCorrectionValue}
             openEvidence={openEvidence}
             setOpenEvidence={setOpenEvidence}
+            decisionsByKey={new Map(itemDecisions.map((d) => [d.itemKey, d]))}
+            footer="Approving a finding writes it to the tracker after quality validation; rejected candidates are never written."
           />
 
           <ReviewBlock
@@ -261,10 +321,10 @@ export function AiReview({ threadId, threadSubject }: { threadId: number; thread
             onApprove={(key) => decide("approve", key)}
             onReject={(key) => decide("reject", key)}
             onCorrect={(key, value) => decide("correct", key, value)}
-            correctionValue={correctionValue}
-            setCorrectionValue={setCorrectionValue}
             openEvidence={openEvidence}
             setOpenEvidence={setOpenEvidence}
+            decisionsByKey={new Map(itemDecisions.map((d) => [d.itemKey, d]))}
+            footer="Approving an iteration signal records the review decision only; it does not change VAPT data."
           />
         </div>
       )}
@@ -281,10 +341,10 @@ function ReviewBlock({
   onApprove,
   onReject,
   onCorrect,
-  correctionValue,
-  setCorrectionValue,
   openEvidence,
   setOpenEvidence,
+  decisionsByKey = new Map(),
+  footer,
 }: {
   title: string;
   items: ReviewItem[];
@@ -292,11 +352,12 @@ function ReviewBlock({
   onApprove: (itemKey: string) => void;
   onReject: (itemKey: string) => void;
   onCorrect: (itemKey: string, value: unknown) => void;
-  correctionValue: string;
-  setCorrectionValue: (v: string) => void;
   openEvidence: string | null;
   setOpenEvidence: (v: string | null) => void;
+  decisionsByKey?: Map<string, ItemDecisionData>;
+  footer?: string;
 }) {
+  const [correctionValues, setCorrectionValues] = React.useState<Record<string, string>>({});
   if (items.length === 0) {
     return (
       <div className="panel px-4 py-3">
@@ -316,7 +377,16 @@ function ReviewBlock({
                 <p className="text-[14px] font-medium text-ink">{item.main}</p>
                 <p className="text-[12px] text-muted">{item.sub}</p>
               </div>
-              <Badge variant="info">AI Proposed</Badge>
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                <Badge variant="info">AI proposed</Badge>
+                {(() => {
+                  const decision = decisionsByKey.get(item.key);
+                  if (!decision) return null;
+                  const label = decision.decision === "approve" ? "Approved" : decision.decision === "reject" ? "Rejected" : "Corrected";
+                  const variant = decision.decision === "approve" ? "good" : decision.decision === "reject" ? "critical" : "info";
+                  return <Badge variant={variant}>{label}</Badge>;
+                })()}
+              </div>
             </div>
 
             <button
@@ -336,33 +406,46 @@ function ReviewBlock({
               </ul>
             ) : null}
 
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <Button size="sm" variant="outline" onClick={() => onApprove(item.key)} disabled={busyItem === item.key}>
-                Approve
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => onReject(item.key)} disabled={busyItem === item.key}>
-                Reject
-              </Button>
-              <input
-                className="rounded-md border border-stroke px-2 py-1 text-[12px]"
-                placeholder={item.correctPlaceholder}
-                value={correctionValue}
-                onChange={(e) => setCorrectionValue(e.target.value)}
-                aria-label={`Correction for ${item.key}`}
-              />
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => onCorrect(item.key, correctionValue)}
-                disabled={busyItem === item.key || !correctionValue}
-              >
-                Correct
-              </Button>
-            </div>
+            {(() => {
+              const decision = decisionsByKey.get(item.key);
+              if (decision) {
+                return (
+                  <p className="mt-2 rounded-md bg-tint-b px-3 py-2 text-[12px] text-ink-2">
+                    This item was already {decision.decision === "approve" ? "approved" : decision.decision === "reject" ? "rejected" : "corrected"} and is read-only.
+                    {decision.correctedValue !== null && decision.correctedValue !== undefined ? ` Corrected value: ${String(decision.correctedValue)}` : ""}
+                  </p>
+                );
+              }
+              return (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={() => onApprove(item.key)} disabled={busyItem === item.key}>
+                    Approve
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => onReject(item.key)} disabled={busyItem === item.key}>
+                    Reject
+                  </Button>
+                  <input
+                    className="rounded-md border border-stroke px-2 py-1 text-[12px]"
+                    placeholder={item.correctPlaceholder}
+                    value={correctionValues[item.key] ?? ""}
+                    onChange={(e) => setCorrectionValues((prev) => ({ ...prev, [item.key]: e.target.value }))}
+                    aria-label={`Correction for ${item.key}`}
+                  />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => onCorrect(item.key, correctionValues[item.key] ?? "")}
+                    disabled={busyItem === item.key || !(correctionValues[item.key] ?? "")}
+                  >
+                    Correct
+                  </Button>
+                </div>
+              );
+            })()}
           </li>
         ))}
       </ul>
-      <p className="mt-2 text-[11px] text-muted">Approving an item does not mutate VAPT data — authoritative application is a later, separately approved workflow.</p>
+      {footer ? <p className="mt-2 text-[11px] text-muted">{footer}</p> : null}
     </div>
   );
 }

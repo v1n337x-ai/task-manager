@@ -6,6 +6,7 @@
  * until human approval (§19-§20).
  */
 import { z } from "zod";
+import { isGenericFindingTitle, titleSupportedByEvidence } from "./finding-quality";
 
 const SeverityCandidate = z.enum(["critical", "high", "medium", "low", "info", "unknown"]);
 const ConfidenceBand = z.enum(["HIGH", "MEDIUM", "LOW"]);
@@ -91,8 +92,29 @@ export const AI_EXTRACTION_V1 = z
     if (out.findings.some((f) => f.identifierExplicit && f.identifierMark === "IDENTIFIER_NOT_EXPLICIT")) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["findings"], message: "identifierExplicit present but marked NOT_EXPLICIT — contradiction." });
     }
+    for (const [i, f] of out.findings.entries()) {
+      if (isGenericFindingTitle(f.title)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["findings", i, "title"],
+          message: "Title is a generic status/remediation summary rather than a concrete vulnerability name.",
+        });
+      }
+
+      if (
+        f.titleMark !== "EXPLICIT" &&
+        f.identifierMark !== "IDENTIFIER_EXPLICIT" &&
+        !titleSupportedByEvidence(f.title, f.evidence)
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["findings", i, "title"],
+          message: "AI-proposed title is not sufficiently supported by the quoted evidence.",
+        });
+      }
+    }
   });
 
 export type AiExtractionV1 = z.infer<typeof AI_EXTRACTION_V1>;
 
-export const PROMPT_VERSION = "VAPT_EMAIL_ANALYSIS_V1";
+export const PROMPT_VERSION = "VAPT_EMAIL_ANALYSIS_V2";

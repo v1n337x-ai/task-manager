@@ -356,7 +356,7 @@ export function FindingStateDialog({
   finding,
   iterations,
 }: {
-  finding: { id: number; code: string; title: string; severityValue: string };
+  finding: { id: number; title: string; severityValue: string };
   iterations: IterationLite[];
 }) {
   const router = useRouter();
@@ -394,18 +394,18 @@ export function FindingStateDialog({
     <>
       <button
         type="button"
-        className="rounded-md p-1.5 text-muted transition hover:bg-band hover:text-ink"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-stroke-soft bg-card text-muted transition hover:border-accent hover:bg-accent-soft hover:text-accent-deep"
         onClick={() => setOpen(true)}
-        aria-label={`Update state of ${finding.code}`}
+        aria-label="Update finding state"
         title="Update iteration state"
-        data-testid={`finding-state-${finding.code}`}
+        data-testid={`finding-state-${finding.id}`}
       >
         <PenLine className="h-4 w-4" />
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Update state â€” {finding.code}</DialogTitle>
+            <DialogTitle>Update state â€” {finding.title}</DialogTitle>
             <DialogDescription>Previous states stay in history. Current = latest authoritative iteration state.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
