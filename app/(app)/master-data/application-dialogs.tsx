@@ -295,6 +295,23 @@ export function RowActions({
                 <Label htmlFor={`target-${application.id}`}>Other target</Label>
                 <Input id={`target-${application.id}`} name="rawTarget" defaultValue={application.rawTarget ?? ""} />
               </div>
+              {of(masterValues, "application_status").length > 0 ? (
+                <div>
+                  <Label htmlFor={`status-${application.id}`}>Status</Label>
+                  <select
+                    id={`status-${application.id}`}
+                    name="statusValue"
+                    defaultValue={application.statusLabel.toLowerCase().replace(/ /g, "_")}
+                    className={selectClass}
+                  >
+                    {of(masterValues, "application_status").map((t) => (
+                      <option key={t.id} value={t.value}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
             </div>
 
             {editState.error ? <AlertText>{editState.error}</AlertText> : null}

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { PageHeader, PageBody } from "@/components/page-header";
 import { DataTable } from "@/components/data-table";
 import { StatusBadge } from "@/components/badges";
-import { ApplicationDialogs } from "@/app/(app)/master-data/application-dialogs";
+import { ApplicationDialogs, RowActions } from "@/app/(app)/master-data/application-dialogs";
 import { MasterValuesSection } from "@/app/(app)/master-data/master-values-section";
 import { listApplications } from "@/lib/services/application-service";
 import { listAll } from "@/lib/services/master-data-service";
@@ -52,6 +52,12 @@ export default async function MasterDataPage() {
                 ),
               },
               { key: "state", header: "State", render: (a) => (a.isActive ? "Active" : "Inactive") },
+              {
+                key: "actions",
+                header: "Actions",
+                className: "text-right",
+                render: (a) => <RowActions application={a} masterValues={masterValues} />,
+              },
             ]}
             emptyTitle="No applications yet"
             emptyHint="Use “New Application” to create the first one. Deactivations preserve history."
