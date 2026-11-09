@@ -14,7 +14,7 @@ const EnvSchema = z
     LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(5),
     LOGIN_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().default(60),
     SESSION_TTL_SECONDS: z.coerce.number().int().positive().default(43200),
-    SEED_ADMIN_EMAIL: z.string().email().default("admin@akasaair.com"),
+    SEED_ADMIN_EMAIL: z.string().email().default("admin@example.com"),
     SEED_ADMIN_PASSWORD: z.string().min(10).default(""),
     NEXT_PUBLIC_APP_NAME: z.string().default("Task Manager"),
     NEXT_PUBLIC_APP_TAGLINE: z.string().default("VAPT"),

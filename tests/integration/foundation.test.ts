@@ -16,12 +16,12 @@ describe.skipIf(!dbAvailable)("§59 end-to-end foundation chain", () => {
   }, 60_000);
 
   it("1-2. authenticates the seeded single credential (valid + invalid password)", async () => {
-    const envEmail = (process.env.SEED_ADMIN_EMAIL ?? "admin@akasaair.com").toLowerCase();
+    const envEmail = (process.env.SEED_ADMIN_EMAIL ?? "admin@clientair.com").toLowerCase();
     const envPwd = process.env.SEED_ADMIN_PASSWORD ?? "TaskManager!2026";
     const ok = await authenticate(envEmail, envPwd);
     expect(ok.email).toBe(envEmail);
     await expect(authenticate(envEmail, "wrong-password-1")).rejects.toThrow();
-    await expect(authenticate("nobody@akasaair.com", envPwd)).rejects.toThrow();
+    await expect(authenticate("nobody@clientair.com", envPwd)).rejects.toThrow();
   });
 
   let applicationId = 0;
@@ -33,7 +33,7 @@ describe.skipIf(!dbAvailable)("§59 end-to-end foundation chain", () => {
         applicationTypeValue: "web",
         scopeValue: "internal",
         environmentValue: "prod",
-        webUrl: "https://e2e.akasaair.test",
+        webUrl: "https://e2e.Task Managerair.test",
       },
       userId,
       {},
@@ -138,23 +138,23 @@ describe.skipIf(!dbAvailable)("§59 end-to-end foundation chain", () => {
   it("12. creates an email thread + message + participant + attachment metadata", async () => {
     const svc = await import("@/lib/services/email-foundation-service");
     await svc.upsertParticipant(
-      { emailAddress: "pentester@digialert.test", name: "Vineet K", roleValue: "pentester", roleSource: "RULE" },
+      { emailAddress: "pentester@security-vendor.test", name: "Vineet K", roleValue: "pentester", roleSource: "RULE" },
       null,
     );
     const thread = await svc.createThread(
       { applicationId, subject: "Re: [Request ID :##SR-99##] E2E probe scan" },
       null,
     );
-    const participant = await testDb.emailParticipant.findUniqueOrThrow({ where: { emailAddress: "pentester@digialert.test" } });
+    const participant = await testDb.emailParticipant.findUniqueOrThrow({ where: { emailAddress: "pentester@security-vendor.test" } });
     const message = await svc.createMessage(
       {
         threadId: thread.id,
-        messageId: "<e2e-probe-1@digialert.test>",
+        messageId: "<e2e-probe-1@security-vendor.test>",
         fromParticipantId: participant.id,
         subject: "Re: E2E probe scan",
         sentAt: new Date("2026-11-02T09:30:00Z"),
         bodyText: "Validation completed.",
-        recipients: [{ kind: "TO", email: "owner@akasaair.test", name: "App Owner" }],
+        recipients: [{ kind: "TO", email: "owner@clientair.test", name: "App Owner" }],
       },
       null,
     );
@@ -169,9 +169,9 @@ describe.skipIf(!dbAvailable)("§59 end-to-end foundation chain", () => {
     expect(withRef.processingStatusRef.value).toBe("pending");
 
     // Human role override beats AI role (§30).
-    await svc.overrideParticipantRole({ participantEmail: "pentester@digialert.test", roleValue: "security_team" }, userId);
+    await svc.overrideParticipantRole({ participantEmail: "pentester@security-vendor.test", roleValue: "security_team" }, userId);
     const overridden = await testDb.emailParticipant.findUniqueOrThrow({
-      where: { emailAddress: "pentester@digialert.test" },
+      where: { emailAddress: "pentester@security-vendor.test" },
       include: { roleOverrideRef: true, roleRef: true },
     });
     expect(overridden.roleOverrideRef?.value).toBe("security_team");

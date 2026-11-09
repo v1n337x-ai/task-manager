@@ -84,7 +84,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
       </nav>
       <div className="px-3 pb-4">
         <p className="flex items-center justify-between rounded-lg border border-slate/20 bg-xlsx-green px-3 py-2 text-[11px] text-muted-2">
-          <span>Akasa Air · It&apos;s Your Sky</span>
+          <span>Task Manager · It&apos;s Your Sky</span>
           <span className="h-2 w-2 rounded-full bg-good/80" aria-hidden />
         </p>
       </div>
@@ -158,7 +158,7 @@ function BrandMenu() {
         >
           <span className="flex h-8 w-8 items-center justify-center rounded-none bg-slate text-white shadow-sm" aria-hidden>
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden>
-              {/* Akasa "rising A" motif — wing shaping inside the A */}
+              {/* Task Manager "rising A" motif — wing shaping inside the A */}
               <path d="M12 3.5 21 21h-4.6l-1.9-4h-5l-1.9 4H3L12 3.5Z" fill="#fff" />
               <path d="M12 9.6 14.2 14h-4.4L12 9.6Z" fill="#E0550C" />
             </svg>

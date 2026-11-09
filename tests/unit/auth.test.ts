@@ -63,7 +63,7 @@ describe("login rate limiter", () => {
 
 describe("login validation schema", () => {
   it("requires email + password", () => {
-    expect(LoginSchema.safeParse({ email: "admin@akasaair.com", password: "TaskManager!2026" }).success).toBe(true);
+    expect(LoginSchema.safeParse({ email: "admin@clientair.com", password: "TaskManager!2026" }).success).toBe(true);
     expect(LoginSchema.safeParse({ email: "not-an-email", password: "x" }).success).toBe(false);
     expect(LoginSchema.safeParse({ email: "", password: "" }).success).toBe(false);
   });
@@ -77,9 +77,9 @@ describe("alias normalization (EML/AI seam, §16-17)", () => {
   });
 
   it("infers alias types by shape", () => {
-    expect(inferAliasType("https://uat.qp.akasaair.com/cash-portal")).toBe("url");
-    expect(inferAliasType("cargo.akasaair.com")).toBe("fqdn");
-    expect(inferAliasType("com.app.akasaair.staging")).toBe("package");
+    expect(inferAliasType("https://uat.qp.Task Managerair.com/cash-portal")).toBe("url");
+    expect(inferAliasType("cargo.Task Managerair.com")).toBe("fqdn");
+    expect(inferAliasType("com.app.Task Managerair.staging")).toBe("package");
     expect(inferAliasType("Cash Portal UAT")).toBe("name");
   });
 });

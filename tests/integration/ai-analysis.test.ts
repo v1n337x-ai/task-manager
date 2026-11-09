@@ -91,7 +91,7 @@ describe.skipIf(!dbAvailable)("AI thread analysis (mock provider)", () => {
     await recordApprovalDecision({ extractionId, decision: "approve", itemKey: "findingStatus:1" }, userId, {});
     // correct a participant role (AI said X → human says pentester):
     await recordApprovalDecision(
-      { extractionId, decision: "correct", itemKey: "participantRole:vineet@digialert.test", correctedValue: "pentester", note: "evidence: authored retest report" },
+      { extractionId, decision: "correct", itemKey: "participantRole:vineet@security-vendor.test", correctedValue: "pentester", note: "evidence: authored retest report" },
       userId,
       {},
     );
@@ -103,7 +103,7 @@ describe.skipIf(!dbAvailable)("AI thread analysis (mock provider)", () => {
 
     const decisions = await testDb.aiApprovalDecision.findMany({ where: { extractionId }, include: { decidedBy: true } });
     expect(decisions.map((d) => d.itemKey)).toContain("findingStatus:1");
-    expect(decisions.map((d) => d.itemKey)).toContain("participantRole:vineet@digialert.test");
+    expect(decisions.map((d) => d.itemKey)).toContain("participantRole:vineet@security-vendor.test");
     const correction = decisions.find((d) => d.decision === "correct");
     expect(correction!.correctedValue).toBe("pentester");
     const rejected = decisions.find((d) => d.decision === "reject");

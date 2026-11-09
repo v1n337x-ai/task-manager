@@ -28,12 +28,12 @@ function hsl(hex: string): { hue: number; saturation: number } | null {
   return { hue, saturation };
 }
 
-const isAkasaPrimary = (hex: string) => {
+const isBrandPrimary = (hex: string) => {
   const color = hsl(hex);
   return !!color && color.hue >= 8 && color.hue <= 48 && color.saturation >= 0.35;
 };
 
-const isAkasaSecondary = (hex: string) => {
+const isBrandSecondary = (hex: string) => {
   const color = hsl(hex);
   return !!color && color.hue >= 255 && color.hue <= 302 && color.saturation >= 0.12;
 };
@@ -76,7 +76,7 @@ export function BrandingPanel({ initial }: { initial: { primary: string; seconda
     }
   }
 
-  const valid = isAkasaPrimary(primary) && isAkasaSecondary(secondary);
+  const valid = isBrandPrimary(primary) && isBrandSecondary(secondary);
 
   return (
     <div className="panel px-5 py-4">
@@ -84,7 +84,7 @@ export function BrandingPanel({ initial }: { initial: { primary: string; seconda
         <div>
           <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">Theme colors</h2>
           <p className="mt-1 text-[13px] text-muted">
-            Akasa Air orange and violet colors used by the web UI and Excel exports. PPT styling is not changed by these settings.
+            Task Manager orange and violet colors used by the web UI and Excel exports. PPT styling is not changed by these settings.
           </p>
         </div>
         <Palette className="h-5 w-5 text-muted" aria-hidden />
@@ -109,7 +109,7 @@ export function BrandingPanel({ initial }: { initial: { primary: string; seconda
               className="font-mono"
             />
           </div>
-          <p className="mt-1 text-[12px] text-muted">Akasa orange only — used for the main band and primary accents.</p>
+          <p className="mt-1 text-[12px] text-muted">Task Manager orange only — used for the main band and primary accents.</p>
         </div>
         <div>
           <Label htmlFor="brand-secondary">Secondary color</Label>
@@ -129,7 +129,7 @@ export function BrandingPanel({ initial }: { initial: { primary: string; seconda
               className="font-mono"
             />
           </div>
-          <p className="mt-1 text-[12px] text-muted">Akasa violet only — used for tables, rules and secondary accents.</p>
+          <p className="mt-1 text-[12px] text-muted">Task Manager violet only — used for tables, rules and secondary accents.</p>
         </div>
       </div>
 

@@ -35,4 +35,4 @@ Fields per brief: name (verbatim registry key), display_name, type, scope (inter
 
 ## Contacts (POCs / assigned members)
 
-`contacts` (org + fullName unique) mirrors the workbook's "POC Akasa Air" and "Digialert Team - Assigned member" columns (multi-person strings will be split during the Phase 3 import). Contact management UI expands in Phase 3 alongside import mapping.
+`contacts` (org + fullName unique) mirrors the workbook's "POC" and "Assigned member" columns (multi-person strings will be split during the Phase 3 import). Contact management UI expands in Phase 3 alongside import mapping.

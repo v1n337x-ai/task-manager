@@ -157,8 +157,8 @@ export async function exportPptReport(params: {
   pptx.layout = "VAPT169";
 
   const pptTemplateDir = path.join(process.cwd(), "prisma", "templates", "ppt");
-  const akasaLogo = path.join(pptTemplateDir, "image3.png");
-  const digialertLogo = path.join(pptTemplateDir, "image1.png");
+  const brandLogo = path.join(pptTemplateDir, "image3.png");
+  const partnerLogo = path.join(pptTemplateDir, "image1.png");
   const coverHero = path.join(pptTemplateDir, "image2.jpeg");
 
   const slideCount = 6;
@@ -167,11 +167,11 @@ export async function exportPptReport(params: {
     slideIndex += 1;
     const slide = pptx.addSlide();
     slide.background = { color: A.PAGE };
-    // Akasa orange band + violet rule motif (Digialert/Akasa template)
+    // Task Manager orange band + violet rule motif (security-vendor/Task Manager template)
     slide.addShape("rect", { x: 0, y: 0, w: 13.33, h: 1.15, fill: { color: A.ORANGE }, line: { color: A.ORANGE } });
     slide.addShape("rect", { x: 0, y: 1.15, w: 13.33, h: 0.06, fill: { color: A.VIOLET }, line: { color: A.VIOLET } });
-    if (fs.existsSync(akasaLogo)) slide.addImage({ path: akasaLogo, x: 10.62, y: 0.24, w: 2.1, h: 0.51 });
-    if (fs.existsSync(digialertLogo)) slide.addImage({ path: digialertLogo, x: 11.39, y: 6.98, w: 1.35, h: 0.33 });
+    if (fs.existsSync(brandLogo)) slide.addImage({ path: brandLogo, x: 10.62, y: 0.24, w: 2.1, h: 0.51 });
+    if (fs.existsSync(partnerLogo)) slide.addImage({ path: partnerLogo, x: 11.39, y: 6.98, w: 1.35, h: 0.33 });
     return slide;
   };
 

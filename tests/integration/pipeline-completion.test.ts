@@ -128,7 +128,7 @@ describe.skipIf(!dbAvailable)("AI approval applies the candidate to the tracker 
     const structured = {
       schemaVersion: "AI_EXTRACTION_V1",
       threadSummary: "Probe thread with one finding candidate.",
-      participants: [{ email: "t@digialert.test", proposedRole: "pentester", roleBasis: "EXPLICIT", confidence: "HIGH", evidence: [{ messageIndex: 0, excerpt: "authority", confidence: "HIGH" }] }],
+      participants: [{ email: "t@security-vendor.test", proposedRole: "pentester", roleBasis: "EXPLICIT", confidence: "HIGH", evidence: [{ messageIndex: 0, excerpt: "authority", confidence: "HIGH" }] }],
       findings: [
         { identifierExplicit: null, identifierMark: "IDENTIFIER_NOT_EXPLICIT", title: "OTP Flooding on Login", titleMark: "AI_PROPOSED", severity: "high", severityMark: "INFERRED", description: null, recommendation: null, relatedTestCaseRefs: [], iterationSignal: 2, iterationSignalExplicit: true, statusSignal: "not_fixed", isNewFindingCandidate: true, evidence: [{ messageIndex: 0, excerpt: "otp flood still", confidence: "HIGH" }] },
       ],
@@ -169,7 +169,7 @@ describe.skipIf(!dbAvailable)("AI approval applies the candidate to the tracker 
     const threadRef2 = await testDb.emailThread.create({ data: { subject: "Probe thread 2", subjectHash: "probe-thread-2", participantKey: "p2" } });
     const pending = (await testDb.masterValue.findUniqueOrThrow({ where: { domain_value: { domain: "extraction_status", value: "pending" } } })).id;
     const structured2 = {
-      schemaVersion: "AI_EXTRACTION_V1", threadSummary: "second probe with a candidate.", participants: [{ email: "t@digialert.test", proposedRole: "pentester", roleBasis: "EXPLICIT", confidence: "HIGH", evidence: [{ messageIndex: 0, excerpt: "e", confidence: "HIGH" }] }],
+      schemaVersion: "AI_EXTRACTION_V1", threadSummary: "second probe with a candidate.", participants: [{ email: "t@security-vendor.test", proposedRole: "pentester", roleBasis: "EXPLICIT", confidence: "HIGH", evidence: [{ messageIndex: 0, excerpt: "e", confidence: "HIGH" }] }],
       findings: [{ identifierExplicit: null, identifierMark: "IDENTIFIER_NOT_EXPLICIT", title: "Should NOT appear", titleMark: "AI_PROPOSED", severity: "high", severityMark: "INFERRED", description: null, recommendation: null, relatedTestCaseRefs: [], iterationSignal: 1, iterationSignalExplicit: true, statusSignal: "open", evidence: [{ messageIndex: 0, excerpt: "e", confidence: "HIGH" }] }],
       testCases: [], iterationSignals: [], evidence: [{ messageIndex: 0, excerpt: "e", confidence: "HIGH" }],
     };
@@ -186,7 +186,7 @@ describe.skipIf(!dbAvailable)("AI approval applies the candidate to the tracker 
     const structured3 = {
       schemaVersion: "AI_EXTRACTION_V1",
       threadSummary: "aggregate remediation follow-up",
-      participants: [{ email: "t@digialert.test", proposedRole: "pentester", roleBasis: "EXPLICIT", confidence: "HIGH", evidence: [{ messageIndex: 0, excerpt: "update", confidence: "HIGH" }] }],
+      participants: [{ email: "t@security-vendor.test", proposedRole: "pentester", roleBasis: "EXPLICIT", confidence: "HIGH", evidence: [{ messageIndex: 0, excerpt: "update", confidence: "HIGH" }] }],
       findings: [{ identifierExplicit: null, identifierMark: "IDENTIFIER_NOT_EXPLICIT", title: "Reported VAPT findings for Chatbot-Service pending remediation", titleMark: "AI_PROPOSED", severity: "unknown", severityMark: "INFERRED", description: null, recommendation: null, relatedTestCaseRefs: [], iterationSignal: 2, iterationSignalExplicit: true, statusSignal: "not_fixed", evidence: [{ messageIndex: 0, excerpt: "update", confidence: "HIGH" }] }],
       testCases: [],
       iterationSignals: [],

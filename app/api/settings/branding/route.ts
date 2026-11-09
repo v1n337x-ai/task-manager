@@ -35,7 +35,7 @@ export async function PUT(request: NextRequest) {
       });
       return NextResponse.json({ colors });
     } catch {
-      throw new AppError("VALIDATION_ERROR", 422, "Akasa theme only: primary must be an orange hex code and secondary must be a violet hex code.");
+      throw new AppError("VALIDATION_ERROR", 422, "Task Manager theme only: primary must be an orange hex code and secondary must be a violet hex code.");
     }
   } catch (error) {
     return toErrorResponse(error);

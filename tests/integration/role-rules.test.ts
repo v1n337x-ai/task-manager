@@ -9,22 +9,22 @@ import bcrypt from "bcryptjs";
 import { dbAvailable, resetTestData, seedMinimal, testDb } from "../setup-db";
 
 describe("EML role rules (deterministic, no AI)", () => {
-  it("digialert vendor domain → pentester (domain + body confidence)", async () => {
+  it("security-vendor vendor domain → pentester (domain + body confidence)", async () => {
     const { inferParticipantRoleFromEml } = await import("@/lib/eml/role-rules");
-    const r1 = inferParticipantRoleFromEml({ email: "vineet@digialert.test", name: "Vineet", bodyHint: "Retest completed. F-001 Fixed." });
+    const r1 = inferParticipantRoleFromEml({ email: "vineet@security-vendor.test", name: "Vineet", bodyHint: "Retest completed. F-001 Fixed." });
     expect(r1?.role).toBe("pentester");
     expect(r1!.confidence).toBeGreaterThanOrEqual(85);
-    const r2 = inferParticipantRoleFromEml({ email: "ashwin.k@digialert.co.in", name: "Ashwin", bodyHint: "report attached" });
+    const r2 = inferParticipantRoleFromEml({ email: "ashwin.k@security-vendor.co.in", name: "Ashwin", bodyHint: "report attached" });
     expect(r2?.role).toBe("pentester");
   });
 
   it("developer via fix language; application owner via name; no evidence stays unknown", async () => {
     const { inferParticipantRoleFromEml } = await import("@/lib/eml/role-rules");
-    const dev = inferParticipantRoleFromEml({ email: "someone@akasaair.com", name: "Rahul", bodyHint: "Deployed. The issue has been fixed and verified in staging." });
+    const dev = inferParticipantRoleFromEml({ email: "someone@clientair.com", name: "Rahul", bodyHint: "Deployed. The issue has been fixed and verified in staging." });
     expect(dev?.role).toBe("developer");
-    const owner = inferParticipantRoleFromEml({ email: "p.prakash2@akasaair.com", name: "Application Owner", bodyHint: "acknowledged" });
+    const owner = inferParticipantRoleFromEml({ email: "p.prakash2@clientair.com", name: "Application Owner", bodyHint: "acknowledged" });
     expect(owner?.role).toBe("application_owner");
-    expect(inferParticipantRoleFromEml({ email: "someone@akasaair.com", name: "Random Person", bodyHint: "thanks" })).toBeNull();
+    expect(inferParticipantRoleFromEml({ email: "someone@clientair.com", name: "Random Person", bodyHint: "thanks" })).toBeNull();
   });
 
   it("conflicting language prefers pentester evidence; empty email rejected", async () => {
@@ -69,7 +69,7 @@ describe.skipIf(!dbAvailable)("EML confirm auto-assigns RULE roles from the .eml
 
   it("participants from the chain get RULE-derived roles with confidence", async () => {
     const parts = await testDb.emailParticipant.findMany();
-    const digi = parts.find((p) => p.emailAddress.includes("digialert"));
+    const digi = parts.find((p) => p.emailAddress.includes("security-vendor"));
     expect(digi).toBeDefined();
     expect(digi!.roleSource).toBe("RULE");
     expect(digi!.confidence).toBeGreaterThanOrEqual(70);

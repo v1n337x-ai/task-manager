@@ -20,7 +20,7 @@
   --color-muted: #7a7a7a;
   --color-muted-2: #5f5f5f;
 
-  /* Surfaces: white paper + Akasa light-orange tints (no steel/blue) */
+  /* Surfaces: white paper + Task Manager light-orange tints (no steel/blue) */
   --color-page: #ffffff;
   --color-page-soft: #fff9f5;
   --color-card: #ffffff;
@@ -30,7 +30,7 @@
   --color-tint-a: #fff0e6;
   --color-tint-b: #fff5ee;
 
-  /* Actions: Akasa Air brand — light orange primary, light purple secondary; no other colors */
+  /* Actions: Task Manager brand — light orange primary, light purple secondary; no other colors */
   --color-accent: #ff8c42;
   --color-accent-deep: #f37021;
   --color-accent-soft: #fff0e6;
@@ -51,7 +51,7 @@
   --color-sev-low-text: #ffffff;
   --color-sev-info-text: #ffffff;
 
-  /* Akasa chrome (no steel/blue) */
+  /* Task Manager chrome (no steel/blue) */
   --color-xlsx-band: #fff0e6;
   --color-xlsx-data: #fff5ee;
   --color-xlsx-peach: #fce4d6;
@@ -110,7 +110,7 @@ body {
   border: 3px solid transparent;
 }
 
-/* Topbar / page header: Akasa Air brand band — light orange with white text. */
+/* Topbar / page header: Task Manager brand band — light orange with white text. */
 .brand-band {
   background: linear-gradient(118deg, var(--color-accent) 0%, #ff9a57 62%, #ffb27c 100%);
   color: #ffffff;
@@ -237,7 +237,7 @@ body {
   text-align: center;
 }
 
-/* Modern findings table — soft Akasa card, generous spacing, no harsh grid. */
+/* Modern findings table — soft Task Manager card, generous spacing, no harsh grid. */
 .modern-table .tm-table {
   background: var(--color-card);
   border: 1px solid var(--color-stroke-soft);

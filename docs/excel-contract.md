@@ -13,8 +13,8 @@
 | 5 | E | `Mail Subject` | engagement thread key |
 | 6 | F | `Type` | web / mobile / api / other |
 | 7 | G | `Source / tool` | assessment source |
-| 8 | H | `POC Akasa Air` | contact names (slash-separated) |
-| 9 | I | `Digialert Team - Assigned member` | vendor assignment |
+| 8 | H | `POC` | contact names (slash-separated) |
+| 9 | I | `Assigned member` | vendor assignment |
 | 10 | J | `Overall Status` | engagement status |
 | 11 | K | `Total Vuln Count` | recorded aggregate |
 | 12 | L | `Scan/Report Date` | required date |

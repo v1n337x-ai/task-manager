@@ -136,7 +136,7 @@ model MasterValue {
 model Contact {
   id        Int      @id @default(autoincrement())
   fullName  String // e.g. "Kenneth Fernandes"
-  org       String   @default("Akasa Air") // "Akasa Air" | "Digialert (iWeen)" | ...
+  org       String   @default("Task Manager") // "Task Manager" | "security-vendor (iWeen)" | ...
   email     String?
   phone     String?
   notes     String?
@@ -158,7 +158,7 @@ model Contact {
 // ---------------------------------------------------------------------------
 model Application {
   id              Int       @id @default(autoincrement())
-  name            String    @unique // verbatim workbook name, e.g. "Akasa Air Ecommerce - PROD"
+  name            String    @unique // verbatim workbook name, e.g. "Task Manager Ecommerce - PROD"
   displayName     String // human-friendly display
   applicationType Int // FK -> application_type master value
   scope           Int // FK -> scope master value (internal | external)

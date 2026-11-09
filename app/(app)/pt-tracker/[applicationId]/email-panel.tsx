@@ -357,7 +357,7 @@ const ROLE_META: Record<string, { label: string; badge: string; dot: string; sid
   unknown: { label: "ROLE UNKNOWN", badge: "bg-band text-muted", dot: "#7a7a7a", side: "left" },
 };
 
-/** Two-sided thread convention: LEFT = Akasa defense + pentester (assessment
+/** Two-sided thread convention: LEFT = Task Manager defense + pentester (assessment
  * side), RIGHT = vendor developers. EVERY role maps into a side — no orphans. */
 const LEFT_SIDE = new Set(["pentester", "security_team", "application_owner", "management", "other", "unknown"]);
 

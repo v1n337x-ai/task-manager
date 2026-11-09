@@ -38,9 +38,9 @@ function mockAnalyze(context: AiAnalyzeContextInput): AiProviderAnalyzeResult {
         role = "pentester";
       } else if (/fixed|deployed|release|patch|remediat/.test(body)) {
         role = "developer";
-      } else if (m.from.includes("digialert") || /(pentester|tester)/.test(m.from)) {
+      } else if (m.from.includes("security-vendor") || /(pentester|tester)/.test(m.from)) {
         role = "pentester";
-      } else if (m.from.includes("akasa")) {
+      } else if (m.from.includes("Task Manager")) {
         role = "other";
       }
       participants.set(m.from, { email: m.from, role, quote, messageIndex: index });

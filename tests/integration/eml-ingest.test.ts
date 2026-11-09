@@ -1,6 +1,6 @@
-﻿/**
- * Phase 4 tests: .eml upload â†’ parse â†’ thread reconstruction â†’ participants â†’
- * attachments â†’ duplicates â†’ security guards.
+/**
+ * Phase 4 tests: .eml upload → parse → thread reconstruction → participants →
+ * attachments → duplicates → security guards.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -13,7 +13,7 @@ import { writeFixtures } from "../fixtures/eml-fixtures";
 
 const FIXTURE_DIR = path.join("tests", "fixtures", "eml-live");
 
-describe("upload guards (Â§7-Â§8)", () => {
+describe("upload guards (§7-§8)", () => {
   it("rejects non-.eml extensions", () => {
     expect(() => guardEmlUpload("report.pdf", Buffer.from("%PDF-1.4"))).toThrow(/only .eml files/);
   });
@@ -53,7 +53,7 @@ describe.skipIf(!dbAvailable)(".EML pipeline (test DB)", () => {
     appId = app.id;
   }, 60_000);
 
-  it("1-2. the Â§15 chain: three EMLs land on ONE thread (Message-ID graph + application link)", async () => {
+  it("1-2. the §15 chain: three EMLs land on ONE thread (Message-ID graph + application link)", async () => {
     const { validateEmlUpload, confirmEmlUpload } = await import("@/lib/eml/email-import-service");
     for (const name of ["chain-a.eml", "chain-b.eml", "chain-c.eml"]) {
       const content = fs.readFileSync(path.join(FIXTURE_DIR, name));
@@ -91,14 +91,14 @@ describe.skipIf(!dbAvailable)(".EML pipeline (test DB)", () => {
     expect(thread.messages.length).toBe(3);
     // graph facts:
     expect(thread.messages[0]!.inReplyTo).toBeNull();
-    expect(thread.messages[0]!.messageId).toBe("<chainA-0001@digialert.test>");
+    expect(thread.messages[0]!.messageId).toBe("<chainA-0001@security-vendor.test>");
     expect(thread.messages[1]!.inReplyTo).toContain("chainA-0001");
     expect(thread.messages[2]!.references).toContain("chainA-0001");
-    // participant roles: AUTO-DETECTED from the .eml (user-directed 2026-11) —
-    // the digialert vendor participants classify as pentester via the rule
+    // participant roles: AUTO-DETECTED from the .eml (user-directed 2026-11) �
+    // the security-vendor vendor participants classify as pentester via the rule
     // engine; unknown remains unknown only when no evidence exists.
     for (const m of thread.messages) {
-      if (m.fromContact.emailAddress.includes("digialert")) {
+      if (m.fromContact.emailAddress.includes("security-vendor")) {
         expect(m.fromContact.roleRef.value).toBe("pentester");
         expect(m.fromContact.roleSource).toBe("RULE");
       } else {
@@ -135,7 +135,7 @@ describe.skipIf(!dbAvailable)(".EML pipeline (test DB)", () => {
     const confirmed = await confirmEmlUpload({ jobId: result.jobId, userId, ctx: {} });
     const message = await testDb.emailMessage.findUniqueOrThrow({ where: { id: confirmed.messageId! } });
     expect(message.bodyHtml).toContain("<strong>markup</strong>");
-    // §2: the DB preserves the ORIGINAL html; sanitization happens at read-time.
+    // �2: the DB preserves the ORIGINAL html; sanitization happens at read-time.
     const { sanitizeEmailHtml } = await import("@/lib/eml/sanitize");
     expect(sanitizeEmailHtml(message.bodyHtml) ?? "").not.toContain("<script");
     const attachments = await testDb.emailAttachment.findMany({ where: { messageId: message.id } });
@@ -143,7 +143,7 @@ describe.skipIf(!dbAvailable)(".EML pipeline (test DB)", () => {
     expect(attachments[0]!.sizeBytes).toBeGreaterThan(0);
   });
 
-  it("4-5. absent Message-ID â†’ deterministic synthetic ID (Â§13); original preserved", async () => {
+  it("4-5. absent Message-ID → deterministic synthetic ID (§13); original preserved", async () => {
     const content = fs.readFileSync(path.join(FIXTURE_DIR, "no-message-id.eml"));
     const { validateEmlUpload, confirmEmlUpload } = await import("@/lib/eml/email-import-service");
     const validated = await validateEmlUpload({ filename: "no-message-id.eml", content, userId, ctx: {} });
@@ -169,16 +169,16 @@ describe.skipIf(!dbAvailable)(".EML pipeline (test DB)", () => {
     await expect(confirmEmlUpload({ jobId: again.jobId, userId, ctx: {} })).rejects.toThrow(/Duplicate EML detected/);
     expect(await testDb.emailMessage.count()).toBe(messagesBefore);
 
-    // Â§13: explicit force reprocess â€” same Message-ID identities are NEVER duplicated;
+    // §13: explicit force reprocess — same Message-ID identities are NEVER duplicated;
     // the same row is reused (idempotent interpretation refresh).
     const forced = await confirmEmlUpload({ jobId: again.jobId, userId, force: true, ctx: {} });
     expect(forced.threadReason).toBe("message_id_known");
     expect(await testDb.emailMessage.count()).toBe(messagesBefore);
-    const sameMessage = await testDb.emailMessage.findUniqueOrThrow({ where: { messageId: "<chainA-0001@digialert.test>" } });
+    const sameMessage = await testDb.emailMessage.findUniqueOrThrow({ where: { messageId: "<chainA-0001@security-vendor.test>" } });
     expect(sameMessage.threadId).toBe(forced.threadId);
   });
 
-  it("Â§17: identical subject across DIFFERENT participants/application must NOT merge", async () => {
+  it("§17: identical subject across DIFFERENT participants/application must NOT merge", async () => {
     const { prisma } = await import("@/lib/db");
     const { validateEmlUpload, confirmEmlUpload } = await import("@/lib/eml/email-import-service");
     const otherApp = await testDb.application.create({
@@ -192,7 +192,7 @@ describe.skipIf(!dbAvailable)(".EML pipeline (test DB)", () => {
       },
     });
     const email = `From: someone@elsewhere.test
-To: other-owner@akasa.test
+To: other-owner@client.test
 Subject: VAPT Findings - Application X
 Date: Sat, 07 Nov 2026 09:00:00 +0530
 Message-ID: <unrelated-99@elsewhere.test>

@@ -12,7 +12,8 @@ export interface RoleInference {
   basis: string;
 }
 
-const PENTESTER_DOMAINS = ["digialert"];
+const PENTESTER_DOMAINS = ["security-vendor", "pentest"];
+const CLIENT_DOMAINS = ["example.com", "example.net", "example.org", "client"];
 const VENDOR_HINTS = ["pentest", "vapt", "penetration", "security", "retest", "re-test", "infosec", "ciso"];
 const OWNER_HINTS = ["owner", "product", "manager"];
 const DEV_HINTS = ["developer", "dev team", "engineering"];
@@ -37,7 +38,7 @@ export function inferParticipantRoleFromEml(params: {
   // 1) Vendor team domain — the pentest vendor's own addresses (strong signal).
   if (PENTESTER_DOMAINS.some((d) => domain.includes(d))) {
     const bodyBacks = PENTEST_BODY.test(body);
-    return { role: "pentester", confidence: bodyBacks ? 90 : 78, basis: bodyBacks ? "digialert vendor domain + retest language in body" : "digialert vendor domain" };
+    return { role: "pentester", confidence: bodyBacks ? 90 : 78, basis: bodyBacks ? "configured security-vendor domain + retest language in body" : "configured security-vendor domain" };
   }
 
   // 2) body-strong signals (independent of domain).
@@ -45,31 +46,31 @@ export function inferParticipantRoleFromEml(params: {
   const isDevBody = DEV_BODY.test(body) && !/not\s+(?:fixed|resolved)/i.test(body);
   const isSecurityTitle = /ciso|chief information security|information security officer/i.test(body);
   if (isPentestBody && !isDevBody) {
-    // Vendor (digialert) senders are the pentest vendor; Akasa-side senders
-    // reporting VAPT status are the security team, not the vendor.
-    const role = domain.includes("akasa") ? "security_team" : "pentester";
+    // Client-side senders reporting VAPT status are the security team, not
+    // the vendor; vendor senders are the pentest team.
+    const role = CLIENT_DOMAINS.some((d) => domain.includes(d)) ? "security_team" : "pentester";
     return { role, confidence: 76, basis: "retest/penetration language in the message body" };
   }
   if (isDevBody && !isPentestBody) {
     return { role: "developer", confidence: 72, basis: "fix/remediation language in the message body" };
   }
 
-  // 3) Airline-side roles from name/email hints.
-  if (domain.includes("akasa")) {
+  // Client-side roles from name/email hints.
+  if (CLIENT_DOMAINS.some((d) => domain.includes(d))) {
     if (SECURITY_HINTS.some((h) => name.includes(h) || email.includes(h)) || isSecurityTitle) {
-      return { role: "security_team", confidence: 70, basis: "security wording on an Akasa address" };
+      return { role: "security_team", confidence: 70, basis: "security wording on a client address" };
     }
     if (DEV_HINTS.some((h) => name.includes(h) || email.includes(h))) {
-      return { role: "developer", confidence: 68, basis: "developer wording on an Akasa address" };
+      return { role: "developer", confidence: 68, basis: "developer wording on a client address" };
     }
     if (OWNER_HINTS.some((h) => name.includes(h))) {
-      return { role: "application_owner", confidence: 64, basis: "owner wording on an Akasa address" };
+      return { role: "application_owner", confidence: 64, basis: "owner wording on a client address" };
     }
   }
   if (VENDOR_HINTS.some((h) => name.includes(h)) || VENDOR_HINTS.some((h) => email.includes(h))) {
     return { role: "pentester", confidence: 60, basis: "vendor/test-team wording in the display name or address" };
   }
 
-  // 4) Default Akasa-side participant without evidence stays UNKNOWN (honest).
+  // 4) Default client-side participant without evidence stays UNKNOWN (honest).
   return null;
 }

@@ -13,7 +13,7 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
-  const adminEmail = (process.env.SEED_ADMIN_EMAIL ?? "admin@akasaair.com").toLowerCase();
+  const adminEmail = (process.env.SEED_ADMIN_EMAIL ?? "admin@example.com").toLowerCase();
   const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? "";
   if (adminPassword.length < 10) {
     throw new Error("Refusing to seed: SEED_ADMIN_PASSWORD must be set (min 10 chars) in your .env file.");
@@ -44,58 +44,8 @@ async function main() {
   }
   console.log(`✓ seeded ${MASTER_VALUES.length} master values across ${new Set(MASTER_VALUES.map((m) => m.domain)).size} domains`);
 
-  // 3) A small set of applications (name spellings match the real tracker for
-  //    Phase 3 continuity; no findings/counts — those arrive via import).
-  const getIds = async () => {
-    const rows = await prisma.masterValue.findMany();
-    const byKey = (domain: string, value: string) => rows.find((r) => r.domain === domain && r.value === value)!.id;
-    return { byKey };
-  };
-  const { byKey } = await getIds();
-
-  const apps = [
-    {
-      name: "Akasa Air Ecommerce - PROD",
-      displayName: "Akasa Air Ecommerce",
-      type: "web",
-      scope: "internal",
-      environment: "prod",
-      webUrl: "https://www.akasaair.com",
-    },
-    {
-      name: "Akasa Air Ecommerce - UAT",
-      displayName: "Akasa Air Ecommerce (UAT)",
-      type: "web",
-      scope: "internal",
-      environment: "uat",
-      webUrl: "https://uat-web.akasaair.in",
-    },
-    {
-      name: "Cash Portal Phase-1",
-      displayName: "Cash Portal",
-      type: "web",
-      scope: "internal",
-      environment: "uat",
-      webUrl: "https://uat.qp.akasaair.com/cash-portal",
-    },
-  ];
-
-  for (const app of apps) {
-    await prisma.application.upsert({
-      where: { name: app.name },
-      update: { displayName: app.displayName },
-      create: {
-        name: app.name,
-        displayName: app.displayName,
-        applicationType: byKey("application_type", app.type),
-        scope: byKey("scope", app.scope),
-        environment: byKey("environment", app.environment),
-        site: byKey("application_status", "active"),
-        webUrl: app.webUrl,
-      },
-    });
-  }
-  console.log(`✓ seeded ${apps.length} applications (registry only — no tracker data, per Phase 3 rule)`);
+  // 3) No operational data is seeded. Applications, engagements, findings, mail,
+  //    and report documents are added only after first login.
 
   // 4) Register the workbook schema version contract (brief section 37) so Phase 3
   //    import/export can already reference a stored 39-column contract.

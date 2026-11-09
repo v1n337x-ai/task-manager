@@ -1,6 +1,6 @@
 # Task Manager — VAPT
 
-Internal VAPT management platform for the Akasa Air programme. **Implementation complete (Phases 2 → 8).**
+Internal VAPT management platform for the Task Manager programme. **Implementation complete (Phases 2 → 8).**
 
 > Architecture and data model follow the approved Phase 1 Blueprint (`../Phase 1 Blueprint/`). Deviations made under change control are listed at the bottom of this file.
 

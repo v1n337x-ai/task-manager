@@ -242,9 +242,9 @@ export async function importMasterTrackerWorkbook(
       }
     }
 
-    // ---- contacts: POC Akasa Air + Digialert assigned members ----
+    // ---- contacts: POC Task Manager + security-vendor assigned members ----
     for (const person of splitPeople(row.pocText)) {
-      const contactId = await ensureContact(person, "Akasa Air");
+      const contactId = await ensureContact(person, "Task Manager");
       if (contactId === null) continue;
       const app = await prisma.application.findUnique({ where: { id: targetApp.id }, select: { primaryPocId: true } });
       if (app && app.primaryPocId === null) {
@@ -252,7 +252,7 @@ export async function importMasterTrackerWorkbook(
       }
     }
     for (const person of splitPeople(row.assignedText)) {
-      const contactId = await ensureContact(person, "Digialert (iWeen)");
+      const contactId = await ensureContact(person, "security-vendor (iWeen)");
       if (contactId === null) continue;
       await linkAssignedMember(targetApp.id, contactId);
     }
@@ -356,7 +356,7 @@ function splitPeople(text: string | null): string[] {
 }
 
 const ORG_TOKENS: [RegExp, string][] = [
-  [/iween/i, "Digialert (iWeen)"],
+  [/iween/i, "security-vendor (iWeen)"],
   [/volody/i, "Volody"],
   [/smartcargo|smartkargo/i, "SmartKargo"],
   [/haptik/i, "Haptik"],

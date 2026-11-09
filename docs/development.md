@@ -27,7 +27,7 @@ npm run db:seed
 npm run dev                 # http://localhost:3210 → auto-redirects to /login
 ```
 
-Seeded login lives in your `.env` (e.g. `admin@akasaair.com` + your `SEED_ADMIN_PASSWORD`).
+Seeded login lives in your `.env` (e.g. `admin@example.com` + your `SEED_ADMIN_PASSWORD`).
 
 ## Scripts
 

@@ -27,7 +27,7 @@ const VALID_V1 = {
   threadSummary: "Thread with three messages discussing retest status of F-002.",
   participants: [
     {
-      email: "vineet@digialert.test",
+      email: "vineet@security-vendor.test",
       proposedRole: "pentester",
       roleBasis: "EXPLICIT",
       confidence: "MEDIUM",

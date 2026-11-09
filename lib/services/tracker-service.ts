@@ -30,8 +30,8 @@ export interface TrackerAppRow {
   assessmentTypeLabel: string;
   engagementName: string | null;
   mailSubject: string | null; // Excel "Mail Subject"
-  poc: string | null; // Excel "POC Akasa Air"
-  assignedMembers: string | null; // Excel "Digialert Team - Assigned member"
+  poc: string | null; // Excel "POC Task Manager"
+  assignedMembers: string | null; // Excel "security-vendor Team - Assigned member"
   requestedDate: Date | null; // Excel "Requested date"
   reportDate: Date | null; // Excel "Scan/Report Date"
   comments: string | null; // Excel "Comments"

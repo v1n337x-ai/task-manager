@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Test bootstrap: loads .env.test, provides a disposable Prisma client + schema
  * reset helper (brief sections 52-53: from-empty migration + seed verification).
  */
@@ -10,7 +10,7 @@ import { config } from "dotenv";
 import { execSync } from "node:child_process";
 import { PrismaClient } from "@prisma/client";
 
-// Load the isolated test environment (.env.test â€” separate database).
+// Load the isolated test environment (.env.test — separate database).
 config({ path: path.resolve(__dirname, "..", ".env.test"), override: true });
 
 export const testDb = new PrismaClient();
@@ -26,11 +26,11 @@ try {
     dbAvailable = true;
   }
 } catch {
-  console.warn("[tests] test database unreachable â€” DB-dependent tests will SKIP.");
+  console.warn("[tests] test database unreachable — DB-dependent tests will SKIP.");
 }
 
 function prismaCli(args: string): string {
-  // Direct Node entry — Windows .cmd shims require a shell to spawn (Node ≥ 20).
+  // Direct Node entry � Windows .cmd shims require a shell to spawn (Node = 20).
   const cli = path.join(ROOT, "node_modules", "prisma", "build", "index.js");
   return `"${process.execPath}" "${cli}" ${args}`;
 }
@@ -90,16 +90,16 @@ export async function resetTestData(): Promise<void> {
 export async function seedMinimal(bcryptModule: typeof bcrypt): Promise<{ userId: number }> {
   const passwordHash = await bcryptModule.hash(process.env.SEED_ADMIN_PASSWORD ?? "TaskManager!2026", 4);
   const user = await testDb.user.upsert({
-    where: { email: (process.env.SEED_ADMIN_EMAIL ?? "admin@akasaair.com").toLowerCase() },
+    where: { email: (process.env.SEED_ADMIN_EMAIL ?? "admin@clientair.com").toLowerCase() },
     update: { passwordHash },
-    create: { email: (process.env.SEED_ADMIN_EMAIL ?? "admin@akasaair.com").toLowerCase(), passwordHash, displayName: "Platform Admin" },
+    create: { email: (process.env.SEED_ADMIN_EMAIL ?? "admin@clientair.com").toLowerCase(), passwordHash, displayName: "Platform Admin" },
   });
   const { MASTER_VALUES } = (await import("../lib/master-data/vocabulary")) as { MASTER_VALUES: { domain: string; value: string; label: string; sortOrder: number }[] };
   await testDb.masterValue.createMany({
     data: MASTER_VALUES.map((m) => ({ domain: m.domain, value: m.value, label: m.label, sortOrder: m.sortOrder })),
     skipDuplicates: true,
   });
-  // Register the fixed workbook contract (Phase 3 §37) — required by the importer.
+  // Register the fixed workbook contract (Phase 3 �37) � required by the importer.
   await testDb.schemaVersion.upsert({
     where: { trackerName_version: { trackerName: "PT Tracker", version: "1.0" } },
     update: { columnsCount: 39 },

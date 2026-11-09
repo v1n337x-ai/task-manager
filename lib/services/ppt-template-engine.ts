@@ -251,7 +251,7 @@ function normalizeAppName(value: string): string {
     .replace(/\bblack box\b/g, "bb")
     .replace(/\btesting\b/g, "")
     .replace(/\bwww\b/g, "")
-    .replace(/\bakasa air\b/g, "")
+    .replace(/\bTask Manager\b/g, "")
     .replace(/\becommerce\b/g, "ecom")
     .replace(/\bmarketing\b/g, "")
     .replace(/\s+/g, " ")

@@ -5,7 +5,7 @@ import LoginForm from "./login-form";
 export const metadata: Metadata = { title: "Sign in" };
 
 /**
- * Login (brief section 7): centered card pattern from the digiALERT reference
+ * Login (brief section 7): centered card pattern from the security-vendor reference
  * study, brand-consistent with Phase 1 tokens. Deliberately undecorated.
  */
 export default async function LoginPage({
@@ -18,7 +18,7 @@ export default async function LoginPage({
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-page-soft px-4">
-      {/* Akasa sky backdrop: sunrise-orange wash into a soft violet dusk. */}
+      {/* Task Manager sky backdrop: sunrise-orange wash into a soft violet dusk. */}
       <div aria-hidden className="absolute inset-0">
         <div className="absolute inset-0 bg-gradient-to-br from-[#fff0e6] via-[#fff9f5] to-[#f0e6ff]" />
         <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-accent/20 blur-3xl" />
@@ -47,7 +47,7 @@ export default async function LoginPage({
         </div>
 
         <p className="mt-6 text-center text-xs text-muted">
-          Akasa Air · It&apos;s Your Sky · Internal platform, single authorized credential
+          Task Manager · It&apos;s Your Sky · Internal platform, single authorized credential
         </p>
       </div>
     </main>

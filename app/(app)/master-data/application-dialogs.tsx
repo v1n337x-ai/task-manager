@@ -139,11 +139,11 @@ export function ApplicationDialogs({ masterValues }: { masterValues: MasterValue
               </div>
               <div>
                 <Label htmlFor="apiFqdn">API / FQDN</Label>
-                <Input id="apiFqdn" name="apiFqdn" placeholder="api.example.akasaair.com" />
+                <Input id="apiFqdn" name="apiFqdn" placeholder="api.example.Task Managerair.com" />
               </div>
               <div>
                 <Label htmlFor="rawTarget">Other target (APK/bundle)</Label>
-                <Input id="rawTarget" name="rawTarget" placeholder="com.app.akasaair.staging" />
+                <Input id="rawTarget" name="rawTarget" placeholder="com.app.Task Managerair.staging" />
               </div>
             </div>
 

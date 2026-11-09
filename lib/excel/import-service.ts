@@ -967,9 +967,9 @@ async function upsertContactTx(tx: Prisma.TransactionClient, fullName: string | 
   if (!fullName) return null;
   try {
     const contact = await tx.contact.upsert({
-      where: { org_fullName: { org: "Akasa Air", fullName } },
+      where: { org_fullName: { org: "Task Manager", fullName } },
       update: {},
-      create: { fullName, org: "Akasa Air" },
+      create: { fullName, org: "Task Manager" },
     });
     return contact.id;
   } catch {

@@ -7,7 +7,7 @@
  */
 import type { AiAnalyzeContextInput } from "./providers";
 
-const SCHEMA_INSTRUCTIONS = `You are the deterministic extraction engine of an internal VAPT management platform (Akasa Air "Task Manager"). You analyze a VULNERABILITY-ASSESSMENT EMAIL THREAD and return a single JSON object, nothing else.
+const SCHEMA_INSTRUCTIONS = `You are the deterministic extraction engine of an internal VAPT management platform (Task Manager "Task Manager"). You analyze a VULNERABILITY-ASSESSMENT EMAIL THREAD and return a single JSON object, nothing else.
 
 OUTPUT RULES (absolute):
 1. Respond with EXACTLY ONE JSON object conforming to AI_EXTRACTION_V1. No markdown, no prose before or after, no JSON fences.

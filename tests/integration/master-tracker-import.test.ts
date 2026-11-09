@@ -1,7 +1,7 @@
 /**
  * Phase M2 — master multi-app tracker import ("PT Tracker 26-27.xlsx").
  * Covers: header/band detection, dd/mm/yyyy + Date cell parsing, grand-total
- * row skip, invalid-matrix guard (Akasa-Inflight-style junk), per-severity CAR
+ * row skip, invalid-matrix guard (Task Manager-Inflight-style junk), per-severity CAR
  * reconstruction, engagement/iteration fill-fill-empty behavior, contacts,
  * placeholder findings, sha256 idempotency and the snapshot marker guard.
  */
@@ -13,7 +13,7 @@ import { parseMasterTrackerWorkbook, type MasterTrackerParseResult } from "@/lib
 
 const HEADERS = [
   "S.no", "Application", "Internal / External", "Web URL/API/FQDN", "Mail Subject", "Type", "Source / tool",
-  "POC Akasa Air", "Digialert Team - Assigned member", "Overall Status", "Total Vuln Count", "Scan/Report Date",
+  "POC Task Manager", "security-vendor Team - Assigned member", "Overall Status", "Total Vuln Count", "Scan/Report Date",
   "Requested date", "iteration - 1 Date", "Iteration - 1 Status", "Iteration-2 Date ", "Iteration - 2 Status",
   "Comments", "Follow-up", "Follow-up Response", "Critical ", "High ", "Medium ", "Low", "Info ",
   "CAR", "Total", "Pending", "Vulnerabilities  Closed",
@@ -24,7 +24,7 @@ function buildMasterWorkbook(): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("VAPT tracker");
   // band row: title + severity band over the Open/Closed matrix
-  const band: (string | number)[] = ["Akasa Air VAPT Tracker 2026"];
+  const band: (string | number)[] = ["Task Manager VAPT Tracker 2026"];
   ws.addRow(band);
   for (let c = 31; c <= 40; c++) ws.getRow(1).getCell(c).value = ["Critical", "Critical", "High", "High", "Medium", "Medium", "Low", "Low", "Info", "Info"][c - 31]!;
   // header row
@@ -34,25 +34,25 @@ function buildMasterWorkbook(): Promise<Buffer> {
   header[34] = "Open"; header[35] = "Closed"; header[36] = "Open"; header[37] = "Closed";
   header[38] = "Open"; header[39] = "Closed";
   ws.addRow(header);
-  // row 3 — full data row (Akasa Air Ecommerce - PROD-like):
+  // row 3 — full data row (Task Manager Ecommerce - PROD-like):
   // totals crit2/hi1/med4/low2/info1 = 10; open: med1; closed: crit2 hi1 med1 low2; CAR → med2 info1 (recon=3)
   ws.addRow([
-    1, "Volody Contracts (Black Box Testing)", "External", "https://contracts.qp.akasaair.com", "URGENT : Suspected open secrets", "Web", "Manual Testing / Burp",
+    1, "Volody Contracts (Black Box Testing)", "External", "https://contracts.qp.Task Managerair.com", "URGENT : Suspected open secrets", "Web", "Manual Testing / Burp",
     "Hemal Dodhia - Volody", "Vineet ", "Completed", 3, "19/6/2026", "17/6/2026", "19/6/2026", "Completed", "19/6/2026", "Completed",
-    "Summary of contracts.akasaair.com (Production Environment)", "20/7/2026", "We sent the summary.", 3, 0, 0, 0, 0, 0, 3, 0, 3,
+    "Summary of contracts.Task Managerair.com (Production Environment)", "20/7/2026", "We sent the summary.", 3, 0, 0, 0, 0, 0, 3, 0, 3,
     "", "", "", "", "", "", "", "", "", "",
   ]);
   for (let c = 31; c <= 40; c++) ws.getRow(3).getCell(c).value = [0, 3, 0, 0, 0, 0, 0, 0, 0, 0][c - 31]!;
   // row 4 — mixed-type date cells (Date objects for scanned columns)
   ws.addRow([
-    2, "MyFlights Web", "Internal", "https://myflights.akasaair.com", "Web VAPT for MyFlights", "Web", "AI Assisted",
+    2, "MyFlights Web", "Internal", "https://myflights.Task Managerair.com", "Web VAPT for MyFlights", "Web", "AI Assisted",
     "Ramesh Ganji / Amar Nath", "Vineet / Niranjena", "In Progress", 10, new Date(Date.UTC(2026, 2, 24)), "16/2/2026", "24/3/2026", "Completed", "Pending", "In Progress",
     "Iteration-1 completed with 10 findings.", "18/9/2026", "Validation confirmed Fixed.", 3, 2, 2, 3, 0, 0, 10, 7, 3,
   ]);
   for (let c = 31; c <= 40; c++) ws.getRow(4).getCell(c).value = [1, 2, 2, 0, 1, 1, 3, 0, 0, 0][c - 31]!;
   // row 5 — grand-total band (no S.no) — must be skipped
   ws.addRow(["", "TOTAL ROW", "", "", "", "", "", "", "", "", 227, "", "", "", "", "", "", "", "", "", 44, 62, 63, 52, 2, 7, 227, 103, 113]);
-  // row 6 — junk matrix above declared total (Akasa Inflight-style) → matrix ignored, 0 vulns
+  // row 6 — junk matrix above declared total (Task Manager Inflight-style) → matrix ignored, 0 vulns
   ws.addRow([
     3, "Import Master App X", "Internal", "", "Request for VAPT Testing", "Mobile Application", "VAPT",
     "Mohsin Chunawala", "Vineet ", "Initiated / Walkthrough Pending", 0, new Date(Date.UTC(2026, 9, 8)), "10/8/2026", "", "", "", "",
@@ -200,7 +200,7 @@ describe.skipIf(!dbAvailable)("Master tracker import (Phase M2)", () => {
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("VAPT tracker");
     const rows = [
-      ["Akasa Air VAPT Tracker 2026", ...Array.from({ length: 30 }, () => "")],
+      ["Task Manager VAPT Tracker 2026", ...Array.from({ length: 30 }, () => "")],
     ] as unknown as (string | number)[][];
     ws.addRow(rows[0]!);
     for (let c = 31; c <= 40; c++) ws.getRow(1).getCell(c).value = ["Critical", "Critical", "High", "High", "Medium", "Medium", "Low", "Low", "Info", "Info"][c - 31]!;

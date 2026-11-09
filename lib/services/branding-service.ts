@@ -14,7 +14,7 @@ const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
 function normalizeHex(value: string): string {
   const v = value.trim().toLowerCase();
-  if (!HEX_RE.test(v)) throw new Error("Color must be an Akasa orange or violet hex code, for example #ff8c42 or #9b7bb5.");
+  if (!HEX_RE.test(v)) throw new Error("Color must be an Task Manager orange or violet hex code, for example #ff8c42 or #9b7bb5.");
   return v;
 }
 
@@ -38,18 +38,18 @@ function hsl(hex: string): { hue: number; saturation: number } {
 }
 
 export function validatePrimaryColor(value: unknown): string {
-  if (typeof value !== "string") throw new Error("Akasa primary must be an orange hex code.");
+  if (typeof value !== "string") throw new Error("Task Manager primary must be an orange hex code.");
   const hex = normalizeHex(value);
   const { hue, saturation } = hsl(hex);
-  if (hue < 8 || hue > 48 || saturation < 0.35) throw new Error("Akasa primary must be an orange hex code.");
+  if (hue < 8 || hue > 48 || saturation < 0.35) throw new Error("Task Manager primary must be an orange hex code.");
   return hex;
 }
 
 export function validateSecondaryColor(value: unknown): string {
-  if (typeof value !== "string") throw new Error("Akasa secondary must be a violet hex code.");
+  if (typeof value !== "string") throw new Error("Task Manager secondary must be a violet hex code.");
   const hex = normalizeHex(value);
   const { hue, saturation } = hsl(hex);
-  if (hue < 255 || hue > 302 || saturation < 0.12) throw new Error("Akasa secondary must be a violet hex code.");
+  if (hue < 255 || hue > 302 || saturation < 0.12) throw new Error("Task Manager secondary must be a violet hex code.");
   return hex;
 }
 
@@ -95,7 +95,7 @@ async function readStored(key: string): Promise<string | null> {
 
 /**
  * Read the admin-selected UI brand colors. Falls back to the existing
- * orange/violet Akasa defaults if no value has been saved yet.
+ * orange/violet Task Manager defaults if no value has been saved yet.
  */
 export async function getBrandingColors(): Promise<BrandingColors> {
   const [primary, secondary] = await Promise.all([

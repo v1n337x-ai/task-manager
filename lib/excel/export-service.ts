@@ -1,12 +1,12 @@
-﻿/**
- * PT Tracker v1.0 Excel export (Phase 3 Â§31/Â§33/Â§35/Â§66).
+/**
+ * PT Tracker v1.0 Excel export (Phase 3 §31/§33/§35/§66).
  *
- * The ORIGINAL workbook (prisma/templates/pt-tracker-v1.xlsx â€” the uploaded
+ * The ORIGINAL workbook (prisma/templates/pt-tracker-v1.xlsx — the uploaded
  * file) is the binary template: ExcelJS opens it, ONLY data regions are
  * rewritten, all styling/validation chrome stays untouched. Exported numbers
- * are LIVE database values (Â§36/Â§37) â€” never stale workbook snapshots.
+ * are LIVE database values (§36/§37) — never stale workbook snapshots.
  * Totals are rewritten as explicit SUM formulas over the exported range
- * (no stale #REF! formulas are recreated, Â§35).
+ * (no stale #REF! formulas are recreated, §35).
  */
 import path from "node:path";
 import fs from "node:fs";
@@ -57,9 +57,9 @@ export interface TrackerExportRow {
   reportDate: Date | null;
   iteration1: { startDate: Date | null; reportDate: Date | null; statusRaw: string } | null;
   iteration2: { reportDate: Date | null; statusRaw: string } | null;
-  description: string | null; // Comments (R) — engagement notes / AI thread summary
-  followUpDate: Date | null; // Follow-up (S) — next-chase date
-  followUpResponse: string | null; // Follow-up Response (T) — manually set responses
+  description: string | null; // Comments (R) � engagement notes / AI thread summary
+  followUpDate: Date | null; // Follow-up (S) � next-chase date
+  followUpResponse: string | null; // Follow-up Response (T) � manually set responses
   counts: {
     critical: number;
     high: number;
@@ -75,7 +75,7 @@ export interface TrackerExportRow {
   };
 }
 
-/** One efficient pass: gather everything, compute live counts in memory (Â§57). */
+/** One efficient pass: gather everything, compute live counts in memory (§57). */
 export async function buildExportRows(): Promise<TrackerExportRow[]> {
   const apps = await prisma.application.findMany({
     where: { isActive: true },
@@ -190,7 +190,7 @@ export async function buildExportRows(): Promise<TrackerExportRow[]> {
   return rows;
 }
 
-/** Render the workbook and record the ExportJob (Â§40). */
+/** Render the workbook and record the ExportJob (§40). */
 export async function exportTrackerWorkbook(
   userId: number,
   ctx: { ip?: string; userAgent?: string },
@@ -252,7 +252,7 @@ export async function exportTrackerWorkbook(
     }
   }
 
-  applyAkasaLightTheme(sheet, exportRows, await getBrandingColors().catch(() => ({ primary: "#ff8c42", secondary: "#9b7bb5" })));
+  applyBrandLightTheme(sheet, exportRows, await getBrandingColors().catch(() => ({ primary: "#ff8c42", secondary: "#9b7bb5" })));
 
   // ---- Single pass: write each data row completely (A..AN) ----
   for (let i = 0; i < exportRows.length; i++) {
@@ -262,7 +262,7 @@ export async function exportTrackerWorkbook(
     // Values only; ExcelJS preserves existing cell styles when not touched.
     row.getCell(1).value = e.sNo; // A S.no
     row.getCell(1).style = { ...(row.getCell(1).style ?? {}), numFmt: "0" };
-    row.getCell(2).value = e.name; // B Application (plain string â€” survives re-import)
+    row.getCell(2).value = e.name; // B Application (plain string — survives re-import)
     row.getCell(3).value = e.scopeRaw; // C
     row.getCell(4).value = e.target; // D (hyperlink objects replaced with plain values)
     row.getCell(5).value = e.mailSubject ?? e.engagementName; // E (engagement thread key)
@@ -321,7 +321,7 @@ export async function exportTrackerWorkbook(
     if (touched) row.commit();
   }
 
-  // ---- Totals (Â§35): explicit SUMs across the exported range; no stale refs ----
+  // ---- Totals (§35): explicit SUMs across the exported range; no stale refs ----
   const lastData = DATA_START_ROW + exportRows.length - 1;
   const totalsRowNumber = exportRows.length > LAST_TEMPLATE_DATA_ROW - DATA_START_ROW + 1
     ? lastData + 1
@@ -500,14 +500,14 @@ function engagementReportDate(e: TrackerExportRow): Date | null {
 }
 
 /**
- * Light Akasa Air skin, applied to the EXPORTED workbook only — column layout,
+ * Light Task Manager skin, applied to the EXPORTED workbook only � column layout,
  * header text, values, merged cells and column widths are NEVER moved or
  * renamed (39-column contract stays binary-stable). Touches fills + font
  * colors only: group-label row 1 (soft sunrise orange), header row 2 (light
  * peach + deep plum), totals row (warm plum tint). Import reads values, so
  * the round trip is unaffected.
  */
-function applyAkasaLightTheme(sheet: ExcelJS.Worksheet, exportRows: TrackerExportRow[] = [], brand: BrandingColors = { primary: "#ff8c42", secondary: "#9b7bb5" }): void {
+function applyBrandLightTheme(sheet: ExcelJS.Worksheet, exportRows: TrackerExportRow[] = [], brand: BrandingColors = { primary: "#ff8c42", secondary: "#9b7bb5" }): void {
   const plum = "FF3D2054";
   const deepOrange = "FFE0550C";
   const argb = (hex: string) => (hex.startsWith("#") ? "FF" + hex.slice(1).toUpperCase() : hex);
@@ -518,7 +518,7 @@ function applyAkasaLightTheme(sheet: ExcelJS.Worksheet, exportRows: TrackerExpor
   void plum;
   void deepOrange;
 
-  // Row 1 — severity group labels (merged "Critical/Open/Closed" pairs, AE..AN).
+  // Row 1 � severity group labels (merged "Critical/Open/Closed" pairs, AE..AN).
   const groupRow = sheet.getRow(1);
   groupRow.eachCell((cell) => {
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: primaryTint } };
@@ -526,7 +526,7 @@ function applyAkasaLightTheme(sheet: ExcelJS.Worksheet, exportRows: TrackerExpor
   });
   groupRow.commit();
 
-  // Row 2 — the contracted header row (A..AN).
+  // Row 2 � the contracted header row (A..AN).
   const headerRow = sheet.getRow(2);
   headerRow.eachCell((cell) => {
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: secondaryTint } };
@@ -535,7 +535,7 @@ function applyAkasaLightTheme(sheet: ExcelJS.Worksheet, exportRows: TrackerExpor
   });
   headerRow.commit();
 
-  // Completed application rows — light green across A..AN. Fill only; values,
+  // Completed application rows � light green across A..AN. Fill only; values,
   // fonts, borders and alignment are preserved.
   for (let i = 0; i < exportRows.length; i++) {
     const e = exportRows[i]!;
@@ -555,7 +555,7 @@ function applyAkasaLightTheme(sheet: ExcelJS.Worksheet, exportRows: TrackerExpor
     row.commit();
   }
 
-  // Totals row — SUM row (U..AN) gets a warm plum band; values/format untouched.
+  // Totals row � SUM row (U..AN) gets a warm plum band; values/format untouched.
   const totalsRow = sheet.getRow(TOTALS_ROW);
   totalsRow.eachCell((cell) => {
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: secondaryTint } };

@@ -23,7 +23,7 @@ export default function LoginForm({ nextPath }: { nextPath?: string }) {
           required
           autoFocus
           className="w-full rounded-lg border border-stroke bg-card px-3 py-2 text-ink-2 placeholder:text-muted focus:outline-none"
-          placeholder="you@akasaair.com"
+          placeholder="you@clientair.com"
         />
       </div>
 

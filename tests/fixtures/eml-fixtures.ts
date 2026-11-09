@@ -6,46 +6,46 @@
 import path from "node:path";
 import fs from "node:fs";
 
-export const chainA = `From: Vineet S <vineet@digialert.test>
-To: Akasa Team <appowner@akasa.test>
-Cc: security@akasa.test
+export const chainA = `From: Vineet S <vineet@security-vendor.test>
+To: Task Manager Team <appowner@client.test>
+Cc: security@client.test
 Subject: VAPT Findings - Application X
 Date: Mon, 02 Nov 2026 09:30:00 +0530
-Message-ID: <chainA-0001@digialert.test>
+Message-ID: <chainA-0001@security-vendor.test>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=utf-8
 
 Iteration 1 report contains 3 findings for Application X.
 `;
 
-export const chainB = `From: appowner@akasa.test
-To: vineet@digialert.test
+export const chainB = `From: appowner@client.test
+To: vineet@security-vendor.test
 Subject: Re: VAPT Findings - Application X
 Date: Mon, 02 Nov 2026 17:12:00 +0530
-In-Reply-To: <chainA-0001@digialert.test>
-References: <chainA-0001@digialert.test>
-Message-ID: <chainB-0002@akasa.test>
+In-Reply-To: <chainA-0001@security-vendor.test>
+References: <chainA-0001@security-vendor.test>
+Message-ID: <chainB-0002@client.test>
 Content-Type: text/plain; charset=utf-8
 
 Developer response: High severity findings F-001 and F-002 are fixed.
 `;
 
-export const chainC = `From: vineet@digialert.test
-To: appowner@akasa.test
+export const chainC = `From: vineet@security-vendor.test
+To: appowner@client.test
 Subject: Re: Re: VAPT Findings - Application X
 Date: Tue, 03 Nov 2026 10:00:00 +0530
-References: <chainA-0001@digialert.test> <chainB-0002@akasa.test>
-Message-ID: <chainC-0003@digialert.test>
+References: <chainA-0001@security-vendor.test> <chainB-0002@client.test>
+Message-ID: <chainC-0003@security-vendor.test>
 Content-Type: text/plain; charset=utf-8
 
 Retest completed. High severity F-001 Fixed. F-002 Not Fixed.
 `;
 
-export const multipartWithAttachment = `From: vineet@digialert.test
-To: appowner@akasa.test
+export const multipartWithAttachment = `From: vineet@security-vendor.test
+To: appowner@client.test
 Subject: =?UTF-8?Q?Report_with_attachment_=E2=80=93_CashPortal?=
 Date: Thu, 05 Nov 2026 09:00:00 +0530
-Message-ID: <multi-0100@digialert.test>
+Message-ID: <multi-0100@security-vendor.test>
 MIME-Version: 1.0
 Content-Type: multipart/mixed; boundary="MIX-BOUNDARY"
 
@@ -75,7 +75,7 @@ Q2FzaCBQb3J0YWwgY2hlY2sgbm90ZXM=
 `;
 
 export const noMessageId = `From: tester@lab.test
-To: appowner@akasa.test
+To: appowner@client.test
 Subject: FW: Unlabelled probe submission
 Date: Fri, 06 Nov 2026 11:00:00 +0530
 Content-Type: text/plain

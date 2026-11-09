@@ -128,7 +128,7 @@ describe("row validation (§26/§35)", () => {
     expect(errors).toHaveLength(0);
     // counts carried through:
     const first = validation.rows[0]!;
-    expect(first.applicationRaw).toBe("Akasa Air Ecommerce - PROD");
+    expect(first.applicationRaw).toBe("Task Manager Ecommerce - PROD");
     expect(first.counts.critical).toBe(2);
     expect(first.matrix.criticalClosed).toBe(2);
   });
@@ -137,12 +137,12 @@ describe("row validation (§26/§35)", () => {
     const rows = await readFixtureRows();
     const { validation } = parseTrackerRows(rows);
     const byNorm = new Map(validation.rows.map((r) => [r.applicationNormalized, r]));
-    expect(byNorm.get("akasa air ecommerce - prod")?.scopeValue).toBe("internal");
+    expect(byNorm.get("Task Manager ecommerce - prod")?.scopeValue).toBe("internal");
     expect(byNorm.get("agents portal uat")?.scopeValue).toBe("external");
     expect(byNorm.get("qp-ground-ops-app apk")?.typeValue).toBe("mobile");
     expect(byNorm.get("chatbot-service")?.typeValue).toBe("api");
     // legacy name contains U+00A0 — matched via the normalized key only:
-    expect(byNorm.get("akasaair groups (black box tesitng)")?.assessmentSourceValue).toBe("ai_assisted");
+    expect(byNorm.get("Task Managerair groups (black box tesitng)")?.assessmentSourceValue).toBe("ai_assisted");
     expect(byNorm.get("chatbot-service")?.iteration2StatusValue).toBeTruthy();
   });
 });

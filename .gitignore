@@ -37,6 +37,7 @@ coverage/
 
 # EML storage (original uploaded files are machine-local and never committed)
 /storage/
+tests/fixtures/eml-live/*.eml
 
 
 # live verification artifacts

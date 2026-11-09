@@ -7,7 +7,7 @@ export const metadata: Metadata = {
     default: "Task Manager — VAPT",
     template: "%s — Task Manager",
   },
-  description: "Internal VAPT management platform — Akasa Air program.",
+  description: "Internal VAPT management platform — Task Manager program.",
   applicationName: "Task Manager",
   robots: { index: false, follow: false },
 };
