@@ -677,15 +677,20 @@ export function parseNeatBlocks(body: string): NeatBlock[] {
       continue;
     }
     if (envelope) {
-      // A blank line or the start of quoted body text ends the header block.
+      // Header values fold ONLY onto whitespace-indented continuation lines
+      // (RFC folding). A non-indented line is the first quoted body line:
+      // close the envelope so the quote renders as body text (folded with the
+      // chain) instead of being glued into a giant Subject/From value.
       if (line.trim() === "" || /^\s*>/.test(line)) {
         envelope = null;
         if (line.trim() === "") continue;
-      } else {
+      } else if (/^\s/.test(line)) {
         // Values wrap; keep absorbing until a blank line.
         const last = envelope[envelope.length - 1];
         if (last) last[1] = `${last[1]} ${line.trim()}`.trim();
         continue;
+      } else {
+        envelope = null;
       }
     }
     textBuf.push(line.replace(/^\s*>\s?/, ""));
@@ -855,10 +860,12 @@ function NeatTextBody({ body, messageId }: { body: string; messageId?: number })
   // Outlook reply chains end up as one giant raw body. Everything from the
   // first forwarded-header block onward is earlier mail — fold it away so the
   // reader sees the actual new message first (and can expand on demand).
+  // A body that OPENS with an envelope (forward/pure quote) folds the same
+  // way: the reader sees the "Show earlier mail" toggle, never the raw chain.
   const firstEnvelope = blocks.findIndex((b) => b.type === "envelope");
-  const splitAt = firstEnvelope > 0 ? firstEnvelope : -1;
-  const head = splitAt > 0 ? blocks.slice(0, splitAt) : blocks;
-  const quoted = splitAt > 0 ? blocks.slice(splitAt) : [];
+  const splitAt = firstEnvelope >= 0 ? firstEnvelope : -1;
+  const head = splitAt >= 0 ? blocks.slice(0, splitAt) : blocks;
+  const quoted = splitAt >= 0 ? blocks.slice(splitAt) : [];
   const blockChars = (b: NeatBlock) =>
     b.type === "text"
       ? b.text.length
@@ -906,9 +913,29 @@ function NeatTextBody({ body, messageId }: { body: string; messageId?: number })
  * thread" and collapsed behind the same toggle as text bodies.
  */
 function splitHtmlQuote(html: string): { head: string; quoted: string | null } {
-  const m = /<blockquote[\s>]/i.exec(html);
-  if (!m || m.index === undefined) return { head: html, quoted: null };
-  return { head: html.slice(0, m.index), quoted: html.slice(m.index) };
+  const bq = /<blockquote[\s>]/i.exec(html);
+  if (bq && bq.index !== undefined) {
+    return { head: html.slice(0, bq.index), quoted: html.slice(bq.index) };
+  }
+  // Outlook / forwarded-mail marker: the quoted block opens with a div/p whose
+  // text is a "From: … Sent: … To: … Subject: …" header stack. Strip tags from
+  // a window to validate the marker, then split at the element boundary so the
+  // quoted chain collapses instead of rendering inline inside the later bubble.
+  const marker = /<(div|p)(?:\s[^>]*)?>\s*From:\s+/i.exec(html);
+  if (marker && marker.index !== undefined) {
+    const windowText = html
+      .slice(marker.index, marker.index + 1500)
+      .replace(/<[^>]*>/g, " ");
+    if (/Sent:/i.test(windowText) || /Subject:/i.test(windowText) || /To:/i.test(windowText)) {
+      return { head: html.slice(0, marker.index), quoted: html.slice(marker.index) };
+    }
+  }
+  // Generic separator some clients emit before the quoted block.
+  const original = /-----Original Message-----/i.exec(html);
+  if (original && original.index !== undefined) {
+    return { head: html.slice(0, original.index), quoted: html.slice(original.index) };
+  }
+  return { head: html, quoted: null };
 }
 
 function MessageBody({ message }: { message: ChatMessage }) {
