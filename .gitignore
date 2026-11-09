@@ -38,6 +38,20 @@ coverage/
 # EML storage (original uploaded files are machine-local and never committed)
 /storage/
 tests/fixtures/eml-live/*.eml
+*.eml
+*.pst
+
+# spreadsheet / presentation / report binaries (never commit)
+/*.xlsx
+/*.pptx
+/*.pdf
+*.xlsx
+*.pptx
+*.pdf
+.e2e-export.*
+.final-ppt.*
+.p-u.txt
+.e2e-*
 
 
 # live verification artifacts

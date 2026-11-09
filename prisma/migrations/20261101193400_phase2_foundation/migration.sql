@@ -43,7 +43,7 @@ CREATE TABLE "master_values" (
 CREATE TABLE "contacts" (
     "id" SERIAL NOT NULL,
     "fullName" TEXT NOT NULL,
-    "org" TEXT NOT NULL DEFAULT 'Akasa Air',
+    "org" TEXT NOT NULL DEFAULT 'Task Manager',
     "email" TEXT,
     "phone" TEXT,
     "notes" TEXT,
