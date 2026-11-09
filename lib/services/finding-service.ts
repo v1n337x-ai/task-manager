@@ -110,7 +110,7 @@ export interface SetIterationStateInput {
   findingId: number;
   iterationId: number;
   severityValue: "critical" | "high" | "medium" | "low" | "info";
-  statusValue: "open" | "new" | "fixed" | "not_fixed" | "not_retested" | "removed" | "out_of_scope" | "not_applicable" | "unknown";
+  statusValue: "open" | "new" | "fixed" | "not_fixed" | "not_retested" | "removed" | "out_of_scope" | "not_applicable" | "unknown" | "accepted_risk";
   firstSeenAt?: Date | null;
   retestNote?: string | null;
   comments?: string | null;

@@ -11,7 +11,7 @@ import { isGenericFindingTitle, titleSupportedByEvidence } from "./finding-quali
 const SeverityCandidate = z.enum(["critical", "high", "medium", "low", "info", "unknown"]);
 const ConfidenceBand = z.enum(["HIGH", "MEDIUM", "LOW"]);
 const RoleCandidate = z.enum(["pentester", "developer", "application_owner", "security_team", "management", "other", "unknown"]);
-const StatusSignal = z.enum(["fixed", "not_fixed", "open", "reopened", "retested", "not_retested", "removed", "out_of_scope"]);
+const StatusSignal = z.enum(["fixed", "not_fixed", "open", "reopened", "retested", "not_retested", "removed", "out_of_scope", "accepted_risk"]);
 const IterationTypeSignal = z.enum(["initial_scan", "retest", "follow_up", "other"]);
 
 const EvidenceRef = z.object({

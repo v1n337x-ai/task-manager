@@ -127,7 +127,7 @@ export async function applyApprovedFinding(
     throw ValidationError("The approved AI finding has unknown severity and cannot be applied.");
   }
   const finalSeverity = severityValue as Sev;
-  const STATUS_UNION = ["fixed", "unknown", "open", "not_fixed", "not_retested", "new", "removed", "out_of_scope", "not_applicable"] as const;
+  const STATUS_UNION = ["fixed", "unknown", "open", "not_fixed", "not_retested", "new", "removed", "out_of_scope", "not_applicable", "accepted_risk"] as const;
   type StatusV = (typeof STATUS_UNION)[number];
   if (typeof item.statusSignal !== "string" || !STATUS_UNION.includes(item.statusSignal as StatusV)) {
     throw ValidationError("The approved AI finding has no valid status signal.");

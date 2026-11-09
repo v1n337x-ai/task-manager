@@ -88,6 +88,7 @@ export const MASTER_VALUES: MasterSeedEntry[] = [
   { domain: "finding_iteration_status", value: "out_of_scope", label: "Out of Scope", sortOrder: 7 },
   { domain: "finding_iteration_status", value: "not_applicable", label: "Not Applicable", sortOrder: 8 },
   { domain: "finding_iteration_status", value: "unknown", label: "Unknown / Not Specified", sortOrder: 9 },
+  { domain: "finding_iteration_status", value: "accepted_risk", label: "Accepted Risk (CAR)", sortOrder: 10 },
 
   // severities (PPT palette; CAR is a status, not a severity — DL-06 decision 3)
   { domain: "severity", value: "critical", label: "Critical", sortOrder: 1 },

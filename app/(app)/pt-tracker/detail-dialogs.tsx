@@ -27,7 +27,7 @@ async function mutate(url: string, method: string, body: unknown): Promise<{ ok:
 }
 
 const SEVERITIES = ["critical", "high", "medium", "low", "info"] as const;
-const FINDING_STATES = ["open", "new", "fixed", "not_fixed", "not_retested", "removed", "out_of_scope", "not_applicable", "unknown"] as const;
+const FINDING_STATES = ["open", "new", "fixed", "not_fixed", "not_retested", "removed", "out_of_scope", "not_applicable", "unknown", "accepted_risk"] as const;
 const TC_STATES = ["included", "tested", "not_tested", "passed", "failed", "retested", "removed", "out_of_scope", "not_retained", "not_applicable", "not_retested"] as const;
 
 export interface IterationLite {
