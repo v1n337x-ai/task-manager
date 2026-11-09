@@ -98,7 +98,6 @@ Sign in using the seed email/password you placed in `.env`.
 ```powershell
 npm run typecheck
 npm run lint
-npm run test:unit
 ```
 
 ## Adding data after first login
@@ -110,50 +109,21 @@ npm run test:unit
 
 None of those data files need to be present to build or run the empty system.
 
-## DevSecOps / GitLab hosting
+## Deployment (GitHub + Render)
 
-This repository is configured for GitLab CI/CD and Docker:
+This repository is configured for GitHub hosting plus Docker:
 
-- `.gitlab-ci.yml` runs TypeScript and ESLint checks, unit tests, a production build, and Docker packaging from `main`.
 - `Dockerfile` builds a production image that listens on port `3210`.
 - `render.yaml` provides a free-hosting deployment definition using Docker plus the Render PostgreSQL service.
 
-### Add the GitLab remote
-
-GitLab cannot be used as a deployment target for the dynamic Next.js server directly; use it as the source/CI/CD repository, then point a free PaaS such as Render to that repository. Keep the GitHub mirror if you want one alongside GitLab.
-
-If the GitHub repository is the current `origin`, add GitLab as another remote:
-
-```powershell
-git remote add gitlab https://gitlab.com/<gitlab-username>/task-manager.git
-git push -u gitlab main
-```
-
-Switch back to GitHub later with:
-
-```powershell
-git remote set-url origin https://github.com/<github-username>/task-manager.git
-```
-
-### Configure GitLab CI/CD variables
-
-In **GitLab → Project → Settings → CI/CD → Variables**, set these as masked/sensitive values:
-
-- `DATABASE_URL`
-- `AUTH_SECRET`
-- `APPLICATION_SECRET`
-- `APP_ENCRYPTION_KEY`
-- Optional AI/provider settings
-
-The CI pipeline uses dummy build-only secrets for compilation. Do not store application secrets in the repository.
-
 ### Free hosting with Render
 
-1. Import the GitLab repository into Render.
-2. Render should detect `render.yaml` and create:
+1. Push `main` to GitHub.
+2. Import the GitHub repository into Render.
+3. Render should detect `render.yaml` and create:
    - the web service from `Dockerfile`
    - the PostgreSQL database
-3. Confirm the health check passes at:
+4. Confirm the health check passes at:
 
    ```text
    https://<render-service-domain>/api/health
