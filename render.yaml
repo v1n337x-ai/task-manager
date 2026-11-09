@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: task-manager-vapt
+    region: singapore
+    env: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: APPLICATION_SECRET
+        generateValue: true
+      - key: APP_ENCRYPTION_KEY
+        generateValue: true
+      - key: EML_STORAGE_ROOT
+        value: storage/eml
+      - key: REPORT_STORAGE_ROOT
+        value: storage/reports
+
+databases:
+  - name: task-manager-postgres
+    databaseName: task_manager
+    user: task_manager
+    plan: free
+    region: singapore
