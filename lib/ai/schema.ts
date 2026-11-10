@@ -117,4 +117,4 @@ export const AI_EXTRACTION_V1 = z
 
 export type AiExtractionV1 = z.infer<typeof AI_EXTRACTION_V1>;
 
-export const PROMPT_VERSION = "VAPT_EMAIL_ANALYSIS_V2";
+export const PROMPT_VERSION = "VAPT_EMAIL_ANALYSIS_V3";
