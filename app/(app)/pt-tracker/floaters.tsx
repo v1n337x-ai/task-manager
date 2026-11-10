@@ -6,10 +6,13 @@ import { Info } from "lucide-react";
 
 /**
  * PT Tracker floaters — BIG hover surface: the whole table CELL is the hot
- * zone (negative-margin block), with a 150ms close grace for diagonal mouse
- * travel and full card-out/in movement. Cards render in a PORTAL at fixed
- * positions, so the scrollable table can never clip or overlap them.
+ * zone (negative-margin block), with a 450ms close grace for diagonal mouse
+ * travel, full card-out/in movement, and the CARD ITSELF keeps the floater
+ * open (moving onto the card cancels the close timer). Cards render in a
+ * PORTAL at fixed positions, so the scrollable table can never clip them.
  */
+
+const CLOSE_GRACE_MS = 450;
 
 const fmtD = (iso: Date | string | null) =>
   iso ? new Date(iso).toLocaleDateString("en-GB") : "—";
@@ -46,7 +49,7 @@ function Floater({
 
   const gracefulClose = React.useCallback(() => {
     cancelGrace();
-    grace.current = window.setTimeout(() => setOpen(false), 150);
+    grace.current = window.setTimeout(() => setOpen(false), CLOSE_GRACE_MS);
   }, [cancelGrace]);
 
   const show = React.useCallback(() => {
@@ -83,7 +86,7 @@ function Floater({
     <>
       <span
         ref={anchor}
-        className={`relative cursor-help focus:outline-none ${triggerClassName}`}
+        className={`relative cursor-default focus:outline-none ${triggerClassName}`}
         onMouseEnter={show}
         onMouseLeave={gracefulClose}
         onFocus={show}
@@ -97,8 +100,10 @@ function Floater({
         ? createPortal(
             <div
               ref={card}
-              className="fixed z-50 rounded-none border border-xlsx-band bg-card px-4 py-3 text-[12px] shadow-[0_12px_30px_rgb(61_32_84/16%)]"
+              className="pointer-events-auto fixed z-50 rounded-none border border-xlsx-band bg-card px-4 py-3 text-[12px] shadow-[0_12px_30px_rgb(61_32_84/16%)]"
               style={{ top: pos.top, left: pos.left, width }}
+              onMouseEnter={cancelGrace}
+              onMouseLeave={gracefulClose}
             >
               {content}
             </div>,
