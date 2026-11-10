@@ -283,7 +283,7 @@ export function AiReview({ threadId, threadSubject }: { threadId: number; thread
             openEvidence={openEvidence}
             setOpenEvidence={setOpenEvidence}
             decisionsByKey={new Map(itemDecisions.map((d) => [d.itemKey, d]))}
-            footer="Approving a role records the review decision only; it does not change VAPT data."
+            footer="Approving a role applies it to the participant (promotes UNKNOWN; your human override always wins). Rejecting records the decision without changes. Correcting sets the role you type."
           />
 
           <ReviewBlock
