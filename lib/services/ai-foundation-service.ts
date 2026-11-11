@@ -322,6 +322,62 @@ export async function recordApprovalDecision(
     } catch {
       // Never let role application break the run-level decision response.
     }
+
+    // Engagement-record fields — part of the same run-level human decision
+    // (user-directed: "I want all these by AI"). Fill-only per field.
+    try {
+      const record = (structured as { engagementRecord?: Record<string, unknown> | null } | null)?.engagementRecord ?? null;
+      if (record && typeof record === "object") {
+        const { applyEngagementRecordField } = await import("@/lib/services/engagement-record-apply-service");
+        for (const field of ["mailSubject", "requestedDate", "scanReportDate", "iteration1Date", "iteration2Date", "comments", "followUpDate", "followUpResponse", "primaryPoc", "assignedMembers"]) {
+          const raw = record[field];
+          const hasValue = typeof raw === "string" && raw.trim().length > 0 && raw.trim() !== "—";
+          if (!hasValue) continue;
+          const itemKey = `engagementRecord:${field}`;
+          const dup = await prisma.aiApprovalDecision.findUnique({
+            where: { extractionId_itemKey: { extractionId: extraction.id, itemKey } },
+          });
+          if (!dup) {
+            await prisma.aiApprovalDecision.create({
+              data: { extractionId: extraction.id, decision: "approve", decidedByUserId: actorUserId, itemKey },
+            });
+          }
+          try {
+            const result = await applyEngagementRecordField(
+              { extractionId: extraction.id, field, correctedValue: null },
+              actorUserId,
+            );
+            if (result.applied) {
+              await recordAudit({
+                action: "engagement_record.field_applied",
+                entityType: "Application",
+                entityId: extraction.applicationId ?? null,
+                fieldName: field,
+                newValue: String(result.value ?? "").slice(0, 500),
+                source: "HUMAN",
+                actorUserId,
+                ip: ctx.ip,
+                userAgent: ctx.userAgent,
+                index: { extractionId: extraction.id, via: "whole_run" },
+              });
+            }
+          } catch {
+            await recordAudit({
+              action: "engagement_record.apply_failed",
+              entityType: "AiExtraction",
+              entityId: extraction.id,
+              newValue: JSON.stringify({ itemKey, via: "whole_run" }),
+              source: "SYSTEM",
+              actorUserId,
+              ip: ctx.ip,
+              userAgent: ctx.userAgent,
+            });
+          }
+        }
+      }
+    } catch {
+      // Never let record application break the run-level decision response.
+    }
   }
 
   // User-requested pipeline completion (Phase 9.1): approving a
@@ -404,6 +460,64 @@ export async function recordApprovalDecision(
       // The approval decision stands; only the tracker write reports honestly.
       await recordAudit({
         action: "ai_approval.finding_apply_failed",
+        entityType: "AiExtraction",
+        entityId: extraction.id,
+        newValue: JSON.stringify({ itemKey: input.itemKey, reason: String((error as Error).message ?? error).slice(0, 240) }),
+        source: "SYSTEM",
+        actorUserId,
+        ip: ctx.ip,
+        userAgent: ctx.userAgent,
+      });
+    }
+  }
+
+  // Engagement-record fields (user-directed 2026-11 — "I want all these by AI"):
+  // approving/correcting an `engagementRecord:<field>` item writes that field
+  // to the application record (mail subject, POC, assigned members, dates,
+  // comments, follow-ups). Approve = fill-only (never overwrites an existing
+  // record value); Correct = the human value replaces it. Reject = no-op.
+  if (input.itemKey?.startsWith("engagementRecord:") && (input.decision === "approve" || input.decision === "correct")) {
+    const field = input.itemKey.slice("engagementRecord:".length);
+    try {
+      const { applyEngagementRecordField } = await import("@/lib/services/engagement-record-apply-service");
+      const correctedValue = input.decision === "correct" && typeof input.correctedValue === "string" ? input.correctedValue : null;
+      if (input.decision === "correct" && (!correctedValue || correctedValue.trim().length === 0)) {
+        throw ValidationError("CORRECT on an engagement-record field requires a corrected value.");
+      }
+      const result = await applyEngagementRecordField(
+        { extractionId: extraction.id, field, correctedValue },
+        actorUserId,
+      );
+      if (result.applied) {
+        await recordAudit({
+          action: "engagement_record.field_applied",
+          entityType: "Application",
+          entityId: extraction.applicationId ?? null,
+          fieldName: field,
+          newValue: String(result.value ?? "").slice(0, 500),
+          source: "HUMAN",
+          actorUserId,
+          ip: ctx.ip,
+          userAgent: ctx.userAgent,
+          index: { extractionId: extraction.id, itemKey: input.itemKey, via: input.decision === "correct" ? "correct" : "approve" },
+        });
+      } else {
+        await recordAudit({
+          action: "engagement_record.field_skipped",
+          entityType: "Application",
+          entityId: extraction.applicationId ?? null,
+          fieldName: field,
+          newValue: result.reason ?? null,
+          source: "SYSTEM",
+          actorUserId,
+          ip: ctx.ip,
+          userAgent: ctx.userAgent,
+        });
+      }
+    } catch (error) {
+      failed.push({ itemKey: input.itemKey, reason: String((error as Error).message ?? error).slice(0, 240) });
+      await recordAudit({
+        action: "engagement_record.apply_failed",
         entityType: "AiExtraction",
         entityId: extraction.id,
         newValue: JSON.stringify({ itemKey: input.itemKey, reason: String((error as Error).message ?? error).slice(0, 240) }),

@@ -14,6 +14,19 @@ interface StructuredExtraction {
   findings: { identifierExplicit: string | null; identifierMark: string; title: string; titleMark: string; severity: string; severityMark: string; statusSignal: string | null; evidence: { messageIndex: number; excerpt: string }[] }[];
   testCases: { title: string; stateSignal: string | null; evidence: { messageIndex: number; excerpt: string }[] }[];
   iterationSignals: { candidateIteration: number | null; typeSignal?: string; explicitOrInferred: string; confidence: string; evidence: { messageIndex: number; excerpt: string }[] }[];
+  engagementRecord?: {
+    mailSubject?: string | null;
+    requestedDate?: string | null;
+    scanReportDate?: string | null;
+    iteration1Date?: string | null;
+    iteration2Date?: string | null;
+    comments?: string | null;
+    followUpDate?: string | null;
+    followUpResponse?: string | null;
+    primaryPoc?: string | null;
+    assignedMembers?: string | null;
+    evidence: { messageIndex: number; excerpt: string }[];
+  } | null;
 }
 
 interface EvidenceRow {
@@ -187,6 +200,8 @@ export function AiReview({ threadId, threadSubject }: { threadId: number; thread
       const blockedItems = (data.result?.failed as Array<{ itemKey: string; reason: string }> | undefined) ?? [];
       const blockedSuffix = blockedItems.length ? ` ${blockedItems.length} candidate(s) were blocked by the quality gate: ${blockedItems.map((item) => `${item.itemKey} — ${item.reason}`).join("; ")}` : "";
       setLastMsg(res.ok ? `Decision recorded (${decision}${itemKey ? `, ${itemKey}` : ", whole run"}). The AI payload is preserved unchanged.${blockedSuffix}` : (data.error?.message ?? "Decision failed."));
+      // Refetch so applied decisions/roles/record fields show immediately.
+      if (res.ok) await loadExtraction(extraction.id);
       await loadExtraction(extraction.id);
       await refreshRuns();
     } finally {
@@ -326,6 +341,49 @@ export function AiReview({ threadId, threadSubject }: { threadId: number; thread
             decisionsByKey={new Map(itemDecisions.map((d) => [d.itemKey, d]))}
             footer="Approving an iteration signal records the review decision only; it does not change VAPT data."
           />
+
+          {(() => {
+            const rec = extraction.structured.engagementRecord;
+            if (!rec) return null;
+            const fieldDefs: Array<{ field: string; label: string }> = [
+              { field: "mailSubject", label: "Mail Subject" },
+              { field: "primaryPoc", label: "POC" },
+              { field: "assignedMembers", label: "Assigned members" },
+              { field: "requestedDate", label: "Requested date" },
+              { field: "scanReportDate", label: "Scan/Report date" },
+              { field: "iteration1Date", label: "Iteration 1 date" },
+              { field: "iteration2Date", label: "Iteration 2 date" },
+              { field: "comments", label: "Comments" },
+              { field: "followUpDate", label: "Follow-up date" },
+              { field: "followUpResponse", label: "Follow-up response" },
+            ];
+            const items = fieldDefs
+              .filter(({ field }) => {
+                const v = (rec as Record<string, unknown>)[field];
+                return typeof v === "string" && v.trim().length > 0 && v.trim() !== "—";
+              })
+              .map(({ field, label }) => ({
+                key: `engagementRecord:${field}`,
+                main: `${label}: ${String((rec as Record<string, unknown>)[field]).slice(0, 240)}`,
+                sub: "AI-proposed record field",
+                evidence: rec.evidence.map((e) => ({ messageIndex: e.messageIndex, excerpt: e.excerpt })),
+                correctPlaceholder: `Corrected ${label.toLowerCase()}`,
+              }));
+            return (
+              <ReviewBlock
+                title="Application record (mail subject, POC, dates, comments, follow-ups)"
+                items={items}
+                busyItem={busyItem}
+                onApprove={(key) => decide("approve", key)}
+                onReject={(key) => decide("reject", key)}
+                onCorrect={(key, value) => decide("correct", key, value)}
+                openEvidence={openEvidence}
+                setOpenEvidence={setOpenEvidence}
+                decisionsByKey={new Map(itemDecisions.map((d) => [d.itemKey, d]))}
+                footer="Approving fills the field ONLY when the record is empty; typing a value and clicking Correct replaces it (your correction wins). Reject records the decision without changes."
+              />
+            );
+          })()}
         </div>
       )}
     </section>

@@ -68,6 +68,28 @@ const IterationSignalOut = z.object({
   evidence: z.array(EvidenceRef).min(1),
 });
 
+/**
+ * Engagement-record candidates (user-directed 2026-11): the thread itself is a
+ * data source for the APPLICATION RECORD — mail subject, POC/assigned members,
+ * dates, comments and follow-ups. Every field is nullable and human-gated:
+ * approving/correcting writes it to the record; nothing is automatic.
+ * Dates may be any human format ("30/1/2026", "2026-01-30"); the apply service
+ * parses tolerantly and stores null when unreadable.
+ */
+export const EngagementRecordOut = z.object({
+  mailSubject: z.string().max(300).nullable().optional(),
+  requestedDate: z.string().max(40).nullable().optional(),
+  scanReportDate: z.string().max(40).nullable().optional(),
+  iteration1Date: z.string().max(40).nullable().optional(),
+  iteration2Date: z.string().max(40).nullable().optional(),
+  comments: z.string().max(2000).nullable().optional(),
+  followUpDate: z.string().max(40).nullable().optional(),
+  followUpResponse: z.string().max(1000).nullable().optional(),
+  primaryPoc: z.string().max(120).nullable().optional(),
+  assignedMembers: z.string().max(300).nullable().optional(),
+  evidence: z.array(EvidenceRef).min(1),
+});
+
 export const AI_EXTRACTION_V1 = z
   .object({
     schemaVersion: z.literal("AI_EXTRACTION_V1"),
@@ -76,6 +98,7 @@ export const AI_EXTRACTION_V1 = z
     findings: z.array(FindingCandidate).max(50),
     testCases: z.array(TestCaseCandidate).max(50),
     iterationSignals: z.array(IterationSignalOut).max(20),
+    engagementRecord: EngagementRecordOut.nullable().optional(),
     evidence: z.array(EvidenceRef).min(1),
   })
   .superRefine((out, ctx) => {
@@ -117,4 +140,4 @@ export const AI_EXTRACTION_V1 = z
 
 export type AiExtractionV1 = z.infer<typeof AI_EXTRACTION_V1>;
 
-export const PROMPT_VERSION = "VAPT_EMAIL_ANALYSIS_V4";
+export const PROMPT_VERSION = "VAPT_EMAIL_ANALYSIS_V5";
