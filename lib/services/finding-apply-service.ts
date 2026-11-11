@@ -137,10 +137,28 @@ export async function applyApprovedFinding(
   if (correctedRaw !== null && !STATUS_UNION.includes(correctedRaw as StatusV)) {
     throw ValidationError(`Corrected status "${correctedRaw}" is not a valid finding status.`);
   }
-  if (correctedRaw === null && (typeof item.statusSignal !== "string" || !STATUS_UNION.includes(item.statusSignal as StatusV))) {
+  const aiStatus = typeof item.statusSignal === "string" && STATUS_UNION.includes(item.statusSignal as StatusV)
+    ? (item.statusSignal as StatusV)
+    : null;
+
+  const iterationNumberPre =
+    typeof item.iterationSignal === "number" &&
+    Number.isInteger(item.iterationSignal) &&
+    item.iterationSignal >= 1 &&
+    item.iterationSignal <= 2
+      ? item.iterationSignal
+      : null;
+  const isNewPre = item.isNewFindingCandidate === true;
+  // First-report default (tracker contract, same as the Excel finding import):
+  // a finding reported for the FIRST time in Iteration 1 enters as OPEN until a
+  // verdict exists. This is the defined initial state — not an invented verdict.
+  // Retest-phase (I2) items with no verdict still REQUIRE the human decision.
+  if (correctedRaw === null && aiStatus === null && iterationNumberPre === 1 && isNewPre) {
+    // falls through to the open default below
+  } else if (correctedRaw === null && aiStatus === null) {
     throw ValidationError("The approved AI finding has no valid status signal.");
   }
-  const statusValue = (correctedRaw ?? (item.statusSignal as string | null) ?? "") as StatusV;
+  const statusValue = (correctedRaw ?? aiStatus ?? (iterationNumberPre === 1 && isNewPre ? "open" : "")) as StatusV;
   const evidenceText = evidence.map((item) => item.excerpt).join(" ");
   let iterationNumber: number | null =
     typeof item.iterationSignal === "number" &&
@@ -175,10 +193,18 @@ export async function applyApprovedFinding(
     select: { id: true, code: true, title: true, firstSeenIterationNumber: true },
   });
   const normalized = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 200);
+  // Identity: explicit code → normalized title equality → PREFIX containment
+  // (the same finding re-reported with the target appended to its title, e.g.
+  // "auth_code Replay — …" vs "auth_code Replay — … staging.hellohaptik.com
+  // API", must not create a duplicate row).
+  const normalizedStartsWith = (a: string, b: string) => a.length >= 20 && b.length >= 20 && (a.startsWith(b) || b.startsWith(a));
   const hit = (identifierExplicit
     ? candidates.find((c) => c.code.toLowerCase() === identifierExplicit.toLowerCase())
     : undefined)
-    ?? (!isGenericFindingTitle(title) ? candidates.find((c) => normalized(c.title) === normalized(title)) : undefined);
+    ?? (!isGenericFindingTitle(title) ? candidates.find((c) => normalized(c.title) === normalized(title)) : undefined)
+    ?? (!isGenericFindingTitle(title)
+      ? candidates.find((c) => normalizedStartsWith(normalized(c.title), normalized(title)))
+      : undefined);
   if (hit) {
     findingId = hit.id;
     code = hit.code;

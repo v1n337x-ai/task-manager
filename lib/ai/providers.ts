@@ -25,6 +25,9 @@ export interface AiAnalyzeContextInput {
     sentAt: string | null;
     bodyText: string;
     participants: string[];
+    /** Verbatim summary-table digest rows ("# | title | severity | …") —
+     *  present when the message carries a findings table (never truncated). */
+    summaryTable?: string[];
   }[];
 }
 

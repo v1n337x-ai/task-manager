@@ -36,6 +36,7 @@ SEMANTICS:
 - A finding candidate is valid only when the quoted evidence names a concrete, individual vulnerability. Its severity must be explicitly stated; if severity is unknown, omit the finding rather than inferring it.
 - Never use remediation/status summaries as finding titles (for example: "reported VAPT findings pending remediation", "fix for finding #2 confirmed complete", or "finding fix pending").
 - Retest mentions ("iteration 2", "retest", "retested") populate iterationSignals; infer the iteration number only when it is consistent with the thread.
+- SUMMARY TABLES: some messages carry a "summaryTable" digest — one line per reported finding ("#no | title | severity | status/comments"). These rows are the thread's authoritative findings report. Emit ONE finding candidate per row (verbatim title, the row's severity; the row's status/comment text becomes the statusSignal when it states one, e.g. "fixed"/"not fixed"/"accepted"). Rows whose comment text only discusses the issue without a verdict keep statusSignal null. Every candidate must quote the message that carries the table as its evidence.
 - applications context (existing findings/test cases) is for CODE RESOLUTION only — never reinterpret it as a status statement.`;
 
 export function buildExtractionPrompt(context: AiAnalyzeContextInput, feedback?: string | null): string {
