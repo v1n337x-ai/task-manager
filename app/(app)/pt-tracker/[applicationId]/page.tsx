@@ -263,9 +263,19 @@ function FindingsTab({
           className: "filled-cell w-40 text-center align-middle whitespace-nowrap",
           render: (r: { f: TrackerFinding }) => {
             const state = r.f.iterationStates.find((s) => s.iterationNumber === num);
-            if (!state) return <StatusFillCell value="—" />;
-            const isNew = state.statusValue === "new" && r.f.iterationStates.length === 1;
-            return <StatusFillCell value={isNew ? `New in I${num}` : state.statusLabel} />;
+            if (state) {
+              const isNew = state.statusValue === "new" && r.f.iterationStates.length === 1;
+              return <StatusFillCell value={isNew ? `New in I${num}` : state.statusLabel} />;
+            }
+            // Retest projection (analyst-workbook semantics): a finding that was
+            // already Fixed before this retest and has NO explicit verdict in
+            // this iteration is carried forward as Fixed ("no news = still
+            // fixed") — the retest confirmed it without a regression note.
+            // Findings with no verdict anywhere stay "—".
+            const hasEarlier = r.f.iterationStates.some((s) => s.iterationNumber < num);
+            const currentFixed = r.f.currentStatusValue === "fixed";
+            if (hasEarlier && currentFixed) return <StatusFillCell value="Fixed" />;
+            return <StatusFillCell value="—" />;
           },
         })),
         {
