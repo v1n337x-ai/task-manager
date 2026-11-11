@@ -12,6 +12,7 @@ import { getEnv, isProduction } from "@/lib/env";
 import { checkRateLimit } from "@/lib/auth/rate-limit";
 import { AI_EXTRACTION_V1, PROMPT_VERSION, type AiExtractionV1 } from "@/lib/ai/schema";
 import { buildAnalysisContext, type ContextBuildResult } from "@/lib/ai/context";
+import { selectAnalysisMessages } from "@/lib/ai/summary-window";
 import { resolveProviderPort } from "@/lib/ai/provider-registry";
 import { decryptSecret } from "@/lib/crypto/secrets";
 import type { EvidenceSourceType } from "@prisma/client";
@@ -47,10 +48,17 @@ async function loadThreadContext(threadId: number): Promise<{
   });
   if (!thread) throw NotFoundError("Email thread");
 
-  // buildAnalysisContext keeps the newest 12 messages and reindexes them
-  // 0..11. The evidence linker and approval validator must use that same
-  // selected window; otherwise messageIndex can point at the wrong email.
-  const messagesDb = [...thread.messages].slice(-12).map((m, index) => ({ id: m.id, index }));
+  // buildAnalysisContext keeps the analysis window (newest 12 + table
+  // carriers) and reindexes it 0..N-1. The evidence linker and approval
+  // validator must use that same selected window via the shared helper;
+  // otherwise messageIndex can point at the wrong email.
+  const { selected: selectedMessages } = selectAnalysisMessages(
+    thread.messages.map((m) => ({ bodyText: m.bodyText, sentAt: m.sentAt })),
+  );
+  const selectedSet = new Set(selectedMessages);
+  const messagesDb = [...thread.messages]
+    .filter((m) => selectedSet.has(m as never))
+    .map((m, index) => ({ id: m.id, index }));
 
   // Supply the model with the application's live finding/test-case identity
   // list so explicit F-/TC- codes can resolve to their real names instead of

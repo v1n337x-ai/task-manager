@@ -8,6 +8,7 @@
 import { createHash } from "node:crypto";
 import type { AiAnalyzeContextInput } from "./providers";
 import { extractSummaryRows, formatSummaryDigest } from "./summary-table-digest";
+import { MAX_MESSAGES, selectAnalysisMessages } from "./summary-window";
 
 export interface ContextBuildResult {
   context: AiAnalyzeContextInput;
@@ -16,7 +17,6 @@ export interface ContextBuildResult {
   reductions: string[];
 }
 
-const MAX_MESSAGES = 12;
 const MAX_BODY_CHARS = 1800;
 
 export function buildAnalysisContext(input: {
@@ -40,28 +40,13 @@ export function buildAnalysisContext(input: {
   // findings summary table are the authoritative report surface. They are
   // ALWAYS kept in the window, even beyond the newest-12 cap, and their rows
   // are carried verbatim as a compact digest that survives the per-message
-  // character budget.
+  // character budget. Selection itself comes from the SHARED helper so the
+  // evidence validator sees the identical window.
   const digests = chronological.map((m) => formatSummaryDigest(extractSummaryRows(m.bodyText)));
-
-  let selected = chronological;
-  if (selected.length > MAX_MESSAGES) {
-    const tableCarrierIndexes = new Set(
-      digests.map((d, i) => (d.length > 0 ? i : -1)).filter((i) => i >= 0),
-    );
-    const newest = chronological.slice(-MAX_MESSAGES);
-    const carrierExtras = chronological.filter(
-      (m, i) => tableCarrierIndexes.has(i) && !newest.includes(m),
-    );
-    if (carrierExtras.length > 0) {
-      reductions.push(`table-carrying messages force-included beyond the newest-12 window: ${carrierExtras.length}`);
-    }
-    selected = [...carrierExtras, ...newest].sort((a, b) => {
-      const ta = a.sentAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
-      const tb = b.sentAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
-      return ta - tb;
-    });
+  const { selected, carrierCount } = selectAnalysisMessages(chronological);
+  if (chronological.length > selected.length || carrierCount > 0) {
     reductions.push(
-      `thread truncated from ${chronological.length} to newest ${MAX_MESSAGES} messages (+${carrierExtras.length} table carriers)`,
+      `window: newest ${Math.min(MAX_MESSAGES, chronological.length)} of ${chronological.length} messages (+${carrierCount} table carriers)`,
     );
   }
 

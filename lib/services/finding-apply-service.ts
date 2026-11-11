@@ -11,6 +11,8 @@ import { ValidationError } from "@/lib/errors";
 import { createFinding, setFindingIterationState } from "@/lib/services/finding-service";
 
 import { isGenericFindingTitle, titleSupportedByEvidence } from "@/lib/ai/finding-quality";
+import { selectAnalysisMessages } from "@/lib/ai/summary-window";
+import { extractSummaryRows, formatSummaryDigest } from "@/lib/ai/summary-table-digest";
 
 export interface ApplyResult {
   findingId: number;
@@ -43,8 +45,21 @@ async function assertEvidenceExcerptsAreVerbatim(
       orderBy: [{ sentAt: "asc" }, { id: "asc" }],
       select: { bodyText: true, bodyHtml: true },
     });
-    // Evidence indexes address the newest 12 messages given to the model.
-    bodies = messages.slice(-12).map((message) => message.bodyText ?? message.bodyHtml ?? "");
+    // Evidence indexes address the ANALYSIS WINDOW — the identical selection
+    // the context builder used (newest 12 + table carriers, chronological,
+    // via the shared helper with index mapping).
+    const { selectedIndexes } = selectAnalysisMessages(
+      messages.map((m) => ({ bodyText: m.bodyText, sentAt: null as Date | null })),
+    );
+    // The haystack per message = raw body + the DETERMINISTIC summary-table
+    // digest the builder fed for that message. The model legitimately quotes
+    // digest lines ("#3 | title | severity: …") for table rows; those are
+    // verbatim-derived from the body, so accepting them is not fabrication.
+    bodies = selectedIndexes.map((i) => {
+      const body = messages[i]!.bodyText ?? messages[i]!.bodyHtml ?? "";
+      const digest = formatSummaryDigest(extractSummaryRows(messages[i]!.bodyText));
+      return digest.length > 0 ? `${body}\n${digest.join("\n")}` : body;
+    });
   } else if (extraction.sourceMessageId) {
     const message = await prisma.emailMessage.findUnique({
       where: { id: extraction.sourceMessageId },
