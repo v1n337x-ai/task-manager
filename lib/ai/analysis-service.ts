@@ -224,7 +224,23 @@ export async function analyzeThread(params: {
     const providerResult = await port.analyze(built.context);
     const rawOutput = typeof providerResult.structured === "string" ? providerResult.structured : JSON.stringify(providerResult.structured);
     const parsedJson = JSON.parse(rawOutput) as unknown;
-    // §51 — Zod validation of the structured response.
+    // Models overshoot the 1500-char evidence cap on long summary-table rows.
+    // Clamp every excerpt verbatim (first 1500 chars keep it a valid substring)
+    // so one long quote cannot fail the whole run.
+    const clampExcerpts = (node: unknown): void => {
+      if (Array.isArray(node)) {
+        for (const item of node) clampExcerpts(item);
+        return;
+      }
+      if (node && typeof node === "object") {
+        const obj = node as Record<string, unknown>;
+        if (typeof obj.excerpt === "string" && obj.excerpt.length > 1500) obj.excerpt = obj.excerpt.slice(0, 1500);
+        for (const value of Object.values(obj)) {
+          if (value && typeof value === "object") clampExcerpts(value);
+        }
+      }
+    };
+    clampExcerpts(parsedJson);
     const validated = AI_EXTRACTION_V1.parse(parsedJson);
 
     const needsReview = await prisma.masterValue.findUnique({ where: { domain_value: { domain: "extraction_status", value: "needs_review" } } });
