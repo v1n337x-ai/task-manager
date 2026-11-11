@@ -31,7 +31,7 @@ export interface TrackerAppRow {
   engagementName: string | null;
   mailSubject: string | null; // Excel "Mail Subject"
   poc: string | null; // Excel "POC Task Manager"
-  assignedMembers: string | null; // Excel "security-vendor Team - Assigned member"
+  assignedMembers: string | null; // Excel "Security Vendor Team - Assigned member"
   requestedDate: Date | null; // Excel "Requested date"
   reportDate: Date | null; // Excel "Scan/Report Date"
   comments: string | null; // Excel "Comments"
@@ -415,6 +415,7 @@ export async function getApplicationTracker(applicationId: number): Promise<Appl
 
   const findings = await prisma.finding.findMany({
     where: { applicationId, isActive: true },
+    orderBy: { code: "asc" }, // vapt.xlsx order: # column = F-code order (F-001, F-002, …)
     include: {
       severityRef: true,
       statusRef: true,
