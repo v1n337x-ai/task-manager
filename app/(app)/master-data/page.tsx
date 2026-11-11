@@ -3,7 +3,6 @@ import { PageHeader, PageBody } from "@/components/page-header";
 import { DataTable } from "@/components/data-table";
 import { StatusBadge } from "@/components/badges";
 import { ApplicationDialogs, RowActions } from "@/app/(app)/master-data/application-dialogs";
-import { MasterValuesSection } from "@/app/(app)/master-data/master-values-section";
 import { listApplications } from "@/lib/services/application-service";
 import { listAll } from "@/lib/services/master-data-service";
 
@@ -24,7 +23,7 @@ export default async function MasterDataPage() {
     <>
       <PageHeader
         title="MASTER DATA"
-        subtitle="Controlled values & application registry"
+        subtitle="Application registry"
         actions={<ApplicationDialogs masterValues={masterValues} />}
       />
 
@@ -63,8 +62,6 @@ export default async function MasterDataPage() {
             emptyHint="Use “New Application” to create the first one. Deactivations preserve history."
           />
         </section>
-
-        <MasterValuesSection masterValues={masterValues} />
       </PageBody>
     </>
   );

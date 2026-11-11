@@ -1203,6 +1203,8 @@ function ChatThread({ subject, appDisplayName, messages }: { subject: string; ap
       group.messages.push(message);
     }
     return groups;
+    // uniqueMessages is a memo of `messages` — grouping reads its deduped rows.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages]);
 
   // Role counts are used only as a thread overview; the conversation itself

@@ -92,7 +92,7 @@ function parseOneLine(lines: string[]): SummaryRowDigest[] {
     const m = /^(\d{1,3})\s*[|.)]?\s+(.+)$/.exec(line);
     if (!m) continue;
     const no = m[1]!;
-    let rest = m[2]!;
+    const rest = m[2]!;
     const pipeParts = rest.split("|").map((p) => p.trim());
     if (pipeParts.length >= 2 && isSeverity(pipeParts[1] ?? "")) {
       rows.push({ no, title: pipeParts[0] ?? "", severity: pipeParts[1] ?? null, rest: pipeParts.slice(2).join(" · ") });
