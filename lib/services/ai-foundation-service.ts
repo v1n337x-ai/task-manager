@@ -234,19 +234,75 @@ export async function recordApprovalDecision(
   }
 
   // User-requested pipeline completion (Phase 9.1): approving a
+  // `participantRole:<email>#<idx>` item APPLIES the AI-proposed role to the
+  // participant row (promote-from-UNKNOWN; human overrides always win).
+  // Rejections/corrections must not silently change data — a correction is
+  // expressed as the correctedValue role and applied identically.
+  if (input.itemKey?.startsWith("participantRole:")) {
+    try {
+      const { applyParticipantRoleDecision } = await import("@/lib/services/participant-role-apply-service");
+      const roleForApply =
+        input.decision === "approve"
+          ? null // use the AI proposed role from the extraction
+          : typeof input.correctedValue === "string" && input.correctedValue.trim().length > 0
+            ? input.correctedValue.trim()
+            : null;
+      const result = await applyParticipantRoleDecision(
+        { extractionId: extraction.id, itemKey: input.itemKey!, correctedRoleValue: roleForApply },
+        actorUserId,
+      );
+      if (result.changed) {
+        await recordAudit({
+          action: "ai_approval.participant_role_applied",
+          entityType: "EmailParticipant",
+          entityId: result.participantId,
+          newValue: JSON.stringify({ extractionId: extraction.id, itemKey: input.itemKey, role: result.role, roleSource: result.roleSource }),
+          source: "HUMAN",
+          actorUserId,
+          ip: ctx.ip,
+          userAgent: ctx.userAgent,
+        });
+      } else {
+        await recordAudit({
+          action: "ai_approval.participant_role_skipped",
+          entityType: "EmailParticipant",
+          entityId: result.participantId,
+          newValue: JSON.stringify({ itemKey: input.itemKey, reason: result.reason }),
+          source: "SYSTEM",
+          actorUserId,
+          ip: ctx.ip,
+          userAgent: ctx.userAgent,
+        });
+      }
+    } catch {
+      // Honest-failure rule: the decision itself already stands in the logs.
+    }
+  }
+
+  // User-requested pipeline completion (Phase 9.1): approving a
   // `findingStatus:<idx>` item CREATES/UPDATES the tracker finding with the
   // AI-proposed values — the human approval is the gate; the AI did not write
   // alone. Rejections never touch the tracker.
-  if (input.decision === "approve" && input.itemKey?.startsWith("findingStatus:")) {
+  // A human CORRECTION with a correctedValue status applies the finding with
+  // the corrected status (this is how "AI could not read the status" items get
+  // their verdict — the human supplies it, the gate stays).
+  if (input.itemKey?.startsWith("findingStatus:") && (input.decision === "approve" || input.decision === "correct")) {
     try {
       const { applyApprovedFinding } = await import("@/lib/services/finding-apply-service");
-      const result = await applyApprovedFinding({ extractionId: extraction.id, itemKey: input.itemKey! }, actorUserId);
+      const correctedStatus =
+        input.decision === "correct" && typeof input.correctedValue === "string" && input.correctedValue.trim().length > 0
+          ? input.correctedValue.trim()
+          : null;
+      if (input.decision === "correct" && correctedStatus === null) {
+        throw ValidationError("CORRECT on a finding requires a correctedValue status (fixed / not_fixed / open / …).");
+      }
+      const result = await applyApprovedFinding({ extractionId: extraction.id, itemKey: input.itemKey!, correctedStatusSignal: correctedStatus }, actorUserId);
       applied.push({ itemKey: input.itemKey, findingId: result.findingId, code: result.code, created: result.created, iterationLabel: result.iterationLabel });
       await recordAudit({
-        action: "ai_approval.finding_applied",
+        action: input.decision === "correct" ? "ai_approval.finding_corrected_applied" : "ai_approval.finding_applied",
         entityType: "Finding",
         entityId: result.findingId,
-        newValue: JSON.stringify({ extractionId: extraction.id, itemKey: input.itemKey, code: result.code, created: result.created, iterationState: result.iterationLabel }),
+        newValue: JSON.stringify({ extractionId: extraction.id, itemKey: input.itemKey, code: result.code, created: result.created, iterationState: result.iterationLabel, corrected: correctedStatus ?? undefined }),
         source: "HUMAN",
         actorUserId,
         ip: ctx.ip,

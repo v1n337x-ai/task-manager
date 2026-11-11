@@ -64,7 +64,7 @@ async function assertEvidenceExcerptsAreVerbatim(
 }
 
 export async function applyApprovedFinding(
-  params: { extractionId: number; itemKey: string },
+  params: { extractionId: number; itemKey: string; correctedStatusSignal?: string | null },
   actorUserId: number,
   ctx: { source?: "HUMAN" | "EXCEL_IMPORT" | "EML" | "AI" | "SYSTEM" } = { source: "AI" },
 ): Promise<ApplyResult> {
@@ -129,10 +129,18 @@ export async function applyApprovedFinding(
   const finalSeverity = severityValue as Sev;
   const STATUS_UNION = ["fixed", "unknown", "open", "not_fixed", "not_retested", "new", "removed", "out_of_scope", "not_applicable", "accepted_risk"] as const;
   type StatusV = (typeof STATUS_UNION)[number];
-  if (typeof item.statusSignal !== "string" || !STATUS_UNION.includes(item.statusSignal as StatusV)) {
+  // A human CORRECTION supplies the status when the AI could not extract one
+  // (no valid statusSignal). The correction must itself be a legal status —
+  // the human gate replaces the missing AI signal, it never bypasses the
+  // vocabulary.
+  const correctedRaw = typeof params.correctedStatusSignal === "string" ? params.correctedStatusSignal.trim().toLowerCase() : null;
+  if (correctedRaw !== null && !STATUS_UNION.includes(correctedRaw as StatusV)) {
+    throw ValidationError(`Corrected status "${correctedRaw}" is not a valid finding status.`);
+  }
+  if (correctedRaw === null && (typeof item.statusSignal !== "string" || !STATUS_UNION.includes(item.statusSignal as StatusV))) {
     throw ValidationError("The approved AI finding has no valid status signal.");
   }
-  const statusValue = item.statusSignal as StatusV;
+  const statusValue = (correctedRaw ?? (item.statusSignal as string | null) ?? "") as StatusV;
   const evidenceText = evidence.map((item) => item.excerpt).join(" ");
   let iterationNumber: number | null =
     typeof item.iterationSignal === "number" &&
