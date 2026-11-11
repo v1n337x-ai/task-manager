@@ -56,7 +56,7 @@ export const TRACKER_COLUMNS: ContractColumn[] = [  { index: 1, letter: "A", hea
   { index: 6, letter: "F", header: "Type", kind: "type", required: true },
   { index: 7, letter: "G", header: "Source / tool", kind: "assessmentSource", required: true },
   { index: 8, letter: "H", header: "POC Task Manager", kind: "poc", required: false },
-  { index: 9, letter: "I", header: "security-vendor Team - Assigned member", kind: "assigned", required: false },
+  { index: 9, letter: "I", header: "Security Vendor Team - Assigned member", kind: "assigned", required: false },
   { index: 10, letter: "J", header: "Overall Status", kind: "overallStatus", required: true },
   { index: 11, letter: "K", header: "Total Vuln Count", kind: "totalVulnCount", required: false },
   { index: 12, letter: "L", header: "Scan/Report Date", kind: "date", required: true },
@@ -107,8 +107,7 @@ export const MATRIX_GROUP_ROW_1: Record<number, string> = {
   40: "Info",
 };
 
-/** Legal raw vocabulary observed in the real workbook (DL-03 §5) → canonical. */
-export const SCOPE_MAP: Record<string, string> = {
+/** Legal raw vocabulary observed in the real workbook (DL-03 §5) → canonical. */export const SCOPE_MAP: Record<string, string> = {
   "internal": "internal",
   "external": "external",
 };
@@ -165,6 +164,9 @@ export const CANONICAL_SCOPE_TO_RAW: Record<string, string> = {
 /** Raw string → canonical kind normalizer for a column (used by reader). */
 export function canonicalizeColumnValue(col: ContractColumn, raw: string): { value: string | null; warning?: string } {
   const trimmed = raw.trim();
+  // "—" placeholder = no data (export fills empty text cells with a dash so
+  // the workbook carries no blank data cells). Round-trips to null.
+  if (trimmed === "—" || trimmed === "–" || trimmed === "-") return { value: null };
   const key = trimmed.toLowerCase();
   switch (col.kind) {
     case "scope": {

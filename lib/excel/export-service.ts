@@ -271,21 +271,21 @@ export async function exportTrackerWorkbook(
     row.getCell(1).style = { ...(row.getCell(1).style ?? {}), numFmt: "0" };
     row.getCell(2).value = e.name; // B Application (plain string — survives re-import)
     row.getCell(3).value = e.scopeRaw; // C
-    row.getCell(4).value = e.target; // D (hyperlink objects replaced with plain values)
+    row.getCell(4).value = e.target ?? "—"; // D (hyperlink objects replaced with plain values)
     row.getCell(5).value = e.mailSubject ?? e.engagementName; // E (engagement thread key)
     row.getCell(6).value = e.typeRaw; // F
     row.getCell(7).value = e.assessmentTypeRaw; // G
-    if (e.poc) row.getCell(8).value = e.poc; // H
-    if (e.assigned) row.getCell(9).value = e.assigned; // I
+    row.getCell(8).value = e.poc ?? "—"; // H
+    row.getCell(9).value = e.assigned ?? "—"; // I
     row.getCell(10).value = e.overallStatusRaw; // J
     row.getCell(11).value = e.counts.total; // K Total Vuln Count (live)
     const rd = engagementReportDate(e);
-    if (rd) { row.getCell(12).value = rd; row.getCell(12).style = { ...(row.getCell(12).style ?? {}), numFmt: "dd/mm/yyyy" }; } else { row.getCell(12).value = null; } // L
-    if (e.requestedDate) { row.getCell(13).value = e.requestedDate; row.getCell(13).style = { ...(row.getCell(13).style ?? {}), numFmt: "dd/mm/yyyy" }; } else { row.getCell(13).value = null; } // M
-    if (e.iteration1?.startDate) { row.getCell(14).value = e.iteration1.startDate; row.getCell(14).style = { ...(row.getCell(14).style ?? {}), numFmt: "dd/mm/yyyy" }; } else { row.getCell(14).value = null; } // N
-    if (e.iteration1) row.getCell(15).value = e.iteration1.statusRaw; else row.getCell(15).value = null; // O
-    if (e.iteration2?.reportDate) { row.getCell(16).value = e.iteration2.reportDate; row.getCell(16).style = { ...(row.getCell(16).style ?? {}), numFmt: "dd/mm/yyyy" }; } else { row.getCell(16).value = null; } // P
-    if (e.iteration2) row.getCell(17).value = e.iteration2.statusRaw; // Q
+    if (rd) { row.getCell(12).value = rd; row.getCell(12).style = { ...(row.getCell(12).style ?? {}), numFmt: "dd/mm/yyyy" }; } else { row.getCell(12).value = "—"; } // L
+    if (e.requestedDate) { row.getCell(13).value = e.requestedDate; row.getCell(13).style = { ...(row.getCell(13).style ?? {}), numFmt: "dd/mm/yyyy" }; } else { row.getCell(13).value = "—"; } // M
+    if (e.iteration1?.startDate) { row.getCell(14).value = e.iteration1.startDate; row.getCell(14).style = { ...(row.getCell(14).style ?? {}), numFmt: "dd/mm/yyyy" }; } else { row.getCell(14).value = "—"; } // N
+    if (e.iteration1) row.getCell(15).value = e.iteration1.statusRaw; else row.getCell(15).value = "—"; // O
+    if (e.iteration2?.reportDate) { row.getCell(16).value = e.iteration2.reportDate; row.getCell(16).style = { ...(row.getCell(16).style ?? {}), numFmt: "dd/mm/yyyy" }; } else { row.getCell(16).value = "—"; } // P
+    if (e.iteration2) row.getCell(17).value = e.iteration2.statusRaw; else row.getCell(17).value = "—"; // Q
     row.getCell(21).value = e.counts.critical; // U
     row.getCell(22).value = e.counts.high; // V
     row.getCell(23).value = e.counts.medium; // W
@@ -307,9 +307,11 @@ export async function exportTrackerWorkbook(
     row.getCell(40).value = e.counts.closedBySeverity.info; // AN
     // Comments (R = col 18), Follow-up (S = col 19) and Follow-up Response
     // (T = col 20) come from the engagement (Phase M2: master tracker import).
-    if (e.description) row.getCell(18).value = e.description;
-    if (e.followUpDate) { row.getCell(19).value = e.followUpDate; row.getCell(19).style = { ...(row.getCell(19).style ?? {}), numFmt: "dd/mm/yyyy" }; }
-    if (e.followUpResponse) row.getCell(20).value = e.followUpResponse;
+    // No blank data cells (user direction): text columns carry "—" when the
+    // record has no value; the reader normalizes "—" back to null.
+    row.getCell(18).value = e.description ?? "—";
+    if (e.followUpDate) { row.getCell(19).value = e.followUpDate; row.getCell(19).style = { ...(row.getCell(19).style ?? {}), numFmt: "dd/mm/yyyy" }; } else { row.getCell(19).value = "—"; }
+    row.getCell(20).value = e.followUpResponse ?? "—";
     row.commit();
   }
 
@@ -397,23 +399,23 @@ export async function exportTrackerWorkbook(
       e.sNo,
       e.name,
       e.scopeRaw,
-      e.target,
+      e.target ?? "—",
       e.mailSubject ?? e.engagementName,
       e.typeRaw,
       e.assessmentTypeRaw,
-      e.poc,
-      e.assigned,
+      e.poc ?? "—",
+      e.assigned ?? "—",
       e.overallStatusRaw,
       e.counts.total,
-      engagementReportDate(e),
-      e.requestedDate,
-      e.iteration1?.startDate ?? null,
-      e.iteration1?.statusRaw ?? null,
-      e.iteration2?.reportDate ?? null,
-      e.iteration2?.statusRaw ?? null,
-      e.description,
-      e.followUpDate,
-      e.followUpResponse,
+      engagementReportDate(e) ?? "—",
+      e.requestedDate ?? "—",
+      e.iteration1?.startDate ?? "—",
+      e.iteration1?.statusRaw ?? "—",
+      e.iteration2?.reportDate ?? "—",
+      e.iteration2?.statusRaw ?? "—",
+      e.description ?? "—",
+      e.followUpDate ?? "—",
+      e.followUpResponse ?? "—",
       e.counts.critical,
       e.counts.high,
       e.counts.medium,
@@ -570,6 +572,7 @@ function applyBrandLightTheme(sheet: ExcelJS.Worksheet, exportRows: TrackerExpor
   });
   totalsRow.commit();
 }
+
 
 
 
