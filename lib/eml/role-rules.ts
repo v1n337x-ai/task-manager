@@ -57,6 +57,9 @@ const PENTEST_NAME =
 /** Owner/management titles inside the signature. */
 const OWNER_TITLE = /\b(?:sre\s+manager|product\s+owner|application\s+owner|it\s+manager|engineering\s+manager|platform\s+manager)\b/i;
 
+/** Developer-identity titles (client-agnostic — any vendor engineering lead). */
+const DEVELOPER_TITLE = /\b(?:development\s+lead|engineering\s+lead|director\s+of\s+engineering|engineering\s+director|technical\s+lead|dev\s+lead|solution\s+architect)\b/i;
+
 function safeLower(value: string | null | undefined): string {
   return (value ?? "").toLowerCase();
 }
@@ -103,6 +106,9 @@ export function inferParticipantRoleFromEml(params: {
   //    working on ANY company's domain is client security leadership).
   if (SECURITY_TITLE.test(body)) {
     return { role: "security_team", confidence: 68, basis: "security title in the message signature" };
+  }
+  if (DEVELOPER_TITLE.test(body) || DEVELOPER_TITLE.test(name)) {
+    return { role: "developer", confidence: 68, basis: "development/engineering lead title in the sender identity" };
   }
   if (OWNER_TITLE.test(body)) {
     return { role: "application_owner", confidence: 64, basis: "owner/manager title in the message signature" };

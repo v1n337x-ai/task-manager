@@ -50,9 +50,11 @@ export async function applyParticipantRoleDecision(
   const structured = extraction.structuredOutput as { participants?: { email?: string; proposedRole?: string }[] } | null;
   if (!structured?.participants?.length) throw ValidationError("The extraction has no participant proposals.");
 
-  const { email, index } = parseItemKey(input.itemKey);
-  const proposals = structured.participants.filter((p) => (p.email ?? "").toLowerCase() === email);
-  const proposal = proposals[index];
+  const { email } = parseItemKey(input.itemKey);
+  // The itemKey email is the identity; the trailing #index is only a UI
+  // disambiguator over the FULL participants array (one proposal per email in
+  // practice). Match by email — never by the filtered-array index.
+  const proposal = structured.participants.find((p) => (p.email ?? "").toLowerCase() === email);
   if (!proposal) throw ValidationError("The approved participant proposal no longer exists.");
 
   const roleName =

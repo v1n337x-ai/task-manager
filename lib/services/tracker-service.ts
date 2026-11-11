@@ -415,7 +415,9 @@ export async function getApplicationTracker(applicationId: number): Promise<Appl
 
   const findings = await prisma.finding.findMany({
     where: { applicationId, isActive: true },
-    orderBy: { code: "asc" }, // vapt.xlsx order: # column = F-code order (F-001, F-002, …)
+    // vapt.xlsx order: severity rank first (Critical → Info), then F-code —
+    // the # column follows the analyst's own workbook layout.
+    orderBy: [{ severityRef: { sortOrder: "asc" } }, { code: "asc" }],
     include: {
       severityRef: true,
       statusRef: true,

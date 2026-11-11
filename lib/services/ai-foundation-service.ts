@@ -141,7 +141,42 @@ export async function recordApprovalDecision(
   const dup = await prisma.aiApprovalDecision.findUnique({
     where: { extractionId_itemKey: { extractionId: input.extractionId, itemKey } },
   });
-  if (dup) throw ConflictError("A decision already exists for this item.");
+  // Idempotent RE-APPLY (precise fix 2026-11): a participantRole decision that
+  // RECORDED but never APPLIED (e.g. an apply-side failure swallowed by the
+  // honest-failure rule) must not wedge the item behind a 409 forever. When
+  // the participant is still UNKNOWN (no effective role was ever written),
+  // a repeated approve re-runs the apply instead of conflicting.
+  if (dup) {
+    const reApplicable =
+      dup.decision === "approve" &&
+      input.decision === "approve" &&
+      input.itemKey?.startsWith("participantRole:") === true;
+    if (reApplicable) {
+      try {
+        const { applyParticipantRoleDecision } = await import("@/lib/services/participant-role-apply-service");
+        const result = await applyParticipantRoleDecision(
+          { extractionId: extraction.id, itemKey: input.itemKey!, correctedRoleValue: null },
+          actorUserId,
+        );
+        if (result.changed) {
+          await recordAudit({
+            action: "ai_approval.participant_role_applied",
+            entityType: "EmailParticipant",
+            entityId: result.participantId,
+            newValue: JSON.stringify({ extractionId: extraction.id, itemKey: input.itemKey, role: result.role, roleSource: result.roleSource, via: "re_apply" }),
+            source: "HUMAN",
+            actorUserId,
+            ip: ctx.ip,
+            userAgent: ctx.userAgent,
+          });
+          return { applied: [], failed: [] };
+        }
+      } catch {
+        // fall through to the conflict below — the decision record stands
+      }
+    }
+    throw ConflictError("A decision already exists for this item.");
+  }
 
   await prisma.$transaction([
     prisma.aiApprovalDecision.create({
@@ -186,8 +221,13 @@ export async function recordApprovalDecision(
   // so the tracker cells reflect the analysis without requiring per-item
   // clicks. Human approval is still the gate (this only runs on an explicit
   // approve decision). Already-applied items are skipped (duplicate decisions).
+  // UNIVERSAL (user-directed 2026-11): the run-level approve ALSO applies every
+  // participant-role proposal (promote-from-UNKNOWN; human overrides always
+  // win) — "Approve all candidates" must mean findings AND roles, on every app.
   if (!input.itemKey && input.decision === "approve") {
-    const structured = (extraction.structuredOutput ?? null) as { findings?: unknown[] } | null;
+    const structured = (extraction.structuredOutput ?? null) as
+      | { findings?: unknown[]; participants?: { email?: string; proposedRole?: string }[] }
+      | null;
     const count = Array.isArray(structured?.findings) ? structured!.findings!.length : 0;
     for (let i = 0; i < count; i += 1) {
       const itemKey = `findingStatus:${i}`;
@@ -230,6 +270,57 @@ export async function recordApprovalDecision(
           userAgent: ctx.userAgent,
         });
       }
+    }
+
+    // Participant roles — part of the same run-level human decision.
+    try {
+      const { applyParticipantRoleDecision } = await import("@/lib/services/participant-role-apply-service");
+      const participants = Array.isArray(structured?.participants) ? structured!.participants! : [];
+      for (let i = 0; i < participants.length; i += 1) {
+        const email = (participants[i]?.email ?? "").toLowerCase().trim();
+        if (!email) continue;
+        const itemKey = `participantRole:${email}#${i}`;
+        const dup = await prisma.aiApprovalDecision.findUnique({
+          where: { extractionId_itemKey: { extractionId: extraction.id, itemKey } },
+        });
+        if (!dup) {
+          await prisma.aiApprovalDecision.create({
+            data: { extractionId: extraction.id, decision: "approve", decidedByUserId: actorUserId, itemKey },
+          });
+        }
+        try {
+          const result = await applyParticipantRoleDecision(
+            { extractionId: extraction.id, itemKey, correctedRoleValue: null },
+            actorUserId,
+          );
+          if (result.changed) {
+            await recordAudit({
+              action: "ai_approval.participant_role_applied",
+              entityType: "EmailParticipant",
+              entityId: result.participantId,
+              newValue: JSON.stringify({ extractionId: extraction.id, itemKey, role: result.role, roleSource: result.roleSource, via: "whole_run" }),
+              source: "HUMAN",
+              actorUserId,
+              ip: ctx.ip,
+              userAgent: ctx.userAgent,
+            });
+          }
+        } catch {
+          // Honest-failure rule: the decision stands; the apply reports via audit.
+          await recordAudit({
+            action: "ai_approval.participant_role_apply_failed",
+            entityType: "AiExtraction",
+            entityId: extraction.id,
+            newValue: JSON.stringify({ itemKey, via: "whole_run" }),
+            source: "SYSTEM",
+            actorUserId,
+            ip: ctx.ip,
+            userAgent: ctx.userAgent,
+          });
+        }
+      }
+    } catch {
+      // Never let role application break the run-level decision response.
     }
   }
 
