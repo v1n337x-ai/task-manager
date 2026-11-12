@@ -10,6 +10,7 @@
  */
 import path from "node:path";
 import fs from "node:fs";
+import JSZip from "jszip";
 import { prisma } from "@/lib/db";
 import { AppError, NotFoundError } from "@/lib/errors";
 import { recordAudit } from "@/lib/audit";
@@ -347,24 +348,50 @@ export async function exportTrackerWorkbook(
     if (touched) row.commit();
   }
 
-  // ---- Totals (§35): explicit SUMs across the exported range; no stale refs ----
+  // ---- Compact the sheet (user direction 2026-11) ----
+  // The workbook must contain ONLY rows that carry data plus the totals row.
+  // ExcelJS cannot delete rows reliably (spliceRows corrupts row geometry),
+  // so the template's totals row is MOVED UP (values + styles) directly below
+  // the last data row, and every leftover template row below it is fully
+  // stripped — values, styles and heights — leaving no visible rows.
   const lastData = DATA_START_ROW + exportRows.length - 1;
-  const totalsRowNumber = exportRows.length > LAST_TEMPLATE_DATA_ROW - DATA_START_ROW + 1
-    ? lastData + 1
-    : TOTALS_ROW;
-  if (totalsRowNumber !== TOTALS_ROW) {
-    const styleSource = sheet.getRow(TOTALS_ROW);
-    const target = sheet.getRow(totalsRowNumber);
+  const totalsRowNumber = lastData + 1;
+  if (exportRows.length > 0 && totalsRowNumber < TOTALS_ROW) {
+    const sourceTotalsRow = sheet.getRow(TOTALS_ROW);
+    const targetTotalsRow = sheet.getRow(totalsRowNumber);
     for (let c = 1; c <= 40; c++) {
-      const src = styleSource.getCell(c);
-      // Copy the totals-row styling only. Row 33 has already been repurposed
-      // as a data row, so copying its values would duplicate a real
-      // application into the totals row.
-      if (src.style) target.getCell(c).style = { ...src.style };
+      const src = sourceTotalsRow.getCell(c);
+      const dst = targetTotalsRow.getCell(c);
+      dst.value = src.value;
+      if (src.style) dst.style = { ...src.style };
     }
-    target.commit();
+    targetTotalsRow.commit();
   }
+
+  // Strip every row below the (new) totals row: values, styles, heights.
+  for (let r = totalsRowNumber + 1; r <= sheet.rowCount; r++) {
+    const row = sheet.getRow(r);
+    if (!row) continue;
+    for (let c = 1; c <= 40; c++) {
+      const cell = row.getCell(c);
+      if (cell.value !== null && cell.value !== undefined) cell.value = null;
+      if (cell.style && Object.keys(cell.style).length > 0) cell.style = {};
+    }
+    try { (row as unknown as { height?: number }).height = undefined; } catch { /* default height is fine */ }
+    row.commit();
+  }
+
+  // ---- Totals (§35): explicit SUMs across the exported range; no stale refs ----
   const totalsRow = sheet.getRow(totalsRowNumber);
+  // Clear the template's stale label/text cells on the totals row (formulas
+  // are replaced below); an empty Application cell also keeps the importer
+  // from ever treating the totals row as an application.
+  for (let c = 1; c <= 20; c++) {
+    const existing = totalsRow.getCell(c).value;
+    if (existing !== null && existing !== undefined && !(typeof existing === "object" && "formula" in (existing as object))) {
+      totalsRow.getCell(c).value = null;
+    }
+  }
   for (const [col, letter] of [
     [21, "U"],
     [22, "V"],
@@ -489,7 +516,13 @@ export async function exportTrackerWorkbook(
   }
 
   const written = await workbook.xlsx.writeBuffer();
-  const buffer = Buffer.from(written as ArrayBuffer);
+  let buffer: Buffer<ArrayBufferLike> = Buffer.from(written as ArrayBuffer);
+  // True row deletion (user direction 2026-11): the exported sheet must END at
+  // the totals row. ExcelJS cannot remove rows, so the value/style-stripped
+  // leftover <row> elements are dropped from the sheet XML directly; the
+  // declared dimension shrinks to match. Best-effort: on any failure the
+  // stripped (visually empty) rows simply remain.
+  buffer = await dropTrailingSheetRows(buffer, TRACKER_SHEET, totalsRowNumber + 1);
   const stamp = new Date().toISOString().slice(0, 10);
   const filename = `PT Tracker ${stamp} - exported.xlsx`;
 
@@ -526,6 +559,59 @@ export async function exportTrackerWorkbook(
 
 function engagementReportDate(e: TrackerExportRow): Date | null {
   return e.reportDate ?? e.iteration1?.reportDate ?? null;
+}
+
+/**
+ * Drop every <row> element from `startRow` onward in one sheet's XML and
+ * shrink the declared dimension — the reliable row deletion ExcelJS lacks
+ * (spliceRows corrupts row geometry). Rows must ALREADY be value/style-stripped
+ * by the caller; this only removes the (now empty) row elements.
+ */
+async function dropTrailingSheetRows(buffer: Buffer<ArrayBufferLike>, sheetName: string, startRow: number): Promise<Buffer<ArrayBufferLike>> {
+  try {
+    const zip = await JSZip.loadAsync(buffer);
+    const workbookXml = await zip.file("xl/workbook.xml")!.async("string");
+    const relsXml = await zip.file("xl/_rels/workbook.xml.rels")!.async("string");
+    const escapedName = sheetName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const sheetEntry =
+      new RegExp(`<sheet[^>]*name="${escapedName}"[^>]*r:id="([^"]+)"`).exec(workbookXml) ??
+      new RegExp(`<sheet[^>]*r:id="([^"]+)"[^>]*name="${escapedName}"`).exec(workbookXml);
+    if (!sheetEntry) return buffer;
+    const rid = sheetEntry[1]!;
+    const rel =
+      new RegExp(`<Relationship[^>]*Id="${rid}"[^>]*Target="([^"]+)"`).exec(relsXml) ??
+      new RegExp(`<Relationship[^>]*Target="([^"]+)"[^>]*Id="${rid}"`).exec(relsXml);
+    if (!rel) return buffer;
+    const target = rel[1]!.replace(/^\//, "");
+    const entryPath = target.startsWith("xl/") ? target : `xl/${target}`;
+    const xml = await zip.file(entryPath)!.async("string");
+
+    let changed = false;
+    // Self-closing rows (no cells) and cell-bearing rows are removed separately:
+    // a lazy `</row>` terminator is safe (rows are never nested).
+    const cleaned = xml
+      .replace(/<row r="(\d+)"[^>]*\/>/g, (m, n) => {
+        if (Number(n) >= startRow) { changed = true; return ""; }
+        return m;
+      })
+      .replace(/<row r="(\d+)"[^>]*>[\s\S]*?<\/row>/g, (m, n) => {
+        if (Number(n) >= startRow) { changed = true; return ""; }
+        return m;
+      });
+    if (!changed) return buffer;
+
+    // Shrink the declared used range (end-row digits follow the column colon).
+    const dimensioned = cleaned.replace(
+      /(<dimension ref="[^":]*:[A-Z]+)(\d+)(")/,
+      (_m, prefix: string, _digits: string, suffix: string) => `${prefix}${startRow - 1}${suffix}`,
+    );
+    zip.file(entryPath, dimensioned);
+    const out = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+    return Buffer.from(out);
+  } catch (error) {
+    logger.warn("excel_export.row_compaction_skipped", { error: String(error) });
+    return buffer;
+  }
 }
 
 /**
