@@ -229,7 +229,21 @@ export async function recordApprovalDecision(
       | { findings?: unknown[]; participants?: { email?: string; proposedRole?: string }[] }
       | null;
     const count = Array.isArray(structured?.findings) ? structured!.findings!.length : 0;
-    for (let i = 0; i < count; i += 1) {
+    // Deterministic application order: earliest evidence mail first. When the
+    // SAME finding appears in two summaries of one thread (an iteration-1
+    // report later superseded by a corrected report or retest table), the
+    // LATER summary is applied last and wins — chronological truth instead of
+    // the model's emission order. Per-iteration states keep both versions;
+    // history keeps the transition.
+    const minEvidenceIndex = (i: number): number => {
+      const f = structured!.findings![i] as { evidence?: { messageIndex?: number }[] } | null | undefined;
+      const idxs = Array.isArray(f?.evidence) ? f!.evidence!.map((e) => Number(e?.messageIndex ?? Number.MAX_SAFE_INTEGER)) : [];
+      return idxs.length ? Math.min(...idxs) : Number.MAX_SAFE_INTEGER;
+    };
+    const orderedIndices = Array.from({ length: count }, (_, i) => i).sort(
+      (a, b) => minEvidenceIndex(a) - minEvidenceIndex(b),
+    );
+    for (const i of orderedIndices) {
       const itemKey = `findingStatus:${i}`;
       const dup = await prisma.aiApprovalDecision.findUnique({
         where: { extractionId_itemKey: { extractionId: extraction.id, itemKey } },

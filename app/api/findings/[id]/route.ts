@@ -11,7 +11,7 @@ import { prisma } from "@/lib/db";
 const PatchSchema = z.object({
   iterationId: z.number().int().positive(),
   severityValue: z.enum(["critical", "high", "medium", "low", "info"]),
-  statusValue: z.enum(["open", "new", "fixed", "not_fixed", "not_retested", "removed", "out_of_scope", "not_applicable", "unknown"]),
+  statusValue: z.enum(["open", "new", "fixed", "not_fixed", "not_retested", "removed", "out_of_scope", "not_applicable", "unknown", "accepted_risk"]),
   firstSeenAt: z.string().datetime().optional(),
   retestNote: z.string().max(4000).optional(),
   comments: z.string().max(4000).optional(),

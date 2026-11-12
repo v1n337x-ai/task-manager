@@ -12,6 +12,7 @@ storage/
 tests/
 .git/
 .github/
+.gitlab-ci.yml
 .env
 .env.*
 !.env.example

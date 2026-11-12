@@ -28,6 +28,15 @@ function normalizeEvidenceText(value: string): string {
     .replace(/&amp;/gi, "&")
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
+    // Punctuation folding — models quote with typographic quotes/dashes while
+    // mails carry straight ones (and vice versa). Folding BOTH haystack and
+    // excerpt keeps honest verbatim quotes passing and fabricated text blocked.
+    .replace(/[\u2018\u2019\u201a\u201b\u2032]/g, "'")
+    .replace(/[\u201c\u201d\u201e\u201f\u2033]/g, "\"")
+    .replace(/[\u2010\u2012\u2013\u2014\u2212]/g, "-")
+    .replace(/\u2026/g, "...")
+    .replace(/[\u00a0\u2007\u202f\u205f]/g, " ")
+    .replace(/[\u200b\u200c\u200d\ufeff\u00ad]/g, "")
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
@@ -164,24 +173,47 @@ export async function applyApprovedFinding(
       ? item.iterationSignal
       : null;
   const isNewPre = item.isNewFindingCandidate === true;
+  // The candidate belongs to the thread's application; without one the item
+  // cannot be attached to any tracker (honest skip, audit explains).
+  // The EXTRACTION row keeps the application linkage from analysis time, but a
+  // thread can be legitimately MOVED to another application afterwards (and an
+  // application can be deleted with the FK going null). The thread's CURRENT
+  // linkage is the source of truth; the stale snapshot is only a fallback.
+  let applicationId = extraction.applicationId;
+  if (extraction.threadId) {
+    const threadLink = await prisma.emailThread.findUnique({
+      where: { id: extraction.threadId },
+      select: { applicationId: true },
+    });
+    if (threadLink?.applicationId) applicationId = threadLink.applicationId;
+  }
+  if (!applicationId) throw ValidationError("The thread has no application linkage — cannot attach the approved finding.");
+  const evidenceText = evidence.map((item) => item.excerpt).join(" ");
+
   // First-report default (tracker contract, same as the Excel finding import):
   // a finding reported for the FIRST time in Iteration 1 enters as OPEN until a
   // verdict exists. This is the defined initial state — not an invented verdict.
-  // Retest-phase (I2) items with no verdict still REQUIRE the human decision.
-  if (correctedRaw === null && aiStatus === null && iterationNumberPre === 1 && isNewPre) {
-    // falls through to the open default below
-  } else if (correctedRaw === null && aiStatus === null) {
+  // An AI item explicitly marked new, with no iteration signal, on an
+  // application that had NO findings before this analysis, belongs to that
+  // first report — the thread never mentions an iteration to quote. Findings
+  // created by THIS run during the whole-run apply loop must not turn the run
+  // itself into a "retest"; compare against the run's start, not "now".
+  // Retest-phase items (pre-existing findings or retest evidence) still
+  // REQUIRE an explicit iteration + verdict.
+  const hasPriorFindings =
+    (await prisma.finding.count({ where: { applicationId, createdAt: { lt: extraction.createdAt } } })) > 0;
+  const isFirstReport =
+    iterationNumberPre === null &&
+    isNewPre &&
+    !hasPriorFindings &&
+    !/retest|iteration\s*2/i.test(evidenceText);
+
+  if (!isFirstReport && correctedRaw === null && aiStatus === null && !(iterationNumberPre === 1 && isNewPre)) {
     throw ValidationError("The approved AI finding has no valid status signal.");
   }
-  const statusValue = (correctedRaw ?? aiStatus ?? (iterationNumberPre === 1 && isNewPre ? "open" : "")) as StatusV;
-  const evidenceText = evidence.map((item) => item.excerpt).join(" ");
-  let iterationNumber: number | null =
-    typeof item.iterationSignal === "number" &&
-    Number.isInteger(item.iterationSignal) &&
-    item.iterationSignal >= 1 &&
-    item.iterationSignal <= 2
-      ? item.iterationSignal
-      : null;
+  const statusValue = (correctedRaw ?? aiStatus ?? (isFirstReport || (iterationNumberPre === 1 && isNewPre) ? "open" : "")) as StatusV;
+  let iterationNumber: number | null = iterationNumberPre;
+  if (iterationNumber === null && isFirstReport) iterationNumber = 1;
   if (iterationNumber === null && /retest|iteration\s*2/i.test(evidenceText) && ["fixed", "not_fixed"].includes(statusValue)) {
     iterationNumber = 2;
   }
@@ -191,11 +223,6 @@ export async function applyApprovedFinding(
   }
   const isNewFindingCandidate = item.isNewFindingCandidate === true;
   const firstSeenIterationNumber = isNewFindingCandidate ? iterationNumber : Math.min(iterationNumber, 1);
-
-  // The candidate belongs to the thread's application; without one the item
-  // cannot be attached to any tracker (honest skip, audit explains).
-  const applicationId = extraction.applicationId;
-  if (!applicationId) throw ValidationError("The thread has no application linkage — cannot attach the approved finding.");
 
   // Match an existing finding by explicit code first, then by normalized title.
   // An explicit code is a stable identity: a status-only update for that code

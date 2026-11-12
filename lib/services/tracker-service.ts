@@ -5,6 +5,7 @@
  */
 import { prisma } from "@/lib/db";
 import { NotFoundError } from "@/lib/errors";
+import { FINDING_CAR_STATUS, FINDING_CLOSED_STATUSES, FINDING_OPEN_STATUSES } from "@/lib/excel/contract";
 import { duplicateMasterPlaceholderIds } from "@/lib/services/finding-placeholder-utils";
 
 export interface TrackerIterationInfo {
@@ -55,14 +56,15 @@ export interface TrackerAppRow {
   /** Excel Open/Closed matrix pairs (AE..AN semantics — identical buckets). */
   openBySeverity: { critical: number; high: number; medium: number; low: number; info: number };
   closedBySeverity: { critical: number; high: number; medium: number; low: number; info: number };
-  /** Excel "Vulnerabilities  Closed" (fixed only). */
+  /** Excel "Vulnerabilities  Closed" (fixed + not fixed + reopened + out of scope/removed; CAR is separate). */
   closed: number;
   active: boolean;
   updatedAt: Date;
 }
 
-const OPEN_STATES = ["open", "new", "not_fixed", "not_retested"];
-const FIXED_STATES = ["fixed"];
+// Shared Excel/Reports semantics — see lib/excel/contract.ts.
+const OPEN_STATES = FINDING_OPEN_STATUSES;
+const CLOSED_STATES = FINDING_CLOSED_STATUSES;
 
 /** Aggregated tracker rows (single batch of queries — no N+1, §57). */
 export async function listTrackerApps(filters: {
@@ -131,6 +133,10 @@ export async function listTrackerApps(filters: {
     const latest = iterations[0];
     const appFindings = findings.filter((f) => f.applicationId === app.id && !duplicatePlaceholderIds.has(f.id));
     const relevant = appFindings.filter((f) => f.isActive);
+    // §19 — live state is the highest-numbered iteration state, falling back to
+    // the finding's base status when no iteration state exists.
+    const currentOf = (f: (typeof relevant)[number]) =>
+      currentStatusFromStates(f.iterationStates.map((s) => ({ iterationNumber: s.iteration.number, statusValue: s.statusRef.value }))) ?? f.statusRef.value;
 
     const row: TrackerAppRow = {
       id: app.id,
@@ -171,10 +177,10 @@ export async function listTrackerApps(filters: {
         medium: relevant.filter((f) => f.severityRef.value === "medium").length,
         low: relevant.filter((f) => f.severityRef.value === "low").length,
         info: relevant.filter((f) => f.severityRef.value === "info").length,
-        pending: relevant.filter((f) => OPEN_STATES.includes(f.statusRef.value)).length,
-        fixed: relevant.filter((f) => FIXED_STATES.includes(f.statusRef.value)).length,
-        notFixed: relevant.filter((f) => f.statusRef.value === "not_fixed").length,
-        car: relevant.filter((f) => f.statusRef.value === "accepted_risk").length,
+        pending: relevant.filter((f) => OPEN_STATES.has(currentOf(f))).length,
+        fixed: relevant.filter((f) => currentOf(f) === "fixed").length,
+        notFixed: relevant.filter((f) => currentOf(f) === "not_fixed").length,
+        car: relevant.filter((f) => currentOf(f) === FINDING_CAR_STATUS).length,
         newInLatestIteration: latest
           ? relevant.filter((f) => {
               const state = f.iterationStates.find((s) => s.iteration.number === latest.number);
@@ -196,10 +202,10 @@ export async function listTrackerApps(filters: {
     let closedCount = 0;
     for (const f of relevant) {
       const sev = f.severityRef.value;
-      const st = f.statusRef.value;
-      if (OPEN_STATES.includes(st)) {
+      const st = currentOf(f);
+      if (OPEN_STATES.has(st)) {
         openBySeverity[sev as keyof typeof openBySeverity] += 1;
-      } else if (st === "fixed") {
+      } else if (CLOSED_STATES.has(st)) {
         closedBySeverity[sev as keyof typeof closedBySeverity] += 1;
         closedCount += 1;
       }
@@ -492,7 +498,7 @@ export async function getApplicationTracker(applicationId: number): Promise<Appl
     medium: relevant.filter((f) => f.severityValue === "medium").length,
     low: relevant.filter((f) => f.severityValue === "low").length,
     info: relevant.filter((f) => f.severityValue === "info").length,
-    pending: relevant.filter((f) => OPEN_STATES.includes(currentOf(f))).length,
+    pending: relevant.filter((f) => OPEN_STATES.has(currentOf(f))).length,
     fixed: relevant.filter((f) => currentOf(f) === "fixed").length,
     notFixed: relevant.filter((f) => currentOf(f) === "not_fixed").length,
     newInLatestIteration: relevant.filter((f) => {
@@ -502,7 +508,7 @@ export async function getApplicationTracker(applicationId: number): Promise<Appl
       return latest.statusValue === "new" && !hasEarlier;
     }).length,
     testCases: testCases.length,
-    car: relevant.filter((f) => f.currentStatusValue === "accepted_risk").length,
+    car: relevant.filter((f) => currentOf(f) === FINDING_CAR_STATUS).length,
   };
 
   // §47 — history: audit entries across this application's entity graph.

@@ -139,11 +139,11 @@ export function ApplicationDialogs({ masterValues }: { masterValues: MasterValue
               </div>
               <div>
                 <Label htmlFor="apiFqdn">API / FQDN</Label>
-                <Input id="apiFqdn" name="apiFqdn" placeholder="api.example.com" />
+                <Input id="apiFqdn" name="apiFqdn" placeholder="api.example.example.com" />
               </div>
               <div>
                 <Label htmlFor="rawTarget">Other target (APK/bundle)</Label>
-                <Input id="rawTarget" name="rawTarget" placeholder="com.example.app.staging" />
+                <Input id="rawTarget" name="rawTarget" placeholder="com.app.example.staging" />
               </div>
             </div>
 
@@ -363,7 +363,7 @@ export function RowActions({
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <Label htmlFor={`alias-${application.id}`}>New alias</Label>
-                <Input id={`alias-${application.id}`} name="alias" required placeholder="cash-portal" />
+                <Input id={`alias-${application.id}`} name="alias" required placeholder="customer-portal" />
               </div>
               <div>
                 <Label htmlFor={`aliasType-${application.id}`}>Type (auto if empty)</Label>

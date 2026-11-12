@@ -167,7 +167,7 @@ export async function exportPptReport(params: {
     slideIndex += 1;
     const slide = pptx.addSlide();
     slide.background = { color: A.PAGE };
-    // Task Manager orange band + violet rule motif (security-vendor/Task Manager template)
+    // Task Manager orange band + violet rule motif (Security Vendor/Task Manager template)
     slide.addShape("rect", { x: 0, y: 0, w: 13.33, h: 1.15, fill: { color: A.ORANGE }, line: { color: A.ORANGE } });
     slide.addShape("rect", { x: 0, y: 1.15, w: 13.33, h: 0.06, fill: { color: A.VIOLET }, line: { color: A.VIOLET } });
     if (fs.existsSync(brandLogo)) slide.addImage({ path: brandLogo, x: 10.62, y: 0.24, w: 2.1, h: 0.51 });

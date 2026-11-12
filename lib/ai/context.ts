@@ -50,10 +50,10 @@ export function buildAnalysisContext(input: {
     );
   }
 
-  const digestFor = (m: (typeof chronological)[number]) => {
-    const originalIndex = chronological.indexOf(m);
-    return digests[originalIndex] ?? [];
-  };
+  // O(n) digest lookup (identity map) — indexOf per message was quadratic on
+  // large imported threads and visibly slowed context building.
+  const digestByMessage = new Map<object, string[]>();
+  chronological.forEach((m, i) => digestByMessage.set(m, digests[i] ?? []));
 
   const context: AiAnalyzeContextInput = {
     applicationName: input.applicationName,
@@ -64,7 +64,7 @@ export function buildAnalysisContext(input: {
     existingTestCases: input.existingTestCases,
     subject: input.subject,
     messages: selected.map((m, i) => {
-      const rows = digestFor(m);
+      const rows = digestByMessage.get(m) ?? [];
       if (rows.length > 0) reductions.push(`message #${i} carries ${rows.length} summary-table row(s) (digest kept verbatim)`);
       let body = m.bodyText ?? "";
       if (body.length > MAX_BODY_CHARS) {

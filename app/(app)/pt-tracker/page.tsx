@@ -225,7 +225,7 @@ export default async function PtTrackerPage({
                       { label: "Mail Subject", value: r.mailSubject },
                       { label: "Requested date", value: r.requestedDate ? formatDate(r.requestedDate) : null },
                       { label: "POC Task Manager", value: r.poc },
-                      { label: "security-vendor Team", value: r.assignedMembers },
+                      { label: "Security Vendor Team", value: r.assignedMembers },
                       { label: "Comments", value: r.comments },
                       { label: "Mail-thread key", value: r.engagementName },
                     ]}

@@ -148,7 +148,7 @@ export async function createIteration(input: IterationInput, actorUserId: number
     throw ValidationError("The PT Tracker contract carries exactly two iterations (Iteration 1 and Iteration 2). Iteration 3 is not available in this build (user-directed change control).");
   }
 
-  const name = input.name?.trim() || (input.iterationTypeValue === "initial_scan" ? `Iteration ${effectiveNumber} — Initial Scan` : `Iteration ${effectiveNumber}`);
+  const name = input.name?.trim() || `Iteration ${effectiveNumber}`;
   const row = await prisma.iteration.create({
     data: {
       engagementId: engagement.id,

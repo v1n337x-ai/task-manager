@@ -208,13 +208,13 @@ export function canonicalizeColumnValue(col: ContractColumn, raw: string): { val
  * Single source of truth for Open / Closed / CAR buckets.
  *
  * User semantics (2026-11): Open = not yet fixed/closed;
- * Closed = fixed + not fixed + reopened + CAR.
+ * Closed = fixed + not fixed + reopened + out of scope/removed.
  *
  * Every rollup — the Excel export's per-app and per-iteration buckets AND the
  * web iteration summaries — consumes THESE sets, so a number on screen always
  * equals the same number in the workbook. In particular `removed` and
- * `out_of_scope` are closed (they are gone), and `accepted_risk` is CAR only
- * (closed as well as CAR).
+ * `out_of_scope` are closed (they are gone). `accepted_risk` is CAR only and
+ * is NOT part of Closed, so Total = Open + Closed + CAR everywhere.
  */
 export const FINDING_CAR_STATUS = "accepted_risk";
 
@@ -224,7 +224,6 @@ export const FINDING_CLOSED_STATUSES = new Set([
   "fixed",
   "not_fixed",
   "reopened",
-  FINDING_CAR_STATUS,
   "out_of_scope",
   "removed",
 ]);

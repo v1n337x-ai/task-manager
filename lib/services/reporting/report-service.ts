@@ -5,6 +5,7 @@
  * never Excel snapshots, never AI narrative numbers.
  */
 import { prisma } from "@/lib/db";
+import { FINDING_CLOSED_STATUSES, FINDING_OPEN_STATUSES } from "@/lib/excel/contract";
 import { duplicateMasterPlaceholderIds } from "@/lib/services/finding-placeholder-utils";
 
 export interface SeverityBreakdown {
@@ -93,7 +94,10 @@ export function validateSeverity(s: string | undefined): ReportFilters["severity
 
 export type { ReportFilters as FiltersAlias };
 
-const OPEN_STATES = ["open", "new", "not_fixed", "not_retested"];
+// Shared Excel/Reports semantics — see lib/excel/contract.ts. Pending = Open
+// only; Not Fixed is adjudicated and therefore part of Closed.
+const OPEN_STATES = FINDING_OPEN_STATUSES;
+const CLOSED_STATES = FINDING_CLOSED_STATUSES;
 
 export async function generateDashboardReport(filters: ReportFilters = {}): Promise<DashboardReport> {
   const appWhere = {
@@ -161,11 +165,11 @@ export async function generateDashboardReport(filters: ReportFilters = {}): Prom
     severityBreakdown[f.severityRef.value as keyof SeverityBreakdown] += 1;
     counts.total += 1;
     counts[f.severityRef.value as "critical" | "high" | "medium" | "low" | "info"] += 1;
-    if (OPEN_STATES.includes(currentStatus)) {
+    if (OPEN_STATES.has(currentStatus)) {
       counts.pending += 1;
       statusBreakdown.open += 1;
-      if (currentStatus === "not_fixed") { statusBreakdown.notFixed += 1; counts.notFixed += 1; }
     }
+    if (currentStatus === "not_fixed") { statusBreakdown.notFixed += 1; counts.notFixed += 1; }
     if (currentStatus === "fixed") { counts.fixed += 1; statusBreakdown.fixed += 1; }
     if (currentStatus === "reopened") { counts.reopened += 1; statusBreakdown.reopened += 1; }
     if (currentStatus === "accepted_risk") { counts.car += 1; statusBreakdown.car += 1; }
@@ -282,13 +286,13 @@ export async function generateDashboardReport(filters: ReportFilters = {}): Prom
       const current = f.iterationStates.length
         ? f.iterationStates.reduce((a, b) => (b.iteration.number > a.iteration.number ? b : a)).statusRef.value
         : f.statusRef.value;
-      return OPEN_STATES.includes(current);
+      return OPEN_STATES.has(current);
     }).length,
     closedFindings: filtered.filter((f) => {
       const current = f.iterationStates.length
         ? f.iterationStates.reduce((a, b) => (b.iteration.number > a.iteration.number ? b : a)).statusRef.value
         : f.statusRef.value;
-      return current === "fixed";
+      return CLOSED_STATES.has(current);
     }).length,
     carVerified: filtered.filter((f) => {
       const current = f.iterationStates.length

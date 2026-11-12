@@ -21,11 +21,23 @@ const FILLS: Record<string, string> = {
   not_fixed: "bg-sev-critical text-white",
   not_retested: "bg-xlsx-band text-muted",
   retested: "bg-sev-low text-white",
+  // CAR = client-accepted risk: brand violet so it is distinct from
+  // Open (peach), Fixed (green) and Not Fixed (red).
+  accepted_risk: "bg-slate text-white",
 };
 
+/** "Accepted Risk (CAR)" → "accepted_risk"; "Not Fixed" → "not_fixed". */
+function statusKey(statusLabel: string): string {
+  return statusLabel
+    .toLowerCase()
+    .trim()
+    .replace(/\s*\([^)]*\)\s*/g, " ")
+    .trim()
+    .replace(/\s+/g, "_");
+}
+
 export function statusFillClass(statusLabel: string): string {
-  const key = statusLabel.toLowerCase().trim().replace(/ /g, "_");
-  return FILLS[key] ?? "bg-card text-ink-2";
+  return FILLS[statusKey(statusLabel)] ?? "bg-card text-ink-2";
 }
 
 /** Severity fills for full-cell severity columns. */

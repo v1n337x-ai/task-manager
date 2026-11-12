@@ -5,7 +5,7 @@ import LoginForm from "./login-form";
 export const metadata: Metadata = { title: "Sign in" };
 
 /**
- * Login (brief section 7): centered card pattern from the security-vendor reference
+ * Login (brief section 7): centered card pattern from the Security Vendor reference
  * study, brand-consistent with Phase 1 tokens. Deliberately undecorated.
  */
 export default async function LoginPage({

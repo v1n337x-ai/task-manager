@@ -258,16 +258,20 @@ export function parseTrackerRows(collected: { rowNumber: number; cells: Record<n
       if (!res.value && res.warning) exceptions.push({ severity: "warning", row: rowNumber, code: "COUNT_WARNING", message: res.warning });
     });
 
-    // Identity (§36): Total = Pending + Closed + CAR — warning recorded, never auto-fixed.
-    const identitySum = counts.pending + counts.closed + counts.car;
+    // Identity (§36): every finding is counted exactly once.
+    // Current exports: Total = Pending + Closed, with CAR already inside Closed.
+    // Legacy workbooks: CAR sits outside Closed, so Total = Pending + Closed + CAR.
+    // Accept both; warning recorded, never auto-fixed.
+    const identityClosed = counts.pending + counts.closed;
+    const identitySeparateCar = identityClosed + counts.car;
     const countsSeen = counts.total + counts.pending + counts.closed + counts.car;
-    if (countsSeen > 0 && identitySum !== counts.total) {
+    if (countsSeen > 0 && counts.total !== identityClosed && counts.total !== identitySeparateCar) {
       identityWarnings += 1;
       exceptions.push({
         severity: "warning",
         row: rowNumber,
         code: "TOTAL_IDENTITY_MISMATCH",
-        message: `${applicationRaw}: Total(${counts.total}) ≠ Pending(${counts.pending}) + Closed(${counts.closed}) + CAR(${counts.car}). Snapshot keeps source values; live counts derive from findings.`,
+        message: `${applicationRaw}: Total(${counts.total}) ≠ Pending(${counts.pending}) + Closed(${counts.closed}) = ${identityClosed}, and Pending + Closed + CAR = ${identitySeparateCar}. Snapshot keeps source values; live counts derive from findings.`,
       });
     }
 
@@ -573,7 +577,7 @@ export async function validateImport(params: {
     })(),
     iterationDetected: validation.rows.some((r) => r.iteration2StatusValue)
       ? "Iteration 2 (Retest) detected via Iteration-2 Status column. Iteration 3+ cannot be derived from the v1 contract."
-      : "Iteration 1 — Initial Scan only.",
+      : "Iteration 1 only.",
     removedTestCasesExpected: 0,
     identityWarnings: validation.identityWarnings,
   };
@@ -872,7 +876,7 @@ async function executeImport(
           engagementId: engagement.id,
           number: 1,
           iterationType: iter1TypeId,
-          name: "Iteration 1 — Initial Scan",
+          name: "Iteration 1",
           startDate: row.iteration1Date ? new Date(row.iteration1Date) : (row.requestedDate ? new Date(row.requestedDate) : null),
           reportDate: row.iteration1Date ? new Date(row.iteration1Date) : null,
           status: iter1StatusId,

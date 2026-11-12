@@ -53,6 +53,9 @@ tests/fixtures/eml-live/*.eml
 .p-u.txt
 .e2e-*
 
+# deployment-local configuration (org roster etc. — never commit)
+/data/*.local.json
+
 
 # live verification artifacts
 .verify-cookies.txt

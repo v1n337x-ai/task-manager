@@ -149,6 +149,10 @@ export async function parseMasterTrackerWorkbook(input: Buffer | Uint8Array): Pr
     if (labels.has("s.no") && labels.has("application")) {
       headerRowNumber = r;
       for (const [name, c] of labels.entries()) headerMap.set(name, c);
+      for (const [name, c] of labels.entries()) {
+        if (name.startsWith("poc")) headerMap.set("poc client", c);
+        if (name.includes("assigned member")) headerMap.set("assigned member", c);
+      }
 
       // Open/Closed matrix band: the header row carries "Open"/"Closed" labels
       // while the band row ABOVE carries the severity names (merged band).
@@ -184,7 +188,14 @@ export async function parseMasterTrackerWorkbook(input: Buffer | Uint8Array): Pr
   }
 
   const col = (name: string): number => {
-    const c = headerMap.get(name);
+    const normalizedName = name.toLowerCase();
+    let c = headerMap.get(normalizedName);
+    if (!c && normalizedName.includes("poc")) {
+      c = [...headerMap.entries()].find(([label]) => label.startsWith("poc"))?.[1];
+    }
+    if (!c && normalizedName.includes("assigned member")) {
+      c = [...headerMap.entries()].find(([label]) => label.includes("assigned member"))?.[1];
+    }
     if (!c) throw new Error(`Master tracker header from '${name}' not found.`);
     return c;
   };
@@ -251,7 +262,7 @@ export async function parseMasterTrackerWorkbook(input: Buffer | Uint8Array): Pr
       mailSubject: cellText(row.getCell(col("mail subject")).value).trim() || null,
       sourceTool: cellText(row.getCell(col("source / tool")).value).trim() || null,
       pocText: cellText(row.getCell(col("poc Task Manager")).value).trim() || null,
-      assignedText: cellText(row.getCell(col("security-vendor team - assigned member")).value).trim() || null,
+      assignedText: cellText(row.getCell(col("Security Vendor team - assigned member")).value).trim() || null,
       overallStatus: normalizedHeader(row.getCell(col("overall status")).value) || null,
       totalVulnCount: cellNumber(row.getCell(col("total vuln count")).value),
       scanDate: cellDate(row.getCell(col("scan/report date")).value),

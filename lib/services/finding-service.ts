@@ -196,9 +196,11 @@ export async function setFindingIterationState(input: SetIterationStateInput, ac
           ? "not_fixed"
           : statusRow.value === "removed"
             ? "removed"
-            : statusRow.value === "out_of_scope" || statusRow.value === "not_applicable"
+            : statusRow.value === "accepted_risk"
               ? "accepted_risk"
-              : "open"; // open | new | not_retested | unknown → surface Open
+              : statusRow.value === "out_of_scope" || statusRow.value === "not_applicable"
+                ? "accepted_risk"
+                : "open"; // open | new | not_retested | unknown → surface Open
     const target = await prisma.masterValue.findUnique({
       where: { domain_value: { domain: "finding_status", value: surface } },
     });

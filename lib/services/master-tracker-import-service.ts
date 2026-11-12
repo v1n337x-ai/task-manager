@@ -24,6 +24,8 @@ import { createFinding, setFindingIterationState } from "@/lib/services/finding-
 import { ensureIterations } from "@/lib/services/finding-import-service";
 import { recordAudit } from "@/lib/audit";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 
 export interface MasterImportOptions {
   fileName: string;
@@ -242,7 +244,7 @@ export async function importMasterTrackerWorkbook(
       }
     }
 
-    // ---- contacts: POC Task Manager + security-vendor assigned members ----
+    // ---- contacts: POC Task Manager + Security Vendor assigned members ----
     for (const person of splitPeople(row.pocText)) {
       const contactId = await ensureContact(person, "Task Manager");
       if (contactId === null) continue;
@@ -252,7 +254,7 @@ export async function importMasterTrackerWorkbook(
       }
     }
     for (const person of splitPeople(row.assignedText)) {
-      const contactId = await ensureContact(person, "security-vendor (iWeen)");
+      const contactId = await ensureContact(person, "Security Vendor (iWeen)");
       if (contactId === null) continue;
       await linkAssignedMember(targetApp.id, contactId);
     }
@@ -358,9 +360,34 @@ function splitPeople(text: string | null): string[] {
 /**
  * Vendor-recognition tokens observed in contact strings (e.g.
  * "Himanshu Kumawat - Haptik"). A generic install has no roster, so org
- * inference is disabled by default — deploys add their own entries here.
+ * inference is disabled by default — the deployment supplies its own roster
+ * OUTSIDE the repository via data/org-tokens.local.json (gitignored):
+ *   [ ["token-regex", "Org Name"], … ]
+ * Invalid entries are skipped; a missing file keeps the generic empty roster.
  */
-const ORG_TOKENS: [RegExp, string][] = [];
+const ORG_TOKENS: [RegExp, string][] = loadLocalOrgTokens();
+
+function loadLocalOrgTokens(): [RegExp, string][] {
+  try {
+    const raw = readFileSync(path.join(process.cwd(), "data", "org-tokens.local.json"), "utf8");
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const tokens: [RegExp, string][] = [];
+    for (const entry of parsed) {
+      if (!Array.isArray(entry) || entry.length !== 2) continue;
+      const [pattern, org] = entry as [unknown, unknown];
+      if (typeof pattern !== "string" || typeof org !== "string") continue;
+      try {
+        tokens.push([new RegExp(pattern, "i"), org]);
+      } catch {
+        // invalid pattern — skip the entry, never break the import
+      }
+    }
+    return tokens;
+  } catch {
+    return []; // no local roster supplied — generic install
+  }
+}
 
 function inferOrg(person: string): { fullName: string; org: string | null } {
   for (const [rx, org] of ORG_TOKENS) {

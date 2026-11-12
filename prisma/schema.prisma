@@ -1,7 +1,7 @@
-// Task Manager â€” Phase 2 database schema
+// Task Manager — Phase 2 database schema
 // Source of truth: Phase 1 Blueprint (06-Database-Architecture.md) adapted to the
 // Phase 2 brief (sections 14-41). Legacy helpers (Counts/Pivot/Detail1) are NOT
-// stored â€” they become SQL views in Phase 3.
+// stored — they become SQL views in Phase 3.
 //
 // Conventions:
 // - All business tables use integer autoincrement PKs.
@@ -230,7 +230,7 @@ model ApplicationAlias {
 }
 
 // ---------------------------------------------------------------------------
-// Engagement â†’ Iteration (brief sections 18-19)
+// Engagement → Iteration (brief sections 18-19)
 // ---------------------------------------------------------------------------
 model Engagement {
   id               Int       @id @default(autoincrement())
@@ -243,7 +243,7 @@ model Engagement {
   status           Int // FK -> engagement_status
   requestedDate    DateTime?
   reportDate       DateTime?
-  sortOrder        Int? // tracker S.no equivalent (display only â€” never a key, per DL-03)
+  sortOrder        Int? // tracker S.no equivalent (display only — never a key, per DL-03)
   notes            String?
   followUpDate     DateTime? // Excel "Follow-up" (column S=19) — next-chase date
   followUpResponse String? // Excel "Follow-up Response" (column T=20)
@@ -266,15 +266,15 @@ model Engagement {
 model Iteration {
   id             Int       @id @default(autoincrement())
   engagementId   Int
-  number         Int // 1, 2, 3, ... â€” NOT limited to two (brief section 19)
+  number         Int // 1, 2, 3, ... — NOT limited to two (brief section 19)
   iterationType  Int // FK -> iteration_type (initial_scan | retest | follow_up | other)
   name           String    @default("Initial Scan")
   startDate      DateTime?
   reportDate     DateTime?
   status         Int // FK -> iteration_status (planned | in_progress | completed | pending | cancelled)
   // Phase 3: raw aggregate snapshot imported from the 39-column workbook
-  // (severity counts etc.) â€” AUDIT CONTEXT ONLY, never the authoritative count
-  // source (Phase 3 brief Â§36). Live counts derive from findings.
+  // (severity counts etc.) — AUDIT CONTEXT ONLY, never the authoritative count
+  // source (Phase 3 brief §36). Live counts derive from findings.
   importSnapshot Json?
   notes          String?
   createdAt      DateTime  @default(now())
@@ -301,7 +301,7 @@ model Iteration {
 model TestCase {
   id            Int      @id @default(autoincrement())
   applicationId Int
-  code          String // "TC-001" â€” stable identity, never renumbered for history
+  code          String // "TC-001" — stable identity, never renumbered for history
   title         String
   description   String?
   category      String? // free until controlled categories are agreed
@@ -347,13 +347,13 @@ model TestCaseIteration {
 model Finding {
   id                       Int      @id @default(autoincrement())
   applicationId            Int
-  code                     String // "F-001" â€” stable identity across iterations
+  code                     String // "F-001" — stable identity across iterations
   title                    String
   description              String?
   // Phase 3: linkage + deterministic matching + first-seen tracking
   testCaseId               Int? // related test case (workbook TC / manual selection)
-  firstSeenIterationNumber Int? // "New in Iteration 2" (Â§22); null when unknown
-  matchKey                 String? // deterministic match key for future importers (Â§23)
+  firstSeenIterationNumber Int? // "New in Iteration 2" (§22); null when unknown
+  matchKey                 String? // deterministic match key for future importers (§23)
   severity                 Int // FK -> severity (critical | high | medium | low | info)
   currentStatus            Int // FK -> finding_status (open | fixed | not_fixed | accepted_risk | removed | duplicate)
   isActive                 Boolean  @default(true)
@@ -377,8 +377,8 @@ model Finding {
   @@map("findings")
 }
 
-// State matrix: one row per (finding Ã— iteration). Historical iterations keep
-// their own rows â€” an update to Iteration 2 never overwrites Iteration 1.
+// State matrix: one row per (finding × iteration). Historical iterations keep
+// their own rows — an update to Iteration 2 never overwrites Iteration 1.
 // `status` includes open / fixed / not_fixed / not_retested / removed /
 // out_of_scope / not_applicable / unknown (brief sections 24-25).
 model FindingIterationState {
@@ -456,7 +456,7 @@ model ApplicationReport {
 }
 
 // ---------------------------------------------------------------------------
-// Email foundations (brief sections 27-31) â€” EML ingestion lands in Phase 6.
+// Email foundations (brief sections 27-31) — EML ingestion lands in Phase 6.
 // ---------------------------------------------------------------------------
 model EmailThread {
   id             Int      @id @default(autoincrement())
@@ -481,17 +481,17 @@ model EmailThread {
 model EmailMessage {
   id                Int       @id @default(autoincrement())
   threadId          Int
-  messageId         String    @unique // RFC 5322 Message-ID (synthesized hash when absent, Â§13)
+  messageId         String    @unique // RFC 5322 Message-ID (synthesized hash when absent, §13)
   inReplyTo         String?
   references        String?
-  replyTo           String? // Reply-To header (Phase 4 Â§12)
-  headersRaw        Json? // PRESERVED original headers â€” the DB row is an interpretation (Â§2/Â§12)
+  replyTo           String? // Reply-To header (Phase 4 §12)
+  headersRaw        Json? // PRESERVED original headers — the DB row is an interpretation (§2/§12)
   fromParticipantId Int
   subject           String?
   sentAt            DateTime?
   bodyText          String?
   bodyHtml          String?
-  sourceFile        String? // original .eml path/reference â€” raw bytes never stored in DB
+  sourceFile        String? // original .eml path/reference — raw bytes never stored in DB
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -552,7 +552,7 @@ model EmailRecipient {
 model EmailAttachment {
   id               Int      @id @default(autoincrement())
   messageId        Int
-  filename         String // display name only â€” NEVER trusted as a security control
+  filename         String // display name only — NEVER trusted as a security control
   contentType      String?
   sizeBytes        Int?
   storageReference String? // future: object-store key (no execution of files, brief 31)
@@ -573,27 +573,27 @@ model EmailAttachment {
 }
 
 // ---------------------------------------------------------------------------
-// AI extraction foundations (brief sections 32-34) â€” no agent wired yet.
+// AI extraction foundations (brief sections 32-34) — no agent wired yet.
 // ---------------------------------------------------------------------------
 model AiExtraction {
   id                 Int       @id @default(autoincrement())
-  sourceMessageId    Int? // single-message analysis (nullable â€” thread runs have null)
+  sourceMessageId    Int? // single-message analysis (nullable — thread runs have null)
   sourceAttachmentId Int?
   applicationId      Int? // proposed application
-  threadId           Int? // Phase 5: thread-level analysis run (Â§7)
-  providerSlug       String? // Phase 5 run metadata (Â§37/Â§45)
+  threadId           Int? // Phase 5: thread-level analysis run (§7)
+  providerSlug       String? // Phase 5 run metadata (§37/§45)
   modelRaw           String? // provider-reported model when available
-  schemaVersion      String? // e.g. AI_EXTRACTION_V1 (Â§12)
-  promptVersion      String? // e.g. VAPT_EMAIL_ANALYSIS_V1 (Â§47)
-  inputContextHash   String? // Â§48 deterministic hash of the analyzed context
+  schemaVersion      String? // e.g. AI_EXTRACTION_V1 (§12)
+  promptVersion      String? // e.g. VAPT_EMAIL_ANALYSIS_V1 (§47)
+  inputContextHash   String? // §48 deterministic hash of the analyzed context
   outputHash         String? // sha256 of raw output
   durationMs         Int?
   extractionType     String // "thread_vapt_analysis" for Phase 5 runs
   rawOutput          String?
   structuredOutput   Json?
   confidence         Int? // 0..100
-  status             Int // FK -> extraction_status (review lifecycle, Â§39)
-  errorMessage       String? // Â§50 sanitized failure info
+  status             Int // FK -> extraction_status (review lifecycle, §39)
+  errorMessage       String? // §50 sanitized failure info
   reviewedByUserId   Int?
   reviewedAt         DateTime?
   createdAt          DateTime  @default(now())
@@ -636,7 +636,7 @@ model AiEvidence {
 }
 
 // Human review gate: AI never writes business rows directly (brief sections 34/61).
-// Phase 5: item-level decisions (Â§74) â€” extractionId+"global" unique for a whole-run
+// Phase 5: item-level decisions (§74) — extractionId+"global" unique for a whole-run
 // decision; item rows carry itemKey + correctedValue for CORRECT decisions.
 model AiApprovalDecision {
   id              Int      @id @default(autoincrement())
@@ -729,7 +729,7 @@ model AuditLog {
 }
 
 // ---------------------------------------------------------------------------
-// Import / export job foundations (brief section 36) â€” processors land Ph 3+.
+// Import / export job foundations (brief section 36) — processors land Ph 3+.
 // ---------------------------------------------------------------------------
 model ImportJob {
   id              Int       @id @default(autoincrement())
@@ -737,7 +737,7 @@ model ImportJob {
   mimeType        String?
   sha256          String    @unique // reproducible import idempotency
   type            String    @default("xlsx_tracker")
-  schemaVersionId Int? // PT Tracker contract used (Phase 3 Â§29)
+  schemaVersionId Int? // PT Tracker contract used (Phase 3 §29)
   status          Int // FK -> job_status (queued | validating | ready | processing | completed | completed_with_warnings | failed | cancelled)
   options         Json?
   preview         Json? // validated preview payload for the confirm step (no DB writes)
@@ -808,16 +808,16 @@ model SchemaVersion {
 }
 
 // ---------------------------------------------------------------------------
-// AI configuration (Phase 2.1) â€” one row per provider (single active config per
+// AI configuration (Phase 2.1) — one row per provider (single active config per
 // provider now; future providers get their own row without schema redesign).
-// The API key is stored ONLY as an encrypted secret â€” never plaintext
+// The API key is stored ONLY as an encrypted secret — never plaintext
 // (Phase 2.1 brief sections 5-7). Never exposed through APIs/audit/logs.
 // ---------------------------------------------------------------------------
 model AiConfiguration {
   id              Int          @id @default(autoincrement())
   provider        String       @unique // slug: "opencode"
-  encryptedApiKey String? // AES-256-GCM envelope â€” never returned to clients
-  apiKeyLast4     String? // display hint only ("â€¢â€¢â€¢â€¢ abcd")
+  encryptedApiKey String? // AES-256-GCM envelope — never returned to clients
+  apiKeyLast4     String? // display hint only ("•••• abcd")
   enabled         Boolean      @default(true)
   lastTestedAt    DateTime?
   lastTestStatus  AiTestStatus @default(NOT_TESTED)

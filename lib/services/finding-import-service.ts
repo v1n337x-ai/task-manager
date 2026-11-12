@@ -175,9 +175,19 @@ export async function importFindingList(params: {
           { source: "EXCEL_IMPORT" },
         );
       }
-      if (row.firstSeenIterationNumber === 2 && i2) {
+      // An Iteration-2 annotation travels with the row on FIRST import too —
+      // otherwise the upsert refactor's create path silently lost it (the
+      // placeholder and existing-finding paths both already apply it).
+      if (row.iteration2Status && i2) {
         await setFindingIterationState(
-          { findingId: finding.id, iterationId: i2, severityValue: row.severity, statusValue: row.iteration2Status ?? "open" },
+          { findingId: finding.id, iterationId: i2, severityValue: row.severity, statusValue: row.iteration2Status },
+          params.actorUserId,
+          { source: "EXCEL_IMPORT" },
+        );
+      }
+      if (row.firstSeenIterationNumber === 2 && !row.iteration2Status && i2) {
+        await setFindingIterationState(
+          { findingId: finding.id, iterationId: i2, severityValue: row.severity, statusValue: "open" },
           params.actorUserId,
           { source: "EXCEL_IMPORT" },
         );

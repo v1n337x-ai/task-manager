@@ -40,7 +40,6 @@ export function templatePath(): string {
   throw new AppError("INTERNAL_ERROR", 500, "The PT Tracker template workbook is missing from the deployment.");
 }
 
-const MATRIX_TOTAL_SOURCE_ROW = 32; // template puts matrix totals on row 32 (AE..AN)
 const TOTALS_ROW = 33; // template totals row (U..AC formulas)
 
 export interface TrackerExportRow {
@@ -99,11 +98,22 @@ export async function buildExportRows(): Promise<TrackerExportRow[]> {
   });
   const findings = await prisma.finding.findMany({
     where: { application: { isActive: true } },
-    select: { applicationId: true, severityRef: { select: { value: true } }, statusRef: { select: { value: true } } },
+    select: {
+      applicationId: true,
+      severityRef: { select: { value: true } },
+      statusRef: { select: { value: true } },
+      // Live state = highest-numbered iteration that has a state (§19),
+      // exactly like the web tracker and reports. The base currentStatus can
+      // lag behind after an import/approval, which used to make Excel miss
+      // CAR/Closed findings that the web already showed.
+      iterationStates: {
+        select: { statusRef: { select: { value: true } }, iteration: { select: { number: true } } },
+      },
+    },
   });
 
   type Bucket = { critical: number; high: number; medium: number; low: number; info: number };
-  const perApp = new Map<number, { open: Bucket; closed: Bucket; car: number; notFixedOpen: number }>();
+  const perApp = new Map<number, { open: Bucket; closed: Bucket; carBySeverity: Bucket; car: number; notFixedOpen: number }>();
   const emptyBucket = (): Bucket => ({ critical: 0, high: 0, medium: 0, low: 0, info: 0 });
   const bump = (b: Bucket, sev: string) => {
     if (sev === "critical") b.critical += 1;
@@ -113,16 +123,21 @@ export async function buildExportRows(): Promise<TrackerExportRow[]> {
     else b.info += 1;
   };
   for (const f of findings) {
-    const entry = perApp.get(f.applicationId) ?? { open: emptyBucket(), closed: emptyBucket(), car: 0, notFixedOpen: 0 };
-    const st = f.statusRef.value;
+    const entry = perApp.get(f.applicationId) ?? { open: emptyBucket(), closed: emptyBucket(), carBySeverity: emptyBucket(), car: 0, notFixedOpen: 0 };
+    const st = f.iterationStates.length
+      ? f.iterationStates.reduce((a, b) => (b.iteration.number > a.iteration.number ? b : a)).statusRef.value
+      : f.statusRef.value;
     // Unified buckets: Open = not yet fixed/closed;
     // Closed = fixed + not fixed + reopened + CAR (+ removed / out_of_scope).
     if (FINDING_OPEN_STATUSES.has(st)) {
       bump(entry.open, f.severityRef.value);
       entry.notFixedOpen += 1;
+    } else if (st === FINDING_CAR_STATUS) {
+      // CAR is its own bucket: Total = Open + Closed + CAR (§31/§86).
+      entry.car += 1;
+      bump(entry.carBySeverity, f.severityRef.value);
     } else if (FINDING_CLOSED_STATUSES.has(st)) {
       bump(entry.closed, f.severityRef.value);
-      if (st === FINDING_CAR_STATUS) entry.car += 1;
     }
     perApp.set(f.applicationId, entry);
   }
@@ -134,7 +149,9 @@ export async function buildExportRows(): Promise<TrackerExportRow[]> {
     const iters = engagement?.iterations ?? [];
     const iter1 = iters.find((it) => it.number === 1);
     const iter2 = iters.find((it) => it.number === 2);
-    const agg = perApp.get(app.id) ?? { open: emptyBucket(), closed: emptyBucket(), car: 0, notFixedOpen: 0 };
+    const agg = perApp.get(app.id) ?? { open: emptyBucket(), closed: emptyBucket(), carBySeverity: emptyBucket(), car: 0, notFixedOpen: 0 };
+    // Total = every finding counted once. CAR is a separate bucket (§31/§86),
+    // so Open + Closed + CAR must reconcile with the severity columns.
     const total = agg.open.critical + agg.open.high + agg.open.medium + agg.open.low + agg.open.info + agg.closed.critical + agg.closed.high + agg.closed.medium + agg.closed.low + agg.closed.info + agg.car;
     rows.push({
       applicationId: app.id,
@@ -168,11 +185,11 @@ export async function buildExportRows(): Promise<TrackerExportRow[]> {
       followUpDate: engagement?.followUpDate ?? null,
       followUpResponse: engagement?.followUpResponse ?? null,
       counts: {
-        critical: agg.open.critical + agg.closed.critical,
-        high: agg.open.high + agg.closed.high,
-        medium: agg.open.medium + agg.closed.medium,
-        low: agg.open.low + agg.closed.low,
-        info: agg.open.info + agg.closed.info,
+        critical: agg.open.critical + agg.closed.critical + agg.carBySeverity.critical,
+        high: agg.open.high + agg.closed.high + agg.carBySeverity.high,
+        medium: agg.open.medium + agg.closed.medium + agg.carBySeverity.medium,
+        low: agg.open.low + agg.closed.low + agg.carBySeverity.low,
+        info: agg.open.info + agg.closed.info + agg.carBySeverity.info,
         car: agg.car,
         total,
         pending: agg.notFixedOpen,
@@ -364,8 +381,11 @@ export async function exportTrackerWorkbook(
   totalsRow.commit();
 
   if (exportRows.length > 0) {
-    // Template quirk (DL-02): matrix totals sit on the last data row (AE..AN).
-    const matrixTotalsRow = sheet.getRow(MATRIX_TOTAL_SOURCE_ROW === 32 ? lastData : MATRIX_TOTAL_SOURCE_ROW);
+    // The template stores its Open/Closed matrix sums on row 32 (the last
+    // template data row). Writing them there would overwrite the LAST real
+    // application's matrix row (and make the SUM self-referential), so the
+    // matrix totals go on the totals row alongside the U..AC sums instead.
+    const matrixTotalsRow = sheet.getRow(totalsRowNumber);
     for (const [col, letter] of [
       [31, "AE"],
       [32, "AF"],

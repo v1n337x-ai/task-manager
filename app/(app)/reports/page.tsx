@@ -97,7 +97,7 @@ export default async function ReportsPage({
                       <span className="text-muted-2">{selected.application.webUrl}</span>
                     </>
                   ) : null}
-                  {" · Open = not yet fixed/closed, Closed = fixed + not fixed + reopened + CAR (Excel semantics)"}
+                  {" · Open = not yet fixed/closed; Closed = fixed + not fixed + reopened; CAR is separate (Total = Open + Closed + CAR)"}
                 </p>
                 <DataTable
                   className="mt-3"

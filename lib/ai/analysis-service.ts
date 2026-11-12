@@ -52,13 +52,14 @@ async function loadThreadContext(threadId: number): Promise<{
   // carriers) and reindexes it 0..N-1. The evidence linker and approval
   // validator must use that same selected window via the shared helper;
   // otherwise messageIndex can point at the wrong email.
-  const { selected: selectedMessages } = selectAnalysisMessages(
-    thread.messages.map((m) => ({ bodyText: m.bodyText, sentAt: m.sentAt })),
-  );
-  const selectedSet = new Set(selectedMessages);
-  const messagesDb = [...thread.messages]
-    .filter((m) => selectedSet.has(m as never))
-    .map((m, index) => ({ id: m.id, index }));
+  // selectAnalysisMessages only reads bodyText/sentAt, so the REAL message
+  // rows can go straight in — selectedIndexes then map window position →
+  // DB row with the builder's exact 0..N-1 reindexing.
+  const { selectedIndexes } = selectAnalysisMessages(thread.messages);
+  const messagesDb = selectedIndexes.map((inputIdx, windowIndex) => ({
+    id: thread.messages[inputIdx]!.id,
+    index: windowIndex,
+  }));
 
   // Supply the model with the application's live finding/test-case identity
   // list so explicit F-/TC- codes can resolve to their real names instead of
@@ -139,6 +140,36 @@ async function loadThreadContext(threadId: number): Promise<{
     built,
     messagesDb,
   };
+}
+
+/**
+ * Tolerant model-output parser. The contract says "one JSON object, nothing
+ * else", but models occasionally wrap the object in a ```json fence or a
+ * short prose lead-in — a parse failure costs a whole paid model call, so the
+ * outermost JSON object is extracted before giving up. The final JSON.parse
+ * still throws an honest error when the payload is genuinely malformed.
+ */
+function parseModelJson(raw: string): unknown {
+  const trimmed = raw.trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    // fall through to extraction
+  }
+  let text = trimmed;
+  const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(text);
+  if (fence?.[1]) text = fence[1].trim();
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    const candidate = text.slice(start, end + 1);
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      // fall through — original raw parse error is more diagnostic
+    }
+  }
+  return JSON.parse(text);
 }
 
 /** §7 explicit user-triggered thread analysis. VAPT state is never mutated. */
@@ -223,7 +254,6 @@ export async function analyzeThread(params: {
   try {
     const providerResult = await port.analyze(built.context);
     const rawOutput = typeof providerResult.structured === "string" ? providerResult.structured : JSON.stringify(providerResult.structured);
-    const parsedJson = JSON.parse(rawOutput) as unknown;
     // Models overshoot the 1500-char evidence cap on long summary-table rows.
     // Clamp every excerpt verbatim (first 1500 chars keep it a valid substring)
     // so one long quote cannot fail the whole run.
@@ -240,6 +270,7 @@ export async function analyzeThread(params: {
         }
       }
     };
+    const parsedJson = parseModelJson(rawOutput);
     clampExcerpts(parsedJson);
     const validated = AI_EXTRACTION_V1.parse(parsedJson);
 
@@ -264,8 +295,6 @@ export async function analyzeThread(params: {
     // §32/§33 — minimal evidence rows linked to REAL messages (§62 references validated).
     const type: EvidenceSourceType = "EMAIL_MESSAGE";
     const messageIndexToDbId = new Map(messagesDb.map((m) => [m.index, m.id]));
-    const evidencePayload: never[] = [];
-    void evidencePayload;
     const rows: { field: string; extractedValue: string; excerpt: string; confidence: string; messageIndex: number }[] = [];
     validated.participants.forEach((p, i) => {
       p.evidence.forEach((e) => rows.push({ field: `participant.role:[${i}]`, extractedValue: p.proposedRole, excerpt: e.excerpt, confidence: e.confidence, messageIndex: e.messageIndex }));
@@ -276,11 +305,12 @@ export async function analyzeThread(params: {
     validated.iterationSignals.forEach((s, i) => {
       s.evidence.forEach((e) => rows.push({ field: `iterationSignal:[${i}]`, extractedValue: s.candidateIteration?.toString() ?? "unknown", excerpt: e.excerpt, confidence: e.confidence, messageIndex: e.messageIndex }));
     });
-    for (const ev of rows.slice(0, 300)) {
-      const dbMessageId = messageIndexToDbId.get(ev.messageIndex);
-      if (!dbMessageId) continue; // invalid reference — rejected silently but audit-visible via weaknesses
-      await prisma.aiEvidence.create({
-        data: {
+    // One batched write instead of one round-trip per evidence row.
+    const evidenceRows = rows.slice(0, 300)
+      .map((ev) => {
+        const dbMessageId = messageIndexToDbId.get(ev.messageIndex);
+        if (!dbMessageId) return null; // invalid reference — rejected silently but audit-visible via weaknesses
+        return {
           extractionId: saved.id,
           sourceType: type,
           sourceId: dbMessageId,
@@ -288,8 +318,11 @@ export async function analyzeThread(params: {
           extractedValue: ev.extractedValue,
           excerpt: ev.excerpt.slice(0, 900),
           confidence: ev.confidence === "HIGH" ? 90 : ev.confidence === "MEDIUM" ? 65 : 35,
-        },
-      });
+        };
+      })
+      .filter((row): row is NonNullable<typeof row> => row !== null);
+    for (let i = 0; i < evidenceRows.length; i += 200) {
+      await prisma.aiEvidence.createMany({ data: evidenceRows.slice(i, i + 200) });
     }
 
     await recordAudit({
