@@ -343,7 +343,7 @@ export async function recordApprovalDecision(
       const record = (structured as { engagementRecord?: Record<string, unknown> | null } | null)?.engagementRecord ?? null;
       if (record && typeof record === "object") {
         const { applyEngagementRecordField } = await import("@/lib/services/engagement-record-apply-service");
-        for (const field of ["mailSubject", "requestedDate", "scanReportDate", "iteration1Date", "iteration2Date", "comments", "followUpDate", "followUpResponse", "primaryPoc", "assignedMembers"]) {
+        for (const field of ["mailSubject", "requestedDate", "scanReportDate", "iteration1Date", "iteration2Date", "iteration1Status", "iteration2Status", "comments", "followUpDate", "followUpResponse", "primaryPoc", "assignedMembers"]) {
           const raw = record[field];
           const hasValue = typeof raw === "string" && raw.trim().length > 0 && raw.trim() !== "—";
           if (!hasValue) continue;

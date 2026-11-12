@@ -15,6 +15,7 @@ import { ExportExcelButton } from "../excel-actions";
 import { EmailPanel, type ThreadSummary } from "./email-panel";
 import { RowActions } from "../../master-data/application-dialogs";
 import { ImportFindingsButton } from "./import-findings-button";
+import { BulkVerdictButton } from "./bulk-verdict-button";
 import { StateReviewPanel } from "./state-review-panel";
 import {
   FindingDialog,
@@ -136,8 +137,9 @@ export default async function ApplicationTrackerPage({
           {activeTab === "overview" ? <OverviewTab detail={detail} statusValueFor={statusValueFor} /> : null}
           {activeTab === "findings" ? (
             <div>
-              <div className="mb-3">
+              <div className="mb-3 flex flex-wrap items-center gap-3">
                 <ImportFindingsButton applicationId={id} />
+                <BulkVerdictButton applicationId={id} iterations={iterations} />
               </div>
               <FindingsTab detail={detail} iterations={iterations} />
             </div>

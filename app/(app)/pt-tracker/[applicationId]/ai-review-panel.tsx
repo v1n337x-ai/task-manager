@@ -20,6 +20,8 @@ interface StructuredExtraction {
     scanReportDate?: string | null;
     iteration1Date?: string | null;
     iteration2Date?: string | null;
+    iteration1Status?: string | null;
+    iteration2Status?: string | null;
     comments?: string | null;
     followUpDate?: string | null;
     followUpResponse?: string | null;
@@ -353,6 +355,8 @@ export function AiReview({ threadId, threadSubject }: { threadId: number; thread
               { field: "scanReportDate", label: "Scan/Report date" },
               { field: "iteration1Date", label: "Iteration 1 date" },
               { field: "iteration2Date", label: "Iteration 2 date" },
+              { field: "iteration1Status", label: "Iteration 1 status" },
+              { field: "iteration2Status", label: "Iteration 2 status" },
               { field: "comments", label: "Comments" },
               { field: "followUpDate", label: "Follow-up date" },
               { field: "followUpResponse", label: "Follow-up response" },

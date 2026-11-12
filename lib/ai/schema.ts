@@ -82,6 +82,10 @@ export const EngagementRecordOut = z.object({
   scanReportDate: z.string().max(40).nullable().optional(),
   iteration1Date: z.string().max(40).nullable().optional(),
   iteration2Date: z.string().max(40).nullable().optional(),
+  /** Iteration RECORD status candidates (planned|in_progress|pending|completed|cancelled),
+   *  populated ONLY when the thread explicitly states the iteration's state. */
+  iteration1Status: z.string().max(20).nullable().optional(),
+  iteration2Status: z.string().max(20).nullable().optional(),
   comments: z.string().max(2000).nullable().optional(),
   followUpDate: z.string().max(40).nullable().optional(),
   followUpResponse: z.string().max(1000).nullable().optional(),
@@ -140,4 +144,4 @@ export const AI_EXTRACTION_V1 = z
 
 export type AiExtractionV1 = z.infer<typeof AI_EXTRACTION_V1>;
 
-export const PROMPT_VERSION = "VAPT_EMAIL_ANALYSIS_V5";
+export const PROMPT_VERSION = "VAPT_EMAIL_ANALYSIS_V6";

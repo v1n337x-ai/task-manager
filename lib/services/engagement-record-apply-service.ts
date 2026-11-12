@@ -27,12 +27,37 @@ const FIELDS = new Set([
   "scanReportDate",
   "iteration1Date",
   "iteration2Date",
+  "iteration1Status",
+  "iteration2Status",
   "comments",
   "followUpDate",
   "followUpResponse",
   "primaryPoc",
   "assignedMembers",
 ]);
+
+/** Thread wording → iteration_status vocabulary. */
+const ITERATION_STATUS_MAP: Record<string, string> = {
+  planned: "planned",
+  pending: "pending",
+  in_progress: "in_progress",
+  "in progress": "in_progress",
+  underway: "in_progress",
+  completed: "completed",
+  complete: "completed",
+  done: "completed",
+  cancelled: "cancelled",
+  canceled: "cancelled",
+};
+
+/** Statuses a fresh iteration is auto-provisioned with — approval may replace these. */
+const AUTO_PROVISIONED_ITERATION_STATUSES = new Set(["planned", "pending", "in_progress"]);
+
+function parseIterationStatus(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const key = raw.trim().toLowerCase();
+  return ITERATION_STATUS_MAP[key] ?? null;
+}
 
 /** Tolerant date parsing: DD/MM/YYYY, YYYY-MM-DD, or anything Date() reads. */
 function parseDateValue(raw: string | null | undefined): Date | null {
@@ -191,6 +216,30 @@ export async function applyEngagementRecordField(
       await prisma.iteration.update({ where: { id: i2.id }, data: { reportDate: parsed } });
       audit("iteration2Date", i2.reportDate, parsed, corrected ? "correct" : "approve");
       return { field: params.field, applied: true, value: parsed.toISOString() };
+    }
+    case "iteration1Status":
+    case "iteration2Status": {
+      const number = params.field === "iteration1Status" ? 1 : 2;
+      const iteration = engagement.iterations.find((it) => it.number === number);
+      if (!iteration) return { field: params.field, applied: false, value, reason: `no Iteration ${number} yet` };
+      const statusValue = parseIterationStatus(value);
+      if (!statusValue) return { field: params.field, applied: false, value, reason: `unrecognized iteration status "${value ?? ""}" (planned|in_progress|pending|completed|cancelled)` };
+      const current = await prisma.iteration.findUnique({ where: { id: iteration.id }, include: { statusRef: { select: { value: true } } } });
+      const currentValue = current?.statusRef.value ?? null;
+      // APPROVE fills only an auto-provisioned default status (planned/pending/
+      // in_progress) — a deliberate human status (e.g. Completed) is never
+      // overwritten by approval. CORRECT always wins (explicit human value).
+      if (!corrected && currentValue && !AUTO_PROVISIONED_ITERATION_STATUSES.has(currentValue)) {
+        return { field: params.field, applied: false, value, reason: `iteration ${number} status already deliberately set (${currentValue})` };
+      }
+      if (!corrected && currentValue === statusValue) {
+        return { field: params.field, applied: false, value, reason: "already in that status" };
+      }
+      const statusRow = await prisma.masterValue.findUnique({ where: { domain_value: { domain: "iteration_status", value: statusValue } } });
+      if (!statusRow) return { field: params.field, applied: false, value, reason: "unknown iteration status vocabulary" };
+      await prisma.iteration.update({ where: { id: iteration.id }, data: { status: statusRow.id } });
+      audit(params.field, currentValue, statusValue, corrected ? "correct" : "approve");
+      return { field: params.field, applied: true, value: statusValue };
     }
     case "primaryPoc": {
       if (!value) return { field: params.field, applied: false, value: null, reason: "no candidate value" };
