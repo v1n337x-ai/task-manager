@@ -124,20 +124,16 @@ export async function validateEmlUpload(params: {
   const sha = sha256Buffer(params.content);
 
   // Â§10 â€” completed job with same file: explicit duplicate report (no re-write).
+  // Cross-application import (user-directed universal fix 2026-11): the same
+  // .eml can legitimately belong to two applications (graybox + blackbox).
+  // Re-validating for a DIFFERENT app must not be reported as a duplicate —
+  // otherwise confirm imports zero emails and the new app looks empty.
   const existing = await prisma.importJob.findUnique({ where: { sha256: sha }, include: { statusRef: true } });
-  if (existing && (existing.statusRef.value === "completed" || existing.statusRef.value === "completed_with_warnings") && !params.options?.force) {
-    // Refresh ONLY the job-level declared application when the uploader now
-    // targets a different application — confirm() will link the thread to it.
-    // (VAPT history is untouched; this is ingestion configuration metadata.)
-    const priorOptions = (existing.options as { batchId?: string | null; declaredApplicationId?: number | null } | null) ?? {};
-    if (params.applicationId && priorOptions.declaredApplicationId !== params.applicationId) {
-      await prisma.importJob.update({
-        where: { id: existing.id },
-        data: {
-          options: { batchId: priorOptions.batchId ?? params.options?.batchId ?? null, declaredApplicationId: params.applicationId } as never,
-        },
-      });
-    }
+  const priorOptions = (existing?.options as { batchId?: string | null; declaredApplicationId?: number | null } | null) ?? {};
+  const isDifferentApplication = Boolean(
+    params.applicationId && existing && priorOptions.declaredApplicationId !== params.applicationId,
+  );
+  if (existing && (existing.statusRef.value === "completed" || existing.statusRef.value === "completed_with_warnings") && !params.options?.force && !isDifferentApplication) {
     const summary = (existing.summary ?? {}) as { threadId?: number } | null;
     const preview = (existing.preview ?? {}) as { row?: EmlRowPreview; threadMatch?: ThreadMatch } | null;
     await recordAudit({

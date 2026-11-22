@@ -46,13 +46,33 @@ function emailsOf(parsed: ParsedEml): string[] {
 export async function resolveThread(parsed: ParsedEml, declaredApplicationId: number | null, tx: Prisma.TransactionClient): Promise<ThreadMatch> {
   const warnings: string[] = [];
 
+  // Application scope (user-directed universal fix 2026-11): one mail thread
+  // can legitimately be imported into several engagements (graybox + blackbox,
+  // each its own application). An ancestor thread owned by a DIFFERENT
+  // application must not capture this import — otherwise the mail is silently
+  // filed under the old app and the new app shows zero emails. Unassigned
+  // threads remain usable by any app. With no declared app, legacy global
+  // behavior is preserved.
+  const threadMatchesApp = async (threadId: number): Promise<boolean> => {
+    if (declaredApplicationId === null) return true;
+    const row = await tx.emailThread.findUnique({ where: { id: threadId }, select: { applicationId: true } });
+    return !row || row.applicationId === null || row.applicationId === declaredApplicationId;
+  };
+  const warnOtherApp = (reason: string) => {
+    warnings.push(`${reason} belongs to a different application — starting this application's own thread.`);
+  };
+
   // 1) Known message-id inside this ingestion set (§14 priority 1).
   const known = await tx.emailMessage.findUnique({
     where: { messageId: parsed.normalized.messageId },
     select: { threadId: true },
   });
   if (known) {
-    return { threadId: known.threadId, reason: "message_id_known", applicationId: await threadApplication(known.threadId, tx), warnings };
+    if (!(await threadMatchesApp(known.threadId))) {
+      warnOtherApp("Message-ID");
+    } else {
+      return { threadId: known.threadId, reason: "message_id_known", applicationId: await threadApplication(known.threadId, tx), warnings };
+    }
   }
 
   // 2) In-Reply-To ancestry (§14 priority 2).
@@ -63,7 +83,11 @@ export async function resolveThread(parsed: ParsedEml, declaredApplicationId: nu
       select: { threadId: true },
     });
     if (ancestor) {
-      return { threadId: ancestor.threadId, reason: "in_reply_to_ancestor", applicationId: await threadApplication(ancestor.threadId, tx), warnings };
+      if (!(await threadMatchesApp(ancestor.threadId))) {
+        warnOtherApp("In-Reply-To ancestor");
+      } else {
+        return { threadId: ancestor.threadId, reason: "in_reply_to_ancestor", applicationId: await threadApplication(ancestor.threadId, tx), warnings };
+      }
     }
   }
 
@@ -75,13 +99,21 @@ export async function resolveThread(parsed: ParsedEml, declaredApplicationId: nu
       select: { threadId: true },
     });
     if (ancestor) {
-      return { threadId: ancestor.threadId, reason: "references_ancestor", applicationId: await threadApplication(ancestor.threadId, tx), warnings };
+      if (!(await threadMatchesApp(ancestor.threadId))) {
+        warnOtherApp("References ancestor");
+      } else {
+        return { threadId: ancestor.threadId, reason: "references_ancestor", applicationId: await threadApplication(ancestor.threadId, tx), warnings };
+      }
     }
   }
 
   // 4) Normalized subject + application (§16: never subject alone).
+  // Legacy EML imports store the normalized subject TEXT in subjectHash while
+  // the parser computes a sha256 hex. Accept BOTH formats so a later mail in
+  // the same thread joins the existing thread instead of spawning a duplicate.
+  const subjectHashes = [parsed.normalized.subjectHash, parsed.normalized.subjectNormalized];
   const subjectKeyWhere = {
-    subjectHash: { equals: parsed.normalized.subjectHash },
+    subjectHash: { in: subjectHashes },
     applicationId: declaredApplicationId,
   } as Prisma.EmailThreadWhereInput;
 
@@ -93,7 +125,7 @@ export async function resolveThread(parsed: ParsedEml, declaredApplicationId: nu
   } else {
     // §17 — identical normalized subject WITHOUT application context must NOT
     // merge unless a participant overlaps that thread.
-    const sameSubject = await tx.emailThread.findMany({ where: { subjectHash: { equals: parsed.normalized.subjectHash } }, orderBy: { updatedAt: "desc" }, take: 20 });
+    const sameSubject = await tx.emailThread.findMany({ where: { subjectHash: { in: subjectHashes } }, orderBy: { updatedAt: "desc" }, take: 20 });
     const myEmails = emailsOf(parsed);
     const myKey = participantKey(myEmails);
     for (const thread of sameSubject) {
