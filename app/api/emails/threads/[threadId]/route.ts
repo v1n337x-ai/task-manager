@@ -3,6 +3,7 @@ import { requireSessionH, toErrorResponse } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
 import { NotFoundError } from "@/lib/errors";
 import { sanitizeEmailHtml } from "@/lib/eml/sanitize";
+import { splitOwnHtml, splitOwnText } from "@/lib/eml/quote-cut";
 
 /**
  * GET /api/emails/threads/[threadId] (Phase 4 §1) — reconstructed conversation:
@@ -64,8 +65,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       messageId: m.messageId,
       subject: m.subject,
       sentAt: m.sentAt?.toISOString() ?? null,
-      bodyText: m.bodyText ? m.bodyText.slice(0, 50_000) : null,
-      bodyHtmlSanitized: sanitizeEmailHtml(m.bodyHtml),
+      // Universal quote cut at READ time (user direction 2026-11): rows stored
+      // before the import-time cut — or imports that predate it — still carry
+      // the whole reply chain. Strip it here so EVERY conversation card, in
+      // ANY app/thread, shows only its own new mail. No per-email cleanup
+      // needed. The verbatim .eml remains archived on disk for audit.
+      bodyText: m.bodyText ? splitOwnText(m.bodyText).own.slice(0, 50_000) : null,
+      bodyHtmlSanitized: sanitizeEmailHtml(splitOwnHtml(m.bodyHtml).own),
       rawHeaders: m.headersRaw,
       sourceFile: m.sourceFile,
       uploadedFile: fileBySyntheticId.get(m.messageId) ?? null,
