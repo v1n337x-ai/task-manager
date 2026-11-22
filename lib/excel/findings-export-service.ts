@@ -12,6 +12,7 @@ import ExcelJS from "exceljs";
 import { generateDashboardReport } from "../services/reporting/report-service";
 import { duplicateMasterPlaceholderIds } from "@/lib/services/finding-placeholder-utils";
 import { lightTint } from "@/lib/services/branding-service";
+import { statusImpliesPriorSighting } from "@/lib/finding-iteration";
 
 const HEADER_FILL = "FFBCD4D8";
 const ROW_FILL = "FFECF2F3";
@@ -214,7 +215,10 @@ export async function exportFindingsWorkbook(): Promise<{ buffer: Buffer; filena
       .map((f) => {
         const state = iterationState(f, 2)!;
         const status = statusLabel(state.statusRef.value);
-        return { no: f.code, title: f.title, sev: state.severityRef.value, status: status || null, isNew: (f.firstSeenIterationNumber ?? 1) === 2 && !iterationState(f, 1) };
+        // A verdict in I2 proves an earlier sighting — never style it as "new",
+        // even if a legacy row still carries a stale firstSeenIterationNumber.
+        const isNew = (f.firstSeenIterationNumber ?? 1) === 2 && !iterationState(f, 1) && !statusImpliesPriorSighting(state.statusRef.value);
+        return { no: f.code, title: f.title, sev: state.severityRef.value, status: status || null, isNew };
       })
       .filter((r) => r.status !== null);
 

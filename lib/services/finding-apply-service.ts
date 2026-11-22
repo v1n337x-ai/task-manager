@@ -13,6 +13,7 @@ import { createFinding, setFindingIterationState } from "@/lib/services/finding-
 import { isGenericFindingTitle, titleSupportedByEvidence } from "@/lib/ai/finding-quality";
 import { selectAnalysisMessages } from "@/lib/ai/summary-window";
 import { extractSummaryRows, formatSummaryDigest } from "@/lib/ai/summary-table-digest";
+import { resolveFirstSeenIterationNumber } from "@/lib/finding-iteration";
 
 export interface ApplyResult {
   findingId: number;
@@ -250,7 +251,15 @@ export async function applyApprovedFinding(
     throw ValidationError("The approved AI finding must reference Iteration 1 or Iteration 2 explicitly.");
   }
   const isNewFindingCandidate = item.isNewFindingCandidate === true;
-  const firstSeenIterationNumber = isNewFindingCandidate ? iterationNumber : Math.min(iterationNumber, 1);
+  // Universal invariant: a Fixed / Not Fixed / Accepted Risk / etc. verdict in
+  // I2 proves the finding was already present in I1. AI's isNewFindingCandidate
+  // flag is evidence-backed CANDIDATE metadata and cannot override that fact —
+  // otherwise the tracker renders a false "New in I2" badge on retest verdicts.
+  const firstSeenIterationNumber = resolveFirstSeenIterationNumber({
+    iterationNumber,
+    aiSaysNew: isNewFindingCandidate,
+    statusValue,
+  });
 
   // Match an existing finding by explicit code first, then by normalized title.
   // An explicit code is a stable identity: a status-only update for that code

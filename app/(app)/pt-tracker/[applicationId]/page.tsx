@@ -6,6 +6,7 @@ import { KpiCard } from "@/components/kpi-card";
 import { DataTable } from "@/components/data-table";
 import { StatusBadge } from "@/components/badges";
 import { cn } from "@/lib/utils";
+import { isNewInIteration } from "@/lib/finding-iteration";
 import { StatusFillCell, SeverityFillCell } from "@/components/status-fill";
 import { getApplicationTracker, type TrackerFinding, type ApplicationTrackerDetail } from "@/lib/services/tracker-service";
 import { listApplications } from "@/lib/services/application-service";
@@ -219,12 +220,18 @@ function FindingsTab({
   // States beyond I2 remain in the database but are never displayed.
   const visibleIterations = [2];
 
-  // A finding is new in I2 only when it was not repeated in Iteration 1
-  // and first appeared in Iteration 2.
+  // A finding is new in I2 only when it was not repeated in Iteration 1,
+  // first appeared in Iteration 2, AND its I2 verdict does not imply an
+  // earlier sighting (Fixed / Not Fixed / Accepted Risk cannot be "new").
+  // The status check also masks stale firstSeen=2 values from legacy rows.
   const isNewInIteration2 = (f: TrackerFinding) =>
-    f.firstSeenIterationNumber === 2 &&
-    f.iterationStates.some((s) => s.iterationNumber === 2) &&
-    !f.iterationStates.some((s) => s.iterationNumber === 1);
+    isNewInIteration({
+      firstSeenIterationNumber: f.firstSeenIterationNumber,
+      iterationNumber: 2,
+      hasIterationState: f.iterationStates.some((s) => s.iterationNumber === 2),
+      hasEarlierIterationState: f.iterationStates.some((s) => s.iterationNumber === 1),
+      statusValue: f.iterationStates.find((s) => s.iterationNumber === 2)?.statusValue,
+    });
 
   // Excel-style layout (vapt.xlsx): # | Name of the vulnerability | Severity
   // | Iteration 2. The Iteration 2 column already shows the current Fixed /

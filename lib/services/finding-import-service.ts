@@ -13,6 +13,7 @@ import { parseFindingListWorkbook } from "@/lib/excel/finding-list-parser";
 import { createFinding, setFindingIterationState, buildFindingMatchKey } from "@/lib/services/finding-service";
 import { MASTER_PLACEHOLDER_MARKER } from "@/lib/services/finding-placeholder-utils";
 import { createIteration } from "@/lib/services/engagement-service";
+import { resolveFirstSeenIterationNumber } from "@/lib/finding-iteration";
 
 export interface FindingImportResult {
   created: { id: number; code: string; title: string; severity: string }[];
@@ -79,6 +80,13 @@ export async function importFindingList(params: {
 
   for (const row of parsed.rows) {
     try {
+      // A stacked I2 table row carrying a verdict was already seen in I1 —
+      // apply the same universal invariant as the AI approval path.
+      const firstSeenIterationNumber = resolveFirstSeenIterationNumber({
+        iterationNumber: row.firstSeenIterationNumber,
+        aiSaysNew: row.firstSeenIterationNumber === 2,
+        statusValue: row.iteration2Status,
+      });
       const matchKey = buildFindingMatchKey({ title: row.title });
       const existingFinding = await prisma.finding.findUnique({
         where: { applicationId_matchKey: { applicationId: params.applicationId, matchKey } },
@@ -97,7 +105,7 @@ export async function importFindingList(params: {
           const severityRow = await prisma.masterValue.findUnique({
             where: { domain_value: { domain: "severity", value: row.severity } },
           });
-          const updates: Record<string, unknown> = { title: row.title.trim(), matchKey, firstSeenIterationNumber: row.firstSeenIterationNumber };
+          const updates: Record<string, unknown> = { title: row.title.trim(), matchKey, firstSeenIterationNumber };
           if (severityRow && placeholder.severity !== severityRow.id) updates.severity = severityRow.id;
           await prisma.finding.update({ where: { id: placeholder.id }, data: updates });
           if (row.iteration2Status && i2) {
@@ -107,7 +115,7 @@ export async function importFindingList(params: {
               { source: "EXCEL_IMPORT" },
             );
           }
-          if (row.firstSeenIterationNumber === 2 && i2) {
+          if (firstSeenIterationNumber === 2 && i2) {
             await setFindingIterationState(
               { findingId: placeholder.id, iterationId: i2, severityValue: row.severity, statusValue: row.iteration2Status ?? "open" },
               params.actorUserId,
@@ -129,10 +137,10 @@ export async function importFindingList(params: {
         const updates: Record<string, unknown> = {};
         if (severityRow && existingFinding.severity !== severityRow.id) updates.severity = severityRow.id;
         if (existingFinding.title.trim() !== row.title.trim()) updates.title = row.title.trim();
-        if (!existingFinding.firstSeenIterationNumber) updates.firstSeenIterationNumber = row.firstSeenIterationNumber;
+        if (!existingFinding.firstSeenIterationNumber) updates.firstSeenIterationNumber = firstSeenIterationNumber;
         if (Object.keys(updates).length) await prisma.finding.update({ where: { id: existingFinding.id }, data: updates });
 
-        if (row.firstSeenIterationNumber === 1) {
+        if (firstSeenIterationNumber === 1) {
           await setFindingIterationState(
             { findingId: existingFinding.id, iterationId: i1, severityValue: row.severity, statusValue: "open" },
             params.actorUserId,
@@ -146,7 +154,7 @@ export async function importFindingList(params: {
             { source: "EXCEL_IMPORT" },
           );
         }
-        if (row.firstSeenIterationNumber === 2 && !row.iteration2Status && i2) {
+        if (firstSeenIterationNumber === 2 && !row.iteration2Status && i2) {
           await setFindingIterationState(
             { findingId: existingFinding.id, iterationId: i2, severityValue: row.severity, statusValue: "open" },
             params.actorUserId,
@@ -163,12 +171,12 @@ export async function importFindingList(params: {
           title: row.title,
           severityValue: row.severity,
           description: row.description ?? undefined,
-          firstSeenIterationNumber: row.firstSeenIterationNumber,
+          firstSeenIterationNumber,
         },
         params.actorUserId,
         {},
       );
-      if (row.firstSeenIterationNumber === 1) {
+      if (firstSeenIterationNumber === 1) {
         await setFindingIterationState(
           { findingId: finding.id, iterationId: i1, severityValue: row.severity, statusValue: "open" },
           params.actorUserId,
@@ -185,7 +193,7 @@ export async function importFindingList(params: {
           { source: "EXCEL_IMPORT" },
         );
       }
-      if (row.firstSeenIterationNumber === 2 && !row.iteration2Status && i2) {
+      if (firstSeenIterationNumber === 2 && !row.iteration2Status && i2) {
         await setFindingIterationState(
           { findingId: finding.id, iterationId: i2, severityValue: row.severity, statusValue: "open" },
           params.actorUserId,
