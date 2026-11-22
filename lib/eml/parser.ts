@@ -7,6 +7,7 @@
 import { simpleParser, type ParsedMail, type Attachment } from "mailparser";
 import { normalizeSubjectForThread, subjectHash } from "@/lib/services/email-foundation-service";
 import { sha256Buffer } from "@/lib/eml/storage";
+import { splitOwnHtml, splitOwnText } from "@/lib/eml/quote-cut";
 
 export interface ParsedParticipant {
   name: string | null;
@@ -172,8 +173,12 @@ export async function parseEml(content: Buffer): Promise<ParsedEml> {
       })(),
     },
     headersRaw,
-    bodyText: typeof parsed.text === "string" ? parsed.text : null,
-    bodyHtmlRaw: typeof parsed.html === "string" ? parsed.html : null,
+    // Own content only (user direction 2026-11): an archived .eml carries the
+    // whole reply chain, which would repeat every earlier mail inside this
+    // message's conversation card. Cut at the first forwarded header; the
+    // verbatim original stays on disk via storeEmlOriginal().
+    bodyText: typeof parsed.text === "string" ? splitOwnText(parsed.text).own : null,
+    bodyHtmlRaw: typeof parsed.html === "string" ? splitOwnHtml(parsed.html).own : null,
     attachments,
     warnings,
     fileSha256: sha256Buffer(content),

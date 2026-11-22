@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { splitOwnHtml } from "@/lib/eml/quote-cut";
 import { SeverityFillCell } from "@/components/status-fill";
 import { AiReview } from "./ai-review-panel";
 import { PstImportButton } from "./pst-import-button";
@@ -913,46 +914,11 @@ function NeatTextBody({ body, messageId }: { body: string; messageId?: number })
  * thread" and collapsed behind the same toggle as text bodies.
  */
 export function splitHtmlQuote(html: string): { head: string; quoted: string | null } {
-  // OWA / Outlook web: a separator <hr> followed by a div whose bold labels
-  // stack the forwarded headers (<b>From:</b> <b>Sent:</b> <b>To:</b> …).
-  // Sanitizer strips ids/styles, so detect on the <hr> + <b>From:</b> pair.
-  const hr = /<hr(?=[\s>])/.exec(html);
-  if (hr && hr.index !== undefined) {
-    const windowHtml = html.slice(hr.index, hr.index + 1500);
-    if (/<b>From:\s*<\/b>/i.test(windowHtml) || /<b>Sent:\s*<\/b>/i.test(windowHtml)) {
-      return { head: html.slice(0, hr.index), quoted: html.slice(hr.index) };
-    }
-  }
-  // OWA quoted container (present when sanitizer keeps ids; harmless fallback).
-  const owa = /id="x_divRplyFwdMsg"/i.exec(html);
-  if (owa && owa.index !== undefined) {
-    const containerStart = html.lastIndexOf("<div", owa.index);
-    const splitAt = containerStart >= 0 ? containerStart : owa.index;
-    return { head: html.slice(0, splitAt), quoted: html.slice(splitAt) };
-  }
-  // Blockquote-wrapped chains (Gmail / Outlook desktop / Apple Mail).
-  const bq = /<blockquote[\s>]/i.exec(html);
-  if (bq && bq.index !== undefined) {
-    return { head: html.slice(0, bq.index), quoted: html.slice(bq.index) };
-  }
-  // Generic forwarded-header marker: a div/p opening with "From:" (tags like
-  // <font>/<b> may sit between the element and the label), validated by a
-  // nearby Sent:/To:/Subject: line.
-  const marker = /<(div|p)(?:\s[^>]*)?>\s*(?:<[^>]+>\s*)*From:\s+/i.exec(html);
-  if (marker && marker.index !== undefined) {
-    const windowText = html
-      .slice(marker.index, marker.index + 1500)
-      .replace(/<[^>]*>/g, " ");
-    if (/Sent:/i.test(windowText) || /Subject:/i.test(windowText) || /To:/i.test(windowText)) {
-      return { head: html.slice(0, marker.index), quoted: html.slice(marker.index) };
-    }
-  }
-  // Generic separator some clients emit before the quoted block.
-  const original = /-----Original Message-----/i.exec(html);
-  if (original && original.index !== undefined) {
-    return { head: html.slice(0, original.index), quoted: html.slice(original.index) };
-  }
-  return { head: html, quoted: null };
+  // One universal definition of "earlier mail" — shared with EML ingestion so
+  // a newly uploaded message stores only its own content and old rows still
+  // fold identically in the UI (lib/eml/quote-cut.ts).
+  const { own, quoted } = splitOwnHtml(html);
+  return { head: own, quoted };
 }
 
 function MessageBody({ message }: { message: ChatMessage }) {
