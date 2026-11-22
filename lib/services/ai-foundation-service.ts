@@ -243,6 +243,10 @@ export async function recordApprovalDecision(
     const orderedIndices = Array.from({ length: count }, (_, i) => i).sort(
       (a, b) => minEvidenceIndex(a) - minEvidenceIndex(b),
     );
+    // Rows created after this instant belong to THIS run. Finding identity
+    // matching must ignore them, or a later candidate can be merged into a row
+    // created earlier in the same loop (distinct findings silently collapsing).
+    const runStartedAt = new Date();
     for (const i of orderedIndices) {
       const itemKey = `findingStatus:${i}`;
       const dup = await prisma.aiApprovalDecision.findUnique({
@@ -259,7 +263,7 @@ export async function recordApprovalDecision(
           },
         });
         const { applyApprovedFinding } = await import("@/lib/services/finding-apply-service");
-        const result = await applyApprovedFinding({ extractionId: extraction.id, itemKey }, actorUserId);
+        const result = await applyApprovedFinding({ extractionId: extraction.id, itemKey, runStartedAt }, actorUserId);
         applied.push({ itemKey, findingId: result.findingId, code: result.code, created: result.created, iterationLabel: result.iterationLabel });
         await recordAudit({
           action: "ai_approval.finding_applied",

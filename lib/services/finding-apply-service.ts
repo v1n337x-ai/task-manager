@@ -21,6 +21,26 @@ export interface ApplyResult {
   iterationLabel: string;
 }
 
+/**
+ * Same finding re-reported with a target appended? Only then may two different
+ * titles collapse into one tracker row. Inputs are already normalized.
+ *
+ * A broad category must NOT absorb a distinct, more specific finding:
+ * "Missing security headers" is not "Missing Security Headers on Third-Party
+ * Host (static.iween.co.in)". Require the shared prefix to cover most of the
+ * longer title AND the shorter one to name a concrete finding (>= 5 tokens).
+ * The genuine retest case ("auth_code Replay — …" vs the same title with a
+ * host appended) passes both guards.
+ */
+export function isSameFindingTitleByPrefix(a: string, b: string): boolean {
+  if (a.length < 20 || b.length < 20) return false;
+  const shorter = a.length <= b.length ? a : b;
+  const longer = a.length <= b.length ? b : a;
+  if (!longer.startsWith(shorter)) return false;
+  if (shorter.length / longer.length < 0.6) return false;
+  return shorter.split(" ").filter(Boolean).length >= 5;
+}
+
 function normalizeEvidenceText(value: string): string {
   return value
     .replace(/<[^>]*>/g, " ")
@@ -88,7 +108,7 @@ async function assertEvidenceExcerptsAreVerbatim(
 }
 
 export async function applyApprovedFinding(
-  params: { extractionId: number; itemKey: string; correctedStatusSignal?: string | null },
+  params: { extractionId: number; itemKey: string; correctedStatusSignal?: string | null; runStartedAt?: Date },
   actorUserId: number,
   ctx: { source?: "HUMAN" | "EXCEL_IMPORT" | "EML" | "AI" | "SYSTEM" } = { source: "AI" },
 ): Promise<ApplyResult> {
@@ -200,8 +220,16 @@ export async function applyApprovedFinding(
   // itself into a "retest"; compare against the run's start, not "now".
   // Retest-phase items (pre-existing findings or retest evidence) still
   // REQUIRE an explicit iteration + verdict.
+  // Identity boundary (user-directed universal fix 2026-11): rows created by
+  // THIS approval run must never act as "existing" findings. Without this, the
+  // whole-run loop matches candidate #2 against the row it just created for #1
+  // and silently merges two distinct findings into one (e.g. "Missing security
+  // headers" swallowing "Missing Security Headers on Third-Party Host").
+  // The caller supplies the run start; a single-item approval falls back to the
+  // extraction time, which is always before any row that approval creates.
+  const identityBoundary = params.runStartedAt ?? extraction.createdAt;
   const hasPriorFindings =
-    (await prisma.finding.count({ where: { applicationId, createdAt: { lt: extraction.createdAt } } })) > 0;
+    (await prisma.finding.count({ where: { applicationId, createdAt: { lt: identityBoundary } } })) > 0;
   const isFirstReport =
     iterationNumberPre === null &&
     isNewPre &&
@@ -230,16 +258,15 @@ export async function applyApprovedFinding(
   let findingId: number | null = null;
   let code = "";
   let created = false;
+  // Same boundary as hasPriorFindings — exclude rows created earlier IN THIS
+  // RUN, otherwise prefix/title matching folds separate findings together.
   const candidates = await prisma.finding.findMany({
-    where: { applicationId },
+    where: { applicationId, createdAt: { lt: identityBoundary } },
     select: { id: true, code: true, title: true, firstSeenIterationNumber: true },
   });
   const normalized = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 200);
-  // Identity: explicit code → normalized title equality → PREFIX containment
-  // (the same finding re-reported with the target appended to its title, e.g.
-  // "auth_code Replay — …" vs "auth_code Replay — … staging.hellohaptik.com
-  // API", must not create a duplicate row).
-  const normalizedStartsWith = (a: string, b: string) => a.length >= 20 && b.length >= 20 && (a.startsWith(b) || b.startsWith(a));
+  // Identity: explicit code → normalized title equality → guarded prefix.
+  const normalizedStartsWith = isSameFindingTitleByPrefix;
   const hit = (identifierExplicit
     ? candidates.find((c) => c.code.toLowerCase() === identifierExplicit.toLowerCase())
     : undefined)
