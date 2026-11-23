@@ -219,11 +219,16 @@ export function parseTrackerRows(collected: { rowNumber: number; cells: Record<n
 
     // L — Scan/Report Date: blank ⇒ warning (newly-initiated apps legitimately
     // have none yet, §34); unparseable CONTENT ⇒ error (first 26 invalid dates).
+    // The master workbook also uses real status words ("Pending", "In Progress",
+    // ...) in date columns for not-yet-reported apps. Those are status values,
+    // not malformed dates, so they are recorded as warnings and stored as null.
     const scanDateCell = cells[12] ?? null;
     const scanDateText = extractCellText(scanDateCell)?.trim() ?? "";
     const scanDate = normalizeCellDate(scanDateCell, ref(12));
     if (!scanDate.value) {
-      if (scanDateText !== "") {
+      if (/^(pending|planned|not started|initiated|in progress|on hold)$/i.test(scanDateText)) {
+        exceptions.push({ severity: "warning", row: rowNumber, ref: ref(12), code: "DATE_STATUS", message: `Row ${rowNumber} ${applicationRaw}: Scan/Report Date is marked "${scanDateText}" (not yet reported). Stored as null.` });
+      } else if (scanDateText !== "") {
         exceptions.push({ severity: "error", row: rowNumber, ref: ref(12), code: "INVALID_DATE", message: `Row ${rowNumber} ${applicationRaw}: ${scanDate.warning ?? "Scan/Report Date is invalid."}` });
       } else {
         exceptions.push({ severity: "warning", row: rowNumber, code: "DATE_MISSING", message: `Row ${rowNumber} ${applicationRaw}: Scan/Report Date is blank (application not yet reported). Stored as null.` });
