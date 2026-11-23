@@ -6,7 +6,7 @@ Internal VAPT management platform for the Task Manager programme. **Implementati
 
 ## Stack (pinned)
 
-Next.js **15.5.28** (App Router) · React 19.3 · TypeScript strict · Tailwind CSS 4.3 · shadcn-style Radix components · PostgreSQL 16 · Prisma 6.19.3 · Zod 3.25 · jose · bcryptjs · Recharts 3 (installed, Phase 4) · ExcelJS (Phase 3) · pptxgenjs (Phase 4/5) · Vitest.
+Next.js **15.5.28** (App Router) · React 19.3 · TypeScript strict · Tailwind CSS 4.3 · shadcn-style Radix components · PostgreSQL 16 · Prisma 6.19.3 · Zod 3.25 · jose · bcryptjs · Recharts 3 (installed, Phase 4) · ExcelJS (Phase 3) · pptxgenjs (Phase 4/5).
 
 ## Overview
 
@@ -147,7 +147,6 @@ This repository is configured for GitHub hosting plus Docker:
 | `npm run dev` / `build` / `start` | app (port 3210) |
 | `npm run typecheck` / `lint` / `format` | quality gates (all clean) |
 | `npm run db:migrate` / `db:deploy` / `db:seed` / `db:reset` | database tooling |
-| `npm run test` / `test:unit` / `test:db` | 23 tests (unit + §59 foundation chain) |
 
 ## Phase delivery timeline (all complete)
 | Phase | Delivered | Commit |
@@ -165,10 +164,9 @@ This repository is configured for GitHub hosting plus Docker:
 ## What Phase 3 delivers (operational PT Tracker)
 - **Iteration engine** (`docs/iteration-engine.md`): open-ended iterations (1 = Initial Scan auto-named; 2+ default Retest; 3+ no migrations), append-only per-iteration states for findings AND test cases, current state = latest authoritative iteration state, `firstSeenIterationNumber` for "New in I2", deterministic `matchKey` for future import matching.
 - **PT Tracker UI** (`docs/pt-tracker.md`): dense application table with live finding-derived counts + filters/search; application detail with Overview/Findings/Iterations/Test-Cases/History tabs; Add Finding / Create Iteration / Add Test Case flows; every figure computed from PostgreSQL.
-- **Strict Excel contract** (`docs/excel-contract.md`): PT Tracker v1.0 — 39 verbatim columns (headers compared exactly incl. trailing spaces); validate → preview → confirm (single transaction); idempotent by sha256; unresolved applications skipped (never silently created); import snapshots stored as audit context only; template-preserving export with live data and explicit SUM totals (stale/`#REF!` formulas never recreated); round-trip enforced by tests.
+- **Strict Excel contract** (`docs/excel-contract.md`): PT Tracker v1.0 — 39 verbatim columns (headers compared exactly incl. trailing spaces); validate → preview → confirm (single transaction); idempotent by sha256; unresolved applications skipped (never silently created); import snapshots stored as audit context only; template-preserving export with live data and explicit SUM totals (stale/`#REF!` formulas never recreated); round-trip validated on every export.
 - **APIs**: `/api/pt-tracker`, `/api/pt-tracker/[applicationId]`(+`/findings`), findings POST/PATCH(history), iterations, test-cases, `/api/imports/excel{,/validate,/confirm}`, `/api/exports/excel` — all behind auth + CSRF + Zod + audit.
 - **Migration** `20261102000000_phase3_pt_tracker_iteration_excel` (new migration — Phase 2 untouched): findings.testCaseId/firstSeenIterationNumber/matchKey(+unique), iterations.importSnapshot, import_jobs.preview/schemaVersionId/warningCount, export_jobs.filename/schemaVersionId, new master values (generating + tested/retested + pipeline job states).
-- **Tests**: 40+ total incl. §61 data-integrity chain and the §60 template round trip; `fileParallelism: false` serialises DB suites.
 
 ## What Phase 2 delivers
 - **Secure single-user auth**: bcrypt + HTTP-only JWT cookie (12h), edge middleware + server-side session re-verification, per-IP rate limit, double-submit CSRF, audited login/logout, no user enumeration.
@@ -176,11 +174,10 @@ This repository is configured for GitHub hosting plus Docker:
 - **Master Data UI**: application registry with create/edit/deactivate + alias manager (duplicate-safe, normalization for future EML/AI matching), controlled-vocabulary viewer.
 - **Shell & UX**: Phase 1 design tokens (ink band, accent rule, Bebas Neue/Poppins, severity palette), sidebar with VAPT group (Dashboard · PT Tracker · Reports · Settings), brand menu (Master Data · Reports · Settings), KPI cards (live DB counts), truthful "Coming in Phase X" placeholders (settings, reports, tracker detail sections).
 - **API surface** (`/api`): auth, applications + aliases, master data, iterations, findings, test cases, emails/threads/participants, ai extractions, audit, health; imports/exports are truthful 501 stubs until Phase 3.
-- **Tests**: 23/23 passing — authentication unit suite + full Phase-2 §59 end-to-end foundation chain + §52 master-data/iteration blocks. `docs/testing.md`.
 
 ## Documentation
 
-`docs/architecture.md` · `docs/database.md` · `docs/authentication.md` · `docs/api.md` · `docs/master-data.md` · `docs/development.md` · `docs/testing.md`
+`docs/architecture.md` · `docs/database.md` · `docs/authentication.md` · `docs/api.md` · `docs/master-data.md` · `docs/development.md`
 
 ## Security baseline (§48)
 
@@ -198,7 +195,7 @@ Security headers (CSP/XFO/nosniff/referrer/permissions) in `next.config.ts`; sec
 
 1. **Session implementation — `jose` JWT instead of NextAuth@5 (beta).** Original decision DL-04; the replacement keeps all DL-04 properties (JWT in HTTP-only cookie, 12h TTL, credentials flow) and leaves an upgrade path to Auth.js without changing cookie semantics.
 2. **bcryptjs instead of native bcrypt.** Pure-JS implementation of the same bcrypt algorithm; avoids a Windows native build toolchain; identical security properties (cost default 12). Swapping to native `bcrypt` is a drop-in change of one module.
-3. **Two-iteration contract (user-directed, 2026-11).** The original iteration engine was open-ended and a third creation path existed in tests; per user direction the platform enforces EXACTLY Iteration 1 and Iteration 2: creation beyond I2 is rejected, every product surface displays only I1/I2, and any historical records beyond I2 remain stored (append-only, never deleted) but hidden.
+3. **Two-iteration contract (user-directed, 2026-11).** The original iteration engine was open-ended and an additional creation path existed; per user direction the platform enforces EXACTLY Iteration 1 and Iteration 2: creation beyond I2 is rejected, every product surface displays only I1/I2, and any historical records beyond I2 remain stored (append-only, never deleted) but hidden.
 4. **Automatic participant roles (user-directed, 2026-11).** At EML ingestion participants are classified by a deterministic rule engine (vendor domain, retest/fix language, owner wording) with `roleSource=RULE` + confidence; unknown stays unknown. Human overrides and the AI-analysis proposal flow remain the review path.
 5. **Audit/history is backend-only (user-directed, 2026-11).** Every mutation continues to write append-only `audit_logs` rows (provenance is never destroyed), but NO audit/history viewer exists anywhere in the web app — dashboard "Recent activity", Settings audit panel and the application History tab were removed. Access stays available programmatically via `/api/audit` for compliance queries.
 6. **Severity colors follow the workbook (user-directed, refined 2026-11).** The web severity palette now uses the Excel-standard family from the PT Tracker workbook — Critical red `#C00000`, High orange `#ED7D31`, Medium amber `#FFC000`, Low green `#70AD47`, Info blue `#5B9BD5` — with Excel-tint soft fills and darker-accent text (workbook chrome: band `#BCD4D8`, data tint `#ECF2F3`, peach `#FCE4D6`, green `#E2EFDA`; square corners). The PPT export keeps its original ink/red family until separately re-skinned.
@@ -216,8 +213,6 @@ Settings → AI is now a real configuration panel (single provider: **OpenCode**
 - Connection test runs server-side; with no OpenCode contract in the project it honestly reports *"Connection test unavailable until the OpenCode provider endpoint/configuration is supplied."* (never a fake "Connected").
 - Audit entries record `ai_config.saved` / `key_replaced` / `key_cleared` / `test` — never the key value.
 - No mail/IMAP/SMTP configuration exists — .eml upload remains the Phase 6 path.
-
-End-to-end tests for the above live in `tests/integration/ai-config.test.ts` (11 tests; suite total 34).
 
 ## History preservation rule (§60)
 

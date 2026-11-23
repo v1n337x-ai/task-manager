@@ -7,10 +7,9 @@ PostgreSQL 16 + Prisma 6.19.3. Created exclusively through `prisma/migrations` (
 | Environment | Database | URL source |
 |---|---|---|
 | Development | `task_manager` | `.env` |
-| Test | `task_manager_test` | `.env.test` (loaded by vitest setup) |
 | Production | provisioned by deployment | environment injection — not in repo |
 
-Local: `docker run -d --name tm-postgres -p 5432:5432 -v tmpgdata:/var/lib/postgresql/data -e POSTGRES_USER=task_manager -e POSTGRES_PASSWORD=task_manager_dev -e POSTGRES_DB=task_manager postgres:16-alpine` (+ manual `CREATE DATABASE task_manager_test OWNER task_manager;` once).
+Local: `docker run -d --name tm-postgres -p 5432:5432 -v tmpgdata:/var/lib/postgresql/data -e POSTGRES_USER=task_manager -e POSTGRES_PASSWORD=task_manager_dev -e POSTGRES_DB=task_manager postgres:16-alpine`
 
 ## Model map (prisma/schema.prisma → PostgreSQL tables)
 
@@ -40,12 +39,12 @@ Local: `docker run -d --name tm-postgres -p 5432:5432 -v tmpgdata:/var/lib/postg
 
 ```
 npm run db:migrate        # create + apply against dev (interactive)
-npm run db:deploy         # apply committed migrations (CI/test)
+npm run db:deploy         # apply committed migrations
 npm run db:reset          # drop + recreate dev (skips seed)
 npm run db:seed           # user + master values + 3 sample apps + schema contract
 ```
 
-From-scratch verification (§53): destroy both databases → `prisma migrate deploy` on each → `npm run db:seed` → application boots and login works. The vitest integration suite performs `migrate deploy/reset` against `task_manager_test` automatically when reachable.
+From-scratch verification: `prisma migrate deploy` → `npm run db:seed` → application boots and login works.
 
 ## Historical-state rule (§60)
 

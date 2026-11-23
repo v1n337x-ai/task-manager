@@ -2,7 +2,7 @@
 
 ## Secret sweep
 
-`.env` / `.env.test` / `.env.local` are gitignored (verified via `git ls-files` — only `.env.example` tracked). Audit/logger outputs redact keys/passwords/tokens. AI API key stored only as AES-256-GCM envelope.
+`.env` / `.env.local` are gitignored (verified via `git ls-files` — only `.env.example` tracked). Audit/logger outputs redact keys/passwords/tokens. AI API key stored only as AES-256-GCM envelope.
 
 ## Placeholder sweep
 
@@ -12,12 +12,12 @@ No "Coming in Phase N" placeholders remain — Settings and Reports reflect deli
 
 | Behavior | Verified |
 |---|---|
-| Unauthenticated API → 401 | LVE ✓ (E2E steps 1) |
-| CSRF absent → 403 | LVE ✓ (E2E step 3) |
-| Login rate limiting | Phase 2 tests ✓ |
-| AI key masked in GET | Phase 2.1 tests ✓ |
-| EML upload auth | Phase 4 tests ✓ |
-| PPT/Excel export auth | Phase 7 tests ✓ |
+| Unauthenticated API → 401 | Verified live |
+| CSRF absent → 403 | Verified live |
+| Login rate limiting | Verified live |
+| AI key masked in GET | Verified live |
+| EML upload auth | Verified live |
+| PPT/Excel export auth | Verified live |
 
 ## Data-lifecycle (§102/§103)
 

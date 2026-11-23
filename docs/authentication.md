@@ -30,7 +30,3 @@
 ## No user enumeration
 
 Unknown email and wrong password return the same generic error ("Invalid username or password."), both logged as `auth.login_rejected` with a reason code only (no credentials).
-
-## Tested
-
-`tests/unit/auth.test.ts` + the §59 chain: valid login, invalid password, invalid username, logout, protected page redirect, direct API access without session. Rate limiter windows and per-key isolation covered in unit tests.

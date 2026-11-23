@@ -33,7 +33,3 @@ Conversations/email are NOT part of Phase 3 (Phase 6); the History tab walks the
 ## States & UX (§58)
 
 Empty states for zero-rows per tab, loading states (server-rendered skeletons not needed — RSC), error state for DB unavailable, confirmation dialog for import confirm + destructive-ish mutations, inline validation errors from Zod through to dialog text.
-
-## Testing
-
-`tests/integration/finding-history.test.ts` (§61 tests 1–5 + matchKey dedupe) and `tests/integration/excel-roundtrip.test.ts` (§60 template round trip + §52 idempotency + invalid header/rows rejection). Run `npm test`.

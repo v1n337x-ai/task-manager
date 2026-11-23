@@ -24,7 +24,7 @@ const eslintConfig = [
       "_*.{cjs,mjs,ts}",
     ],
   },
-  { files: ["lib/logger.ts", "prisma/seed.ts", "tests/**"], rules: { "no-console": "off" } },
+  { files: ["lib/logger.ts", "prisma/seed.ts"], rules: { "no-console": "off" } },
 ];
 
 export default eslintConfig;

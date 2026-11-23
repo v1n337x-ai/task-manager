@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node ≥ 20.9 (tested on Node 26), npm 11
+- Node ≥ 20.9, npm 11
 - Docker (for local PostgreSQL 16)
 - Note (Windows): PowerShell ExecutionPolicy blocks `npm.ps1` on this machine — use `npm.cmd` or run from cmd.
 
@@ -13,7 +13,6 @@
 docker run -d --name tm-postgres -p 5432:5432 -v tmpgdata:/var/lib/postgresql/data ^
   -e POSTGRES_USER=task_manager -e POSTGRES_PASSWORD=task_manager_dev -e POSTGRES_DB=task_manager ^
   postgres:16-alpine
-docker exec tm-postgres psql -U task_manager -d task_manager -c "CREATE DATABASE task_manager_test OWNER task_manager;"
 
 # 2. Environment
 copy .env.example .env     # then edit DATABASE_URL / AUTH_SECRET / APPLICATION_SECRET / SEED_ADMIN_PASSWORD
@@ -36,7 +35,6 @@ Seeded login lives in your `.env` (e.g. `admin@example.com` + your `SEED_ADMIN_P
 | `dev` / `build` / `start` | Next.js 15 app (port 3210) |
 | `typecheck` / `lint` / `format` | TS strict · ESLint · Prettier |
 | `db:migrate` `db:deploy` `db:seed` `db:reset` | Prisma tooling (see database.md) |
-| `test` / `test:unit` / `test:db` | Vitest suites (see testing.md) |
 
 ## Project layout
 
@@ -45,8 +43,7 @@ app/            routes (login + (app)=authenticated group + api)
 components/     ui primitives + shell + feature components
 lib/            env · db · logger · errors · audit · auth/ · services/ · validation/
 prisma/         schema.prisma · migrations/ · seed.ts
-tests/          unit (no DB) · integration (test DB) via setup-db.ts
-docs/           architecture/database/authentication/api/master-data/development/testing
+docs/           architecture/database/authentication/api/master-data/development
 middleware.ts   edge protection + CSRF double-submit
 ```
 

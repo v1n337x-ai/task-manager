@@ -1,4 +1,4 @@
-# Production Docker build context — keep tests, local data, and secrets out.
+# Production Docker build context — keep local data and secrets out.
 # The builder only needs: app/, components/, lib/, prisma/, public/,
 # scripts/ (PST worker), *.ts/*.mjs/*.json config, package*.json.
 # NOTE: prisma/templates/*.xlsx/*.pptx are runtime templates — never exclude prisma/.
@@ -6,13 +6,9 @@
 node_modules/
 out/
 build/
-coverage/
-.vitest/
 storage/
-tests/
 .git/
 .github/
-.gitlab-ci.yml
 .env
 .env.*
 !.env.example

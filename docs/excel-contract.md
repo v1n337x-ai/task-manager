@@ -69,6 +69,6 @@ Upload (multipart, never trusts filename/MIME)
 
 Accepted: Excel serials, JS Date cells, ISO `yyyy-mm-dd`, `d/m/yyyy` ("16/6/2026" convention), `dd MMM yy`/`yyyy` ("04 Jul 26"). Ambiguous `04/01/2026` → interpreted day-first (program convention) **with a recorded warning**; invalid/out-of-range → warning/error, never silently fixed.
 
-## Round-trip contract (§32) — enforced by tests
+## Round-trip contract (§32) — enforced on export
 
-`template → import → DB → export → re-import` must always succeed with the same row count and zero duplicates; header validation runs on the export too (`tests/integration/excel-roundtrip.test.ts`).
+`template → import → DB → export → re-import` must always succeed with the same row count and zero duplicates; header validation runs on the export too.

@@ -28,7 +28,7 @@ Deterministic filename `VAPT_[Application]_YYYY-MM-DD.pptx` (sanitized §33). Au
 
 ## Consistency (§10/§87/§95)
 
-Dashboard = Reports = PPT for the same filters/timestamp — covered by the golden-data test (`tests/integration/reports-ppt.test.ts`) that unzips the generated deck and verifies KPI text equals the report snapshot.
+Dashboard = Reports = PPT for the same filters/timestamp; the generated deck is validated (slide count, no `undefined`/`NaN`, KPI text presence) before it is returned.
 
 ## Application reports screen (Phase 9.1 — user-requested redesign)
 

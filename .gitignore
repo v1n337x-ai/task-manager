@@ -28,16 +28,11 @@ yarn-error.log*
 node_modules/.prisma
 node_modules/@prisma
 
-# vitest
-coverage/
-.vitest/
-
 # local docker volume dumps
 .docker/
 
 # EML storage (original uploaded files are machine-local and never committed)
 /storage/
-tests/fixtures/eml-live/*.eml
 *.eml
 *.pst
 
