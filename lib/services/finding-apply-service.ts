@@ -13,7 +13,7 @@ import { createFinding, setFindingIterationState } from "@/lib/services/finding-
 import { isGenericFindingTitle, titleSupportedByEvidence } from "@/lib/ai/finding-quality";
 import { selectAnalysisMessages } from "@/lib/ai/summary-window";
 import { extractSummaryRows, formatSummaryDigest } from "@/lib/ai/summary-table-digest";
-import { resolveFirstSeenIterationNumber } from "@/lib/finding-iteration";
+import { resolveFirstSeenIterationNumber, statusImpliesPriorSighting } from "@/lib/finding-iteration";
 import { isSameFindingTitle } from "@/lib/finding-title";
 
 export interface ApplyResult {
@@ -262,6 +262,25 @@ export async function applyApprovedFinding(
   if (iterationNumber === null || (typeof item.iterationSignal === "number" && item.iterationSignalExplicit !== true && iterationNumber !== item.iterationSignal)) {
     throw ValidationError("The approved AI finding must reference Iteration 1 or Iteration 2 explicitly.");
   }
+  // Universal retest guard: the AI frequently identifies a finding from the
+  // Iteration-1 table but quotes its verdict from a LATER Iteration-2 / retest
+  // summary (e.g. the Ecommerce UAT/Prod status tables). Filing that verdict
+  // in I1 leaves I2 empty, so the Findings table renders "—" for every
+  // non-Fixed row. When the application has an I2 and the extraction carries
+  // an explicit retest signal, a verdict belongs in I2.
+  const structuredSignals = (extraction.structuredOutput ?? null) as { iterationSignals?: unknown[] } | null;
+  const hasRetestSignal =
+    /retest|revalidat|iteration\s*2|updated summary/i.test(evidenceText) ||
+    (Array.isArray(structuredSignals?.iterationSignals) &&
+      structuredSignals!.iterationSignals!.some((raw) => {
+        const signal = raw as { candidateIteration?: unknown; typeSignal?: unknown };
+        return signal.candidateIteration === 2 && /retest|follow_up/i.test(String(signal.typeSignal ?? ""));
+      }));
+  const { ensureIterations } = await import("./finding-import-service");
+  const { i1, i2 } = await ensureIterations(applicationId, actorUserId);
+  if (iterationNumber === 1 && i2 !== null && statusImpliesPriorSighting(statusValue) && hasRetestSignal) {
+    iterationNumber = 2;
+  }
   const isNewFindingCandidate = item.isNewFindingCandidate === true;
   // Universal invariant: a Fixed / Not Fixed / Accepted Risk / etc. verdict in
   // I2 proves the finding was already present in I1. AI's isNewFindingCandidate
@@ -332,10 +351,8 @@ export async function applyApprovedFinding(
     created = true;
   }
 
-  // Resolve the target iteration (I1 or I2), provisioning the container when
-  // the application has none yet — same behavior as the Excel finding import.
-  const { ensureIterations } = await import("./finding-import-service");
-  const { i1, i2 } = await ensureIterations(applicationId, actorUserId);
+  // Resolve the target iteration (I1 or I2) using the containers provisioned
+  // above for the retest guard — same behavior as the Excel finding import.
   const iterationId = iterationNumber === 2 && i2 !== null ? i2 : i1;
   const iterationLabel = iterationId === i2 ? "I2" : "I1";
 
