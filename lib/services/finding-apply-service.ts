@@ -223,6 +223,27 @@ export async function applyApprovedFinding(
   if (!applicationId) throw ValidationError("The thread has no application linkage — cannot attach the approved finding.");
   const evidenceText = verifiedEvidence.map((item) => item.excerpt).join(" ");
 
+  // Universal iteration fallback: the V6 prompt emits ITERATION SIGNALS at run
+  // level, but a per-finding iterationSignal may legitimately be null (e.g. the
+  // verdict comes from a status table shared by several rounds). Resolving the
+  // iteration from the extraction's own evidence keeps the human approval gate
+  // intact instead of failing every such candidate with "no explicit iteration".
+  const runSignals = ((extraction.structuredOutput ?? null) as { iterationSignals?: unknown[] } | null)?.iterationSignals;
+  const signals = Array.isArray(runSignals) ? runSignals : [];
+  const signalText = signals
+    .map((raw) => {
+      const s = raw as { typeSignal?: unknown; evidence?: Array<{ excerpt?: unknown }> };
+      return [String(s.typeSignal ?? ""), ...(Array.isArray(s.evidence) ? s.evidence.map((e) => String(e?.excerpt ?? "")) : [])].join(" ");
+    })
+    .join(" ");
+  const hasI2Signal =
+    signals.some((raw) => {
+      const s = raw as { candidateIteration?: unknown; typeSignal?: unknown };
+      return s.candidateIteration === 2 || /retest|follow_up/i.test(String(s.typeSignal ?? ""));
+    }) || /iteration\s*2/i.test(signalText);
+  const hasI1Signal =
+    signals.some((raw) => (raw as { candidateIteration?: unknown }).candidateIteration === 1) || /iteration\s*1/i.test(signalText);
+
   // First-report default (tracker contract, same as the Excel finding import):
   // a finding reported for the FIRST time in Iteration 1 enters as OPEN until a
   // verdict exists. This is the defined initial state — not an invented verdict.
@@ -255,10 +276,10 @@ export async function applyApprovedFinding(
   const statusValue = (correctedRaw ?? aiStatus ?? (isFirstReport || (iterationNumberPre === 1 && isNewPre) ? "open" : "")) as StatusV;
   let iterationNumber: number | null = iterationNumberPre;
   if (iterationNumber === null && isFirstReport) iterationNumber = 1;
-  if (iterationNumber === null && /retest|iteration\s*2/i.test(evidenceText) && ["fixed", "not_fixed"].includes(statusValue)) {
+  if (iterationNumber === null && (hasI2Signal || /retest|revalidat|iteration\s*2/i.test(evidenceText)) && statusImpliesPriorSighting(statusValue)) {
     iterationNumber = 2;
   }
-  if (iterationNumber === null && /iteration\s*1/i.test(evidenceText)) iterationNumber = 1;
+  if (iterationNumber === null && (hasI1Signal || /iteration\s*1/i.test(evidenceText))) iterationNumber = 1;
   if (iterationNumber === null || (typeof item.iterationSignal === "number" && item.iterationSignalExplicit !== true && iterationNumber !== item.iterationSignal)) {
     throw ValidationError("The approved AI finding must reference Iteration 1 or Iteration 2 explicitly.");
   }
