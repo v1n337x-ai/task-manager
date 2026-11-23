@@ -14,6 +14,7 @@ import { createFinding, setFindingIterationState, buildFindingMatchKey } from "@
 import { MASTER_PLACEHOLDER_MARKER } from "@/lib/services/finding-placeholder-utils";
 import { createIteration } from "@/lib/services/engagement-service";
 import { resolveFirstSeenIterationNumber } from "@/lib/finding-iteration";
+import { isSameFindingTitle } from "@/lib/finding-title";
 
 export interface FindingImportResult {
   created: { id: number; code: string; title: string; severity: string }[];
@@ -77,6 +78,13 @@ export async function importFindingList(params: {
     orderBy: { id: "asc" },
   });
   const usedPlaceholderIds = new Set<number>();
+  // Snapshot titles so a paraphrased retest row folds into its I1 finding
+  // instead of creating a second tracker row with a missing verdict.
+  const knownTitles = await prisma.finding.findMany({
+    where: { applicationId: params.applicationId },
+    select: { id: true, title: true },
+    orderBy: { id: "asc" },
+  });
 
   for (const row of parsed.rows) {
     try {
@@ -88,9 +96,13 @@ export async function importFindingList(params: {
         statusValue: row.iteration2Status,
       });
       const matchKey = buildFindingMatchKey({ title: row.title });
-      const existingFinding = await prisma.finding.findUnique({
+      let existingFinding = await prisma.finding.findUnique({
         where: { applicationId_matchKey: { applicationId: params.applicationId, matchKey } },
       });
+      if (!existingFinding) {
+        const near = knownTitles.find((c) => isSameFindingTitle(c.title, row.title));
+        if (near) existingFinding = await prisma.finding.findUnique({ where: { id: near.id } });
+      }
 
       // Replace synthetic master-import placeholders with the named finding.
       // These placeholder rows were deliberately created to hold aggregate
@@ -108,6 +120,7 @@ export async function importFindingList(params: {
           const updates: Record<string, unknown> = { title: row.title.trim(), matchKey, firstSeenIterationNumber };
           if (severityRow && placeholder.severity !== severityRow.id) updates.severity = severityRow.id;
           await prisma.finding.update({ where: { id: placeholder.id }, data: updates });
+          knownTitles.push({ id: placeholder.id, title: row.title.trim() });
           if (row.iteration2Status && i2) {
             await setFindingIterationState(
               { findingId: placeholder.id, iterationId: i2, severityValue: row.severity, statusValue: row.iteration2Status },
@@ -200,6 +213,7 @@ export async function importFindingList(params: {
           { source: "EXCEL_IMPORT" },
         );
       }
+      knownTitles.push({ id: finding.id, title: finding.title });
       created.push({ id: finding.id, code: finding.code, title: finding.title, severity: row.severity });
     } catch (error) {
       const message = String((error as Error).message ?? error);

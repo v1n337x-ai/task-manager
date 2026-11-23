@@ -14,6 +14,7 @@ import { isGenericFindingTitle, titleSupportedByEvidence } from "@/lib/ai/findin
 import { selectAnalysisMessages } from "@/lib/ai/summary-window";
 import { extractSummaryRows, formatSummaryDigest } from "@/lib/ai/summary-table-digest";
 import { resolveFirstSeenIterationNumber } from "@/lib/finding-iteration";
+import { isSameFindingTitle } from "@/lib/finding-title";
 
 export interface ApplyResult {
   findingId: number;
@@ -63,10 +64,18 @@ function normalizeEvidenceText(value: string): string {
     .toLowerCase();
 }
 
-async function assertEvidenceExcerptsAreVerbatim(
+/**
+ * Return only the excerpts that are genuinely grounded in the analyzed
+ * messages. The AI may attach several quotes to one finding; a single
+ * imperfect quote must not discard a verdict that another verbatim quote
+ * proves (e.g. the I2 table said "Not Fixed" but a later mail validated it as
+ * "Fixed"). Unverified quotes are dropped BEFORE title/status checks, so the
+ * approval stays evidence-backed rather than trusting fabricated text.
+ */
+async function filterVerbatimEvidenceExcerpts(
   extraction: { threadId: number | null; sourceMessageId: number | null },
   evidence: Array<{ messageIndex: number; excerpt: string }>,
-): Promise<void> {
+): Promise<Array<{ messageIndex: number; excerpt: string }>> {
   let bodies: string[] = [];
 
   if (extraction.threadId) {
@@ -98,14 +107,16 @@ async function assertEvidenceExcerptsAreVerbatim(
     if (message) bodies = [message.bodyText ?? message.bodyHtml ?? ""];
   }
 
-  if (bodies.length === 0) return;
-  for (const item of evidence) {
+  if (bodies.length === 0) return evidence; // no local corpus to verify against
+  const verified = evidence.filter((item) => {
     const body = bodies[item.messageIndex];
-    if (!body) throw ValidationError(`AI evidence references missing message #${item.messageIndex}.`);
-    if (!normalizeEvidenceText(body).includes(normalizeEvidenceText(item.excerpt))) {
-      throw ValidationError(`AI evidence excerpt is not a verbatim substring of message #${item.messageIndex}.`);
-    }
+    if (!body) return false;
+    return normalizeEvidenceText(body).includes(normalizeEvidenceText(item.excerpt));
+  });
+  if (verified.length === 0) {
+    throw ValidationError("None of the AI evidence excerpts is a verbatim substring of the analyzed messages.");
   }
+  return verified;
 }
 
 export async function applyApprovedFinding(
@@ -149,7 +160,8 @@ export async function applyApprovedFinding(
     (candidate as { excerpt: string }).excerpt.trim().length >= 3,
   );
   if (evidence.length === 0) throw ValidationError("The approved AI finding has no usable source evidence.");
-  await assertEvidenceExcerptsAreVerbatim(extraction, evidence);
+  // Keep only grounded quotes — one bad excerpt must not drop a valid verdict.
+  const verifiedEvidence = await filterVerbatimEvidenceExcerpts(extraction, evidence);
 
   const identifierExplicit = typeof item.identifierExplicit === "string" && item.identifierExplicit.trim().length > 0
     ? item.identifierExplicit.trim().slice(0, 32)
@@ -162,7 +174,7 @@ export async function applyApprovedFinding(
   if (!identifierExplicit && isGenericFindingTitle(title)) {
     throw ValidationError("The approved AI candidate is a generic remediation/status summary, not a concrete vulnerability finding.");
   }
-  if (!identifierExplicit && identifierMark !== "IDENTIFIER_EXPLICIT" && titleMark !== "EXPLICIT" && !titleSupportedByEvidence(title, evidence)) {
+  if (!identifierExplicit && identifierMark !== "IDENTIFIER_EXPLICIT" && titleMark !== "EXPLICIT" && !titleSupportedByEvidence(title, verifiedEvidence)) {
     throw ValidationError("The AI-proposed finding title is not sufficiently supported by the quoted evidence.");
   }
 
@@ -209,7 +221,7 @@ export async function applyApprovedFinding(
     if (threadLink?.applicationId) applicationId = threadLink.applicationId;
   }
   if (!applicationId) throw ValidationError("The thread has no application linkage — cannot attach the approved finding.");
-  const evidenceText = evidence.map((item) => item.excerpt).join(" ");
+  const evidenceText = verifiedEvidence.map((item) => item.excerpt).join(" ");
 
   // First-report default (tracker contract, same as the Excel finding import):
   // a finding reported for the FIRST time in Iteration 1 enters as OPEN until a
@@ -282,6 +294,12 @@ export async function applyApprovedFinding(
     ?? (!isGenericFindingTitle(title) ? candidates.find((c) => normalized(c.title) === normalized(title)) : undefined)
     ?? (!isGenericFindingTitle(title)
       ? candidates.find((c) => normalizedStartsWith(normalized(c.title), normalized(title)))
+      : undefined)
+    // Universal near-duplicate guard: retest reports paraphrase the same
+    // vulnerability ("leads" vs "lead", an extra "and", double spaces).
+    // Without this, I1 and I2 verdicts split across two tracker rows.
+    ?? (!isGenericFindingTitle(title)
+      ? candidates.find((c) => isSameFindingTitle(c.title, title))
       : undefined);
   if (hit) {
     findingId = hit.id;
