@@ -83,7 +83,7 @@ export default async function DashboardPage({
               />
               <KpiCard
                 label="Request → report"
-                number={report.insights.averageRequestedToReportDays === null ? "—" : `${report.insights.averageRequestedToReportDays} days`}
+                number={report.insights.averageRequestedToReportDays === null ? "" : `${report.insights.averageRequestedToReportDays} days`}
                 accent="progress"
                 supporting={
                   report.insights.earliestScanDate && report.insights.latestScanDate

@@ -14,7 +14,7 @@ import { StatusFillCell } from "@/components/status-fill";
 
 export const metadata: Metadata = { title: "Reports" };
 
-const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-GB") : "—");
+const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-GB") : "");
 
 /**
  * Reports (user-requested redesign): NO findings register table. An

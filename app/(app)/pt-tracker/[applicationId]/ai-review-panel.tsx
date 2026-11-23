@@ -310,7 +310,7 @@ export function AiReview({ threadId, threadSubject }: { threadId: number; thread
               return {
               key: `findingStatus:${i}`,
               main: `${f.identifierMark === "IDENTIFIER_EXPLICIT" ? `${f.identifierExplicit} (explicit ID)` : f.identifierMark === "AI_PROPOSED" ? `${f.title} (AI proposed)` : f.title}`,
-              sub: `severity ${f.severity} (${f.severityMark}) · status ${f.statusSignal ?? "—"} · evidence ${f.evidence.length}${qualityReasons.length ? ` · blocked: ${qualityReasons.join(" ")}` : ""}`,
+              sub: `severity ${f.severity} (${f.severityMark}) · status ${f.statusSignal ?? ""} · evidence ${f.evidence.length}${qualityReasons.length ? ` · blocked: ${qualityReasons.join(" ")}` : ""}`,
               evidence: f.evidence.map((e) => ({ messageIndex: e.messageIndex, excerpt: e.excerpt })),
               correctPlaceholder: "Corrected status (fixed / not_fixed / open / …)",
               };
@@ -329,7 +329,7 @@ export function AiReview({ threadId, threadSubject }: { threadId: number; thread
             title="Iteration signals"
             items={extraction.structured.iterationSignals.map((s, i) => ({
               key: `iterationSignal:${i}`,
-              main: `Iteration candidate: ${s.candidateIteration ?? "—"} (${s.typeSignal ?? "?"})`,
+              main: `Iteration candidate: ${s.candidateIteration ?? ""} (${s.typeSignal ?? "?"})`,
               sub: `${s.explicitOrInferred} · confidence ${s.confidence}`,
               evidence: s.evidence.map((e) => ({ messageIndex: e.messageIndex, excerpt: e.excerpt })),
               correctPlaceholder: "Corrected iteration number",
@@ -515,7 +515,7 @@ function ReviewBlock({
 function MetaLine({ provider, schema, prompt, hash, confidence }: { provider: string | null; schema: string | null; prompt: string | null; hash: string | null; confidence: number | null }) {
   return (
     <p className="mt-1 text-[11px] text-muted">
-      provider: {provider ?? "—"} · schema: {schema ?? "—"} · prompt: {prompt ?? "—"} · context hash: {(hash ?? "").slice(0, 16)} · confidence: {confidence ?? "—"}
+      provider: {provider ?? ""} · schema: {schema ?? ""} · prompt: {prompt ?? ""} · context hash: {(hash ?? "").slice(0, 16)} · confidence: {confidence ?? ""}
     </p>
   );
 }

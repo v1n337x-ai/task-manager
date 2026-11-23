@@ -182,10 +182,10 @@ export function PstImportButton({ applicationId }: { applicationId: number }) {
                     </td>
                     <td className="px-2 py-1 tabular-nums">{s.count}</td>
                     <td className="px-2 py-1 text-muted">
-                      {s.firstSentAt ? new Date(s.firstSentAt).toLocaleDateString("en-GB") : "—"} → {s.lastSentAt ? new Date(s.lastSentAt).toLocaleDateString("en-GB") : "—"}
+                      {s.firstSentAt ? new Date(s.firstSentAt).toLocaleDateString("en-GB") : ""} → {s.lastSentAt ? new Date(s.lastSentAt).toLocaleDateString("en-GB") : ""}
                     </td>
                     <td className="px-2 py-1">
-                      {s.vaptFlagged ? <span className="bg-sev-critical-soft px-1.5 py-0.5 text-[10px] font-bold text-sev-critical-text">VAPT</span> : <span className="text-muted">—</span>}
+                      {s.vaptFlagged ? <span className="bg-sev-critical-soft px-1.5 py-0.5 text-[10px] font-bold text-sev-critical-text">VAPT</span> : <span className="text-muted" />}
                     </td>
                   </tr>
                 ))}

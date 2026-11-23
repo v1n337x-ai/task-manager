@@ -149,7 +149,7 @@ export function UploadPdfPanel({
                 <td className="max-w-[280px] truncate px-3 py-2 align-top text-ink-2" title={`${r.fileName} · sha256 ${r.sha256.slice(0, 12)}`}>
                   {r.fileName}
                 </td>
-                <td className="px-3 py-2 align-top whitespace-nowrap text-ink-2">{r.iterationNumber ? `I${r.iterationNumber}` : "—"}</td>
+                <td className="px-3 py-2 align-top whitespace-nowrap text-ink-2">{r.iterationNumber ? `I${r.iterationNumber}` : ""}</td>
                 <td className="px-3 py-2 align-top whitespace-nowrap text-muted">{formatBytes(r.byteSize)}</td>
                 <td className="px-3 py-2 align-top whitespace-nowrap text-muted">{new Date(r.createdAt).toLocaleString("en-GB")}</td>
                 <td className="px-3 py-2 align-top whitespace-nowrap text-muted">{r.uploadedBy}</td>

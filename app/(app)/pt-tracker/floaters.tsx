@@ -15,7 +15,7 @@ import { Info } from "lucide-react";
 const CLOSE_GRACE_MS = 450;
 
 const fmtD = (iso: Date | string | null) =>
-  iso ? new Date(iso).toLocaleDateString("en-GB") : "—";
+  iso ? new Date(iso).toLocaleDateString("en-GB") : "";
 
 /** Full-cell hot zone (eats the default td padding, then re-pads itself). */
 const CELL_ZONE = "-mx-3 -my-2 flex min-h-[40px] items-center px-3 py-2 transition hover:bg-accent-soft/50";
@@ -180,7 +180,7 @@ export function IterationsFloater({ iterations }: { iterations: IterationFloater
       triggerClassName={CELL_ZONE + " justify-center"}
       trigger={
         <span className="inline-flex items-center gap-1 whitespace-nowrap">
-          {iterations.length > 0 ? `I${iterations[iterations.length - 1]!.number}` : "—"}
+          {iterations.length > 0 ? `I${iterations[iterations.length - 1]!.number}` : ""}
           {iterations.length > 1 ? (
             <span className="rounded-none bg-accent/10 px-1.5 text-[10px] font-semibold text-accent-deep">×{iterations.length}</span>
           ) : null}

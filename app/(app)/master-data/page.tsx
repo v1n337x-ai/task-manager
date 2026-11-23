@@ -42,12 +42,12 @@ export default async function MasterDataPage() {
               { key: "scope", header: "Scope", render: (a) => a.scopeLabel },
               { key: "env", header: "Environment", render: (a) => a.environmentLabel },
               { key: "status", header: "Status", render: (a) => <StatusBadge value={a.statusLabel.toLowerCase().replace(/ /g, "_")} label={a.statusLabel} /> },
-              { key: "poc", header: "POC", render: (a) => a.primaryPoc?.fullName ?? "—" },
+              { key: "poc", header: "POC", render: (a) => a.primaryPoc?.fullName ?? "" },
               {
                 key: "aliases",
                 header: "Aliases",
                 render: (a) => (
-                  <span className="text-muted">{a.aliases.length === 0 ? "—" : `${a.aliases.length} recorded`}</span>
+                  <span className="text-muted">{a.aliases.length === 0 ? "" : `${a.aliases.length} recorded`}</span>
                 ),
               },
               { key: "state", header: "State", render: (a) => (a.isActive ? "Active" : "Inactive") },

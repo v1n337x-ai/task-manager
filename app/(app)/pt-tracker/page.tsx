@@ -150,7 +150,7 @@ export default async function PtTrackerPage({
             caption="Application tracker — PT Tracker v1.0 columns (minimized via floaters)"
             rows={rows}
             columns={[
-              { key: "sno", header: "S.No", className: "w-12 text-center text-muted", render: (r) => r.sNo ?? "—" },
+              { key: "sno", header: "S.No", className: "w-12 text-center text-muted", render: (r) => r.sNo ?? "" },
               {
                 key: "name",
                 header: "Application",
@@ -178,7 +178,7 @@ export default async function PtTrackerPage({
                       {r.target}
                     </a>
                   ) : (
-                    <span className="text-muted">—</span>
+                    <span className="text-muted" />
                   ),
               },
               { key: "type", header: "Type", className: "whitespace-nowrap", render: (r) => <span className="text-muted-2">{r.typeName}</span> },
@@ -190,7 +190,7 @@ export default async function PtTrackerPage({
                 render: (r) => <StatusFillCell value={r.overallStatusLabel} />,
               },
               { key: "vulncount", header: "Total Vuln Count", className: "text-center whitespace-nowrap", render: (r) => <strong>{r.counts.total}</strong> },
-              { key: "scan", header: "Scan/Report Date", className: "whitespace-nowrap", render: (r) => <span className="text-muted text-[12px]">{r.reportDate ? formatDate(r.reportDate) : "—"}</span> },
+              { key: "scan", header: "Scan/Report Date", className: "whitespace-nowrap", render: (r) => <span className="text-muted text-[12px]">{r.reportDate ? formatDate(r.reportDate) : ""}</span> },
               { key: "critical", header: "Critical", className: "text-center whitespace-nowrap px-2", render: (r) => <SevStat sev="critical" total={r.counts.critical} open={r.openBySeverity.critical} closed={r.closedBySeverity.critical} /> },
               { key: "high", header: "High", className: "text-center whitespace-nowrap px-2", render: (r) => <SevStat sev="high" total={r.counts.high} open={r.openBySeverity.high} closed={r.closedBySeverity.high} /> },
               { key: "medium", header: "Medium", className: "text-center whitespace-nowrap px-2", render: (r) => <SevStat sev="medium" total={r.counts.medium} open={r.openBySeverity.medium} closed={r.closedBySeverity.medium} /> },

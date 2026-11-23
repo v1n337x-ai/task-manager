@@ -177,7 +177,7 @@ export function AiConfigPanel({
       <dl className="mt-4 grid grid-cols-1 gap-3 text-[13px] sm:grid-cols-2">
         <div>
           <dt className="text-muted">Last test</dt>
-          <dd className="text-ink-2">{config.lastTestedAt ? formatDateTime(config.lastTestedAt) : "—"}</dd>
+          <dd className="text-ink-2">{config.lastTestedAt ? formatDateTime(config.lastTestedAt) : ""}</dd>
         </div>
         <div>
           <dt className="text-muted">Test status</dt>

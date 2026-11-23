@@ -508,7 +508,7 @@ export function parseSummaryTableRow(raw: string, statusLabels: string[] = ["Sta
     statuses.unshift(statusMatch[1]);
     rest = rest.slice(0, -statusMatch[0].length).trim();
   }
-  while (statuses.length < statusLabels.length) statuses.push("—");
+  while (statuses.length < statusLabels.length) statuses.push("");
 
   let severity = "unknown";
   for (const candidate of SUMMARY_SEVERITIES) {
@@ -576,7 +576,7 @@ function parseVerticalSummaryTable(lines: string[], start: number, statusLabels:
       if (/^(not fixed \/ new finding|not fixed|new finding|accepted risk|not retested|out of scope|not applicable|not mitigated|reopened|remediated|mitigated|pending|open|fixed|closed|car|removed)$/i.test(statusCandidate)) {
         statuses.push(statusCandidate);
         i += 1;
-      } else statuses.push("—");
+      } else statuses.push("");
     }
     const title = titleLines.join(" ").trim();
     if (title) rows.push({ no, title, severity, statuses });
@@ -763,7 +763,7 @@ function renderNeatBlocks(blocks: NeatBlock[], offset = 0) {
                     <td className="filled-cell"><SeverityFillCell severityValue={row.severity} label={row.severity.charAt(0).toUpperCase() + row.severity.slice(1)} /></td>
                     {row.statuses.map((status, index) => (
                       <td key={index} className="filled-cell">
-                        <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${status.toLowerCase() === "fixed" ? "bg-[#dcf3e1] text-green-800" : status === "—" ? "bg-band text-muted" : "bg-[#ffe4e4] text-[#b42318]"}`}>{status}</span>
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${status.toLowerCase() === "fixed" ? "bg-[#dcf3e1] text-green-800" : status === "" ? "bg-band text-muted" : "bg-[#ffe4e4] text-[#b42318]"}`}>{status}</span>
                       </td>
                     ))}
                   </tr>
@@ -796,10 +796,10 @@ function renderNeatBlocks(blocks: NeatBlock[], offset = 0) {
                       recipients.length ? (
                         <RecipientList recipients={recipients} showEmails={label.toLowerCase() === "from"} />
                       ) : (
-                        <span className="text-muted">—</span>
+                        <span className="text-muted" />
                       )
                     ) : (
-                      <span className="whitespace-pre-wrap">{cleanMailto(value) || "—"}</span>
+                      <span className="whitespace-pre-wrap">{cleanMailto(value) || ""}</span>
                     )}
                   </dd>
                 </div>
@@ -1069,7 +1069,7 @@ function MessageGroupCard({ group, showDay }: { group: MessageGroupData; showDay
                 </ul>
               ) : null}
               <footer className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[10px] text-muted">
-                <span>To: {message.recipients.filter((r) => r.kind === "TO").map((r) => r.email).join(", ") || "—"}</span>
+                <span>To: {message.recipients.filter((r) => r.kind === "TO").map((r) => r.email).join(", ") || ""}</span>
                 <time dateTime={message.sentAt ?? undefined} title={`${message.from.email} · id ${message.messageId}`}>
                   {timeOf(message.sentAt)}{message.sentAt ? ` · ${new Date(message.sentAt).toLocaleDateString("en-GB", { timeZone: CALENDAR_TZ })}` : ""}
                 </time>
@@ -1286,7 +1286,7 @@ function ChatThread({ subject, appDisplayName, messages }: { subject: string; ap
                     className="w-full truncate border bg-tint-b px-2 py-1 text-left text-[11px] text-ink-2 transition hover:bg-xlsx-data"
                     title={`Jump to message ${i + 1}${m.uploadedFile ? ` · ${m.uploadedFile}` : ""}`}
                   >
-                    <span className="font-semibold text-ink">{i + 1}.</span> {m.uploadedFile ?? `(stored) ${m.sourceFile ?? "—"}`}
+                    <span className="font-semibold text-ink">{i + 1}.</span> {m.uploadedFile ?? `(stored) ${m.sourceFile ?? ""}`}
                   </button>
                 </li>
               ))}

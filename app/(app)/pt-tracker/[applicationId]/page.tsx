@@ -191,18 +191,18 @@ function OverviewTab({
       <dl aria-label="Application overview" className="panel mt-5 grid grid-cols-1 gap-4 px-5 py-4 text-[13px] sm:grid-cols-2">
         <Field label="Application name" value={detail.application.name} />
         <Field label="Display name" value={detail.application.displayName} />
-        <Field label="Web URL" value={detail.application.webUrl ?? "—"} />
-        <Field label="API / FQDN" value={detail.application.apiFqdn ?? (detail.application.rawTarget ?? "—")} />
-        <Field label="Engagement" value={detail.engagement?.name ?? "— (created with the first iteration)"} />
-        <Field label="Assessment type" value={detail.engagement?.assessmentTypeLabel ?? "—"} />
-        <Field label="Current iteration" value={detail.latestIterationNumber ? `I${detail.latestIterationNumber}` : "—"} />
+        <Field label="Web URL" value={detail.application.webUrl ?? ""} />
+        <Field label="API / FQDN" value={detail.application.apiFqdn ?? (detail.application.rawTarget ?? "")} />
+        <Field label="Engagement" value={detail.engagement?.name ?? ""} />
+        <Field label="Assessment type" value={detail.engagement?.assessmentTypeLabel ?? ""} />
+        <Field label="Current iteration" value={detail.latestIterationNumber ? `I${detail.latestIterationNumber}` : ""} />
         <Field
           label="PT status"
           value={<StatusBadge value={statusValueFor(detail.application.statusLabel)} label={detail.application.statusLabel} />}
         />
-        <Field label="POC" value={detail.application.primaryPoc ?? "—"} />
-        <Field label="Assigned members" value={detail.application.assignedMembers.join(", ") || "—"} />
-        <Field label="Aliases" value={detail.application.aliases.map((a) => a.alias).join(", ") || "—"} />
+        <Field label="POC" value={detail.application.primaryPoc ?? ""} />
+        <Field label="Assigned members" value={detail.application.assignedMembers.join(", ") || ""} />
+        <Field label="Aliases" value={detail.application.aliases.map((a) => a.alias).join(", ") || ""} />
         <Field label="Last updated" value={new Date(detail.application.updatedAt).toLocaleDateString("en-GB")} />
       </dl>
     </>
@@ -280,11 +280,11 @@ function FindingsTab({
             // already Fixed before this retest and has NO explicit verdict in
             // this iteration is carried forward as Fixed ("no news = still
             // fixed") — the retest confirmed it without a regression note.
-            // Findings with no verdict anywhere stay "—".
+            // Findings with no verdict anywhere stay visually blank.
             const hasEarlier = r.f.iterationStates.some((s) => s.iterationNumber < num);
             const currentFixed = r.f.currentStatusValue === "fixed";
             if (hasEarlier && currentFixed) return <StatusFillCell value="Fixed" />;
-            return <StatusFillCell value="—" />;
+            return <StatusFillCell value="" />;
           },
         })),
         {
@@ -325,8 +325,8 @@ function IterationsTab({
         { key: "name", header: "Name", render: (i) => i.name },
         { key: "type", header: "Type", render: (i) => i.typeLabel },
         { key: "status", header: "Status", className: "filled-cell text-center whitespace-nowrap", render: (i) => <StatusFillCell value={i.statusLabel} /> },
-        { key: "start", header: "Start", render: (i) => (i.startDate ? new Date(i.startDate).toLocaleDateString("en-GB") : "—") },
-        { key: "report", header: "Report", render: (i) => (i.reportDate ? new Date(i.reportDate).toLocaleDateString("en-GB") : "—") },
+        { key: "start", header: "Start", render: (i) => (i.startDate ? new Date(i.startDate).toLocaleDateString("en-GB") : "") },
+        { key: "report", header: "Report", render: (i) => (i.reportDate ? new Date(i.reportDate).toLocaleDateString("en-GB") : "") },
         // Imported-snapshot column removed (user direction 2026-11): the raw
         // workbook aggregate stays in the DB for audit, never on screen.
       ]}

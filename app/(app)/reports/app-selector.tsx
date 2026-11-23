@@ -44,7 +44,7 @@ export function ApplicationSelector({ apps, current }: { apps: { id: number; dis
           disabled={busy}
           className="w-full appearance-none rounded-lg border border-stroke bg-card py-2 pl-3 pr-9 text-[13px] text-ink-2 shadow-sm focus:outline-none"
         >
-          <option value="">— Select application —</option>
+          <option value="">Select application</option>
           {apps.map((app) => (
             <option key={app.id} value={app.id}>
               {app.displayName}

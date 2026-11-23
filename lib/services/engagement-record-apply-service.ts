@@ -21,7 +21,8 @@ export interface EngagementRecordApplyResult {
   reason?: string;
 }
 
-const FIELDS = new Set([
+/** Single source of truth for the record fields a human can approve/correct. */
+export const ENGAGEMENT_RECORD_FIELDS = [
   "mailSubject",
   "requestedDate",
   "scanReportDate",
@@ -34,6 +35,20 @@ const FIELDS = new Set([
   "followUpResponse",
   "primaryPoc",
   "assignedMembers",
+] as const;
+
+export type EngagementRecordField = (typeof ENGAGEMENT_RECORD_FIELDS)[number];
+
+const FIELDS = new Set<string>(ENGAGEMENT_RECORD_FIELDS);
+
+/** Participant roles that are never the client-side application owner / POC. */
+const NON_OWNER_PARTICIPANT_ROLES = new Set([
+  "pentester",
+  "developer",
+  "security_team",
+  "management",
+  "other",
+  "unknown",
 ]);
 
 /** Thread wording → iteration_status vocabulary. */
@@ -86,6 +101,98 @@ async function ensureContact(fullName: string, actorUserId: number): Promise<num
   return created.id;
 }
 
+type PocParticipant = { aliases: string[]; role: string | null; preferredName: string | null };
+
+function normalizePerson(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function nameFromEmail(email: string): string {
+  const local = email.split("@")[0] ?? "";
+  return local
+    .split(/[._\-+]/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function aliasSet(...values: Array<string | null | undefined>): string[] {
+  const aliases = new Set<string>();
+  for (const value of values) {
+    const normal = normalizePerson(value ?? "");
+    if (normal) aliases.add(normal);
+  }
+  return [...aliases];
+}
+
+function matchesPerson(name: string, participant: PocParticipant): boolean {
+  const target = normalizePerson(name);
+  if (!target) return false;
+  return participant.aliases.some((alias) =>
+    alias === target || (alias.length > 3 && target.includes(alias)) || (target.length > 3 && alias.includes(target)),
+  );
+}
+
+/**
+ * Client-agnostic POC rule: the POC is the application owner, never a person
+ * whose mailbox participant role is pentester / developer / security team /
+ * management / other. On APPROVE the application_owner participant is used
+ * automatically; a human CORRECTION always wins (the reviewer decides).
+ */
+async function resolvePocValue(
+  raw: string | null,
+  corrected: string | null,
+  structured: { participants?: Array<{ email?: string; name?: string | null; proposedRole?: string }> } | null,
+  threadId: number | null,
+): Promise<string | null> {
+  const mailbox = threadId
+    ? await prisma.emailParticipant.findMany({
+        where: {
+          OR: [
+            { messagesFrom: { some: { threadId } } },
+            { recipients: { some: { message: { threadId } } } },
+          ],
+        },
+        select: {
+          emailAddress: true, displayName: true, name: true,
+          roleRef: { select: { value: true } },
+          roleOverrideRef: { select: { value: true } },
+        },
+      })
+    : [];
+
+  const people: PocParticipant[] = mailbox.map((p) => ({
+    aliases: aliasSet(p.displayName, p.name, nameFromEmail(p.emailAddress), p.emailAddress.split("@")[0]),
+    role: p.roleOverrideRef?.value ?? p.roleRef.value ?? null,
+    preferredName: p.displayName?.trim() || p.name?.trim() || nameFromEmail(p.emailAddress) || null,
+  }));
+
+  // Include AI proposals not yet present as mailbox participants.
+  for (const proposal of structured?.participants ?? []) {
+    const email = proposal.email?.toLowerCase().trim();
+    if (!email) continue;
+    const proposalAliases = aliasSet(proposal.name, nameFromEmail(email), email.split("@")[0]);
+    if (people.some((p) => p.aliases.some((a) => proposalAliases.some((x) => x.includes(a) || a.includes(x))))) continue;
+    people.push({
+      aliases: proposalAliases,
+      role: proposal.proposedRole?.toLowerCase() ?? null,
+      preferredName: proposal.name?.trim() || nameFromEmail(email) || null,
+    });
+  }
+
+  const isNonOwner = (name: string): boolean => {
+    const match = people.find((p) => matchesPerson(name, p));
+    return !!match?.role && NON_OWNER_PARTICIPANT_ROLES.has(match.role);
+  };
+
+  // A human correction is authoritative — the reviewer, not the role heuristic,
+  // decides who the application owner is.
+  if (corrected) return corrected;
+  const owner = people.find((p) => p.role === "application_owner" && p.preferredName);
+  if (owner?.preferredName) return owner.preferredName;
+  return raw && !isNonOwner(raw) ? raw : null;
+}
+
 export async function applyEngagementRecordField(
   params: { extractionId: number; field: string; correctedValue?: string | null },
   actorUserId: number,
@@ -93,7 +200,10 @@ export async function applyEngagementRecordField(
   if (!FIELDS.has(params.field)) throw ValidationError(`Unknown engagement-record field "${params.field}".`);
   const extraction = await prisma.aiExtraction.findUnique({ where: { id: params.extractionId } });
   if (!extraction) throw NotFoundError("AI extraction");
-  const structured = extraction.structuredOutput as { engagementRecord?: Record<string, unknown> | null } | null;
+  const structured = extraction.structuredOutput as {
+    engagementRecord?: Record<string, unknown> | null;
+    participants?: Array<{ email?: string; name?: string | null; proposedRole?: string }>;
+  } | null;
   const proposal = structured?.engagementRecord ?? null;
 
   // Resolve the candidate value: human correction wins over the AI proposal.
@@ -102,7 +212,12 @@ export async function applyEngagementRecordField(
     : null;
   const aiRaw = proposal ? (proposal[params.field] ?? null) : null;
   const aiValue = typeof aiRaw === "string" && aiRaw.trim().length > 0 && aiRaw.trim() !== "—" ? aiRaw.trim() : null;
-  const value = corrected ?? aiValue;
+  const value = params.field === "primaryPoc"
+    ? await resolvePocValue(aiValue, corrected, structured, extraction.threadId ?? null)
+    : corrected ?? aiValue;
+  if (params.field === "primaryPoc" && corrected && !value) {
+    return { field: params.field, applied: false, value: null, reason: "POC must be the application owner; vendor/analyst names are not valid POCs." };
+  }
 
   const thread = extraction.threadId
     ? await prisma.emailThread.findUnique({ where: { id: extraction.threadId }, select: { applicationId: true } })
